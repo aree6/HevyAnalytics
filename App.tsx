@@ -144,7 +144,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-200 font-sans">
+    <div className="flex flex-col h-screen bg-slate-950 text-slate-200 font-sans">
       
       {/* CSV Import Modal */}
       {showCSVModal && (
@@ -177,107 +177,113 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Sidebar Navigation */}
-      <aside className="w-20 lg:w-64 bg-slate-900 border-r border-slate-800 flex-shrink-0 flex flex-col justify-between">
-        <div>
-          <div className="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-800 bg-slate-900">
-             <img src="/HevyAnalytics.png" alt="HevyAnalytics Logo" className="w-8 h-8 lg:w-10 lg:h-10" />
-             <span className="hidden lg:block ml-3 font-bold text-xl tracking-tight text-white">HevyAnalytics</span>
-          </div>
-          
-          <nav className="p-4 space-y-2">
-            <button 
-              onClick={() => {
-                setActiveTab(Tab.DASHBOARD);
-                setSelectedDay(null); // Clear day filter when going back to Dashboard
-              }}
-              className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${activeTab === Tab.DASHBOARD ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-            >
-              <LayoutDashboard className="w-6 h-6 lg:mr-3" />
-              <span className="hidden lg:inline font-medium">Dashboard</span>
-            </button>
-            <button 
-              onClick={() => setActiveTab(Tab.EXERCISES)}
-              className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${activeTab === Tab.EXERCISES ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-            >
-              <Dumbbell className="w-6 h-6 lg:mr-3" />
-              <span className="hidden lg:inline font-medium">Exercises</span>
-            </button>
-            <button 
-              onClick={() => setActiveTab(Tab.HISTORY)}
-              className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${activeTab === Tab.HISTORY ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-            >
-              <History className="w-6 h-6 lg:mr-3" />
-              <span className="hidden lg:inline font-medium">History</span>
-            </button>
-          </nav>
-        </div>
+      {/* Top Header Navigation */}
+      <header className="bg-slate-900 border-b border-slate-800 flex-shrink-0">
+        <div className="px-6 py-4 flex flex-col gap-4">
+          {/* Top Row: Logo and Nav Buttons */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <img src="/HevyAnalytics.png" alt="HevyAnalytics Logo" className="w-8 h-8" />
+              <span className="font-bold text-xl tracking-tight text-white">HevyAnalytics</span>
+            </div>
+            
+            <nav className="flex items-center gap-2">
+              <button 
+                onClick={() => {
+                  setActiveTab(Tab.DASHBOARD);
+                  setSelectedDay(null); // Clear day filter when going back to Dashboard
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.DASHBOARD ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+              >
+                <LayoutDashboard className="w-5 h-5" />
+                <span className="font-medium">Dashboard</span>
+              </button>
+              <button 
+                onClick={() => setActiveTab(Tab.EXERCISES)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.EXERCISES ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+              >
+                <Dumbbell className="w-5 h-5" />
+                <span className="font-medium">Exercises</span>
+              </button>
+              <button 
+                onClick={() => setActiveTab(Tab.HISTORY)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.HISTORY ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+              >
+                <History className="w-5 h-5" />
+                <span className="font-medium">History</span>
+              </button>
+            </nav>
 
-        <div className="p-4 border-t border-slate-800 bg-slate-900 space-y-2">
-          <label className="cursor-pointer group flex items-center justify-center lg:justify-start w-full p-3 rounded-lg border border-dashed border-slate-600 hover:border-slate-400 hover:bg-slate-800/50 transition-all">
-            <Upload className="w-5 h-5 text-slate-400 group-hover:text-white" />
-            <span className="hidden lg:block ml-3 text-sm text-slate-400 group-hover:text-white">Import CSV</span>
-            <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
-          </label>
-          <button
-            onClick={handleClearCSV}
-            className="w-full flex items-center justify-center lg:justify-start p-3 rounded-lg border border-dashed border-slate-600 hover:border-red-500 hover:bg-red-950/30 transition-all group"
-          >
-            <Trash2 className="w-5 h-5 text-slate-400 group-hover:text-red-400" />
-            <span className="hidden lg:block ml-3 text-sm text-slate-400 group-hover:text-red-400">Remove CSV</span>
-          </button>
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
+              <label className="cursor-pointer group flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-600 hover:border-slate-400 hover:bg-slate-800/50 transition-all">
+                <Upload className="w-4 h-4 text-slate-400 group-hover:text-white" />
+                <span className="text-sm text-slate-400 group-hover:text-white">Import</span>
+                <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
+              </label>
+              <button
+                onClick={handleClearCSV}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-600 hover:border-red-500 hover:bg-red-950/30 transition-all group"
+              >
+                <Trash2 className="w-4 h-4 text-slate-400 group-hover:text-red-400" />
+                <span className="text-sm text-slate-400 group-hover:text-red-400">Remove</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Controls Row */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-white">
+                {activeTab === Tab.DASHBOARD && 'Overview'}
+                {activeTab === Tab.EXERCISES && 'Exercise Analytics'}
+                {activeTab === Tab.HISTORY && 'Workout History'}
+              </h1>
+              <p className="text-slate-400 text-sm">
+                 {filteredData.length > 0 ? `Analyzing ${filteredData.length} sets based on filters.` : 'No data available for current filters.'}
+              </p>
+            </div>
+
+            {/* Filter Controls */}
+            <div className="flex flex-col sm:flex-row gap-3 bg-slate-950 p-2 rounded-xl border border-slate-800 shadow-sm items-start sm:items-center">
+               <div className="flex items-center px-2">
+                  <Filter className="w-4 h-4 text-slate-500 mr-2" />
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Filters</span>
+               </div>
+               
+               {/* Specific Day Active Chip */}
+               {selectedDay && (
+                 <button 
+                   onClick={() => setSelectedDay(null)}
+                   className="flex items-center gap-2 bg-blue-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                 >
+                   <span>{format(selectedDay, 'MMM d, yyyy')}</span>
+                   <X className="w-3 h-3" />
+                 </button>
+               )}
+
+               {/* Month Filter (Disabled if Day Selected to avoid confusion, or allowed but hidden) */}
+               {!selectedDay && (
+                 <select 
+                   value={selectedMonth} 
+                   onChange={(e) => setSelectedMonth(e.target.value)}
+                   className="bg-slate-900 text-slate-200 text-sm border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 hover:border-slate-600 transition-colors cursor-pointer"
+                 >
+                   <option value="all">All Months</option>
+                   {availableMonths.map(month => (
+                     <option key={month} value={month}>
+                       {format(new Date(month), 'MMMM yyyy')}
+                     </option>
+                   ))}
+                 </select>
+               )}
+            </div>
+          </div>
         </div>
-      </aside>
+      </header>
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-950 p-6 lg:p-8">
-        <header className="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">
-              {activeTab === Tab.DASHBOARD && 'Overview'}
-              {activeTab === Tab.EXERCISES && 'Exercise Analytics'}
-              {activeTab === Tab.HISTORY && 'Workout History'}
-            </h1>
-            <p className="text-slate-400">
-               {filteredData.length > 0 ? `Analyzing ${filteredData.length} sets based on filters.` : 'No data available for current filters.'}
-            </p>
-          </div>
-
-          {/* Filter Controls */}
-          <div className="flex flex-col sm:flex-row gap-3 bg-slate-900 p-2 rounded-xl border border-slate-800 shadow-sm items-center">
-             <div className="flex items-center px-2">
-                <Filter className="w-4 h-4 text-slate-500 mr-2" />
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Filters</span>
-             </div>
-             
-             {/* Specific Day Active Chip */}
-             {selectedDay && (
-               <button 
-                 onClick={() => setSelectedDay(null)}
-                 className="flex items-center gap-2 bg-blue-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-               >
-                 <span>{format(selectedDay, 'MMM d, yyyy')}</span>
-                 <X className="w-3 h-3" />
-               </button>
-             )}
-
-             {/* Month Filter (Disabled if Day Selected to avoid confusion, or allowed but hidden) */}
-             {!selectedDay && (
-               <select 
-                 value={selectedMonth} 
-                 onChange={(e) => setSelectedMonth(e.target.value)}
-                 className="bg-slate-950 text-slate-200 text-sm border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 hover:border-slate-600 transition-colors cursor-pointer"
-               >
-                 <option value="all">All Months</option>
-                 {availableMonths.map(month => (
-                   <option key={month} value={month}>
-                     {format(new Date(month), 'MMMM yyyy')}
-                   </option>
-                 ))}
-               </select>
-             )}
-          </div>
-        </header>
 
         {activeTab === Tab.DASHBOARD && (
           <Dashboard 

@@ -10,7 +10,7 @@ import {
 import { saveChartModes, getChartModes } from '../utils/localStorage';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  Legend, ComposedChart, AreaChart, Area, 
+  Legend, AreaChart, Area, 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
   PieChart, Pie, Cell
 } from 'recharts';
@@ -32,7 +32,7 @@ type ChartKey = 'heatmap' | 'prTrend' | 'volumeVsDuration' | 'intensityEvo' | 'w
 const CHART_LABELS: Record<ChartKey, string> = {
   heatmap: 'Consistency Heatmap',
   prTrend: 'PRs Over Time',
-  volumeVsDuration: 'Volume vs Duration',
+  volumeVsDuration: 'Volume Density',
   intensityEvo: 'Training Style Evolution',
   weekShape: 'Weekly Rhythm',
   topExercises: 'Most Frequent Exercises'
@@ -254,7 +254,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     return result;
   }, [fullData, chartModes.intensityEvo]);
 
-  // 3. Volume vs Duration Data (with Auto-aggregation logic)
+  // 3. Volume Density Data (volume done per set)
   const volumeDurationData = useMemo(() => {
     const mode = chartModes.volumeVsDuration;
     
@@ -263,29 +263,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         ...d,
         dateFormatted: format(new Date(d.timestamp), 'MMM d'),
         tooltipLabel: format(new Date(d.timestamp), 'MMM d, yyyy'),
-        density: d.durationMinutes > 0 ? Math.round(d.totalVolume / d.durationMinutes) : 0
+        volumePerSet: d.sets > 0 ? Math.round(d.totalVolume / d.sets) : 0
       }));
     } else {
-      // Manual aggregation for monthly view if util doesn't exist
-      const monthlyData: Record<string, { volSum: number, durSum: number, count: number, timestamp: number }> = {};
+      // Manual aggregation for monthly view
+      const monthlyData: Record<string, { volSum: number, setSum: number, count: number, timestamp: number }> = {};
       dailyData.forEach(d => {
         const monthKey = format(new Date(d.timestamp), 'yyyy-MM');
         if (!monthlyData[monthKey]) {
-          monthlyData[monthKey] = { volSum: 0, durSum: 0, count: 0, timestamp: startOfMonth(new Date(d.timestamp)).getTime() };
+          monthlyData[monthKey] = { volSum: 0, setSum: 0, count: 0, timestamp: startOfMonth(new Date(d.timestamp)).getTime() };
         }
         monthlyData[monthKey].volSum += d.totalVolume;
-        monthlyData[monthKey].durSum += d.durationMinutes;
+        monthlyData[monthKey].setSum += d.sets;
         monthlyData[monthKey].count += 1;
       });
       return Object.values(monthlyData).sort((a,b) => a.timestamp - b.timestamp).map(m => {
         const avgVol = Math.round(m.volSum / m.count);
-        const avgDur = Math.round(m.durSum / m.count);
+        const avgSets = Math.round(m.setSum / m.count);
         return {
           dateFormatted: format(new Date(m.timestamp), 'MMM yyyy'),
           tooltipLabel: format(new Date(m.timestamp), 'MMMM yyyy'),
           totalVolume: avgVol,
-          durationMinutes: avgDur,
-          density: avgDur > 0 ? Math.round(avgVol / avgDur) : 0
+          sets: avgSets,
+          volumePerSet: avgSets > 0 ? Math.round(avgVol / avgSets) : 0
         };
       });
     }
@@ -376,11 +376,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
           </div>
         )}
 
-        {/* 3. VOLUME vs DURATION (Composed) */}
+        {/* 3. VOLUME DENSITY (Line) */}
         {visibleCharts.volumeVsDuration && (
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg min-h-[480px] flex flex-col">
             <ChartHeader 
-              title="Volume vs Duration" 
+              title="Volume Density" 
               icon={Timer} 
               color="text-purple-500" 
               mode={chartModes.volumeVsDuration}
@@ -388,37 +388,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             />
             <div className="flex-1 w-full min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={volumeDurationData}>
+                <LineChart data={volumeDurationData}>
                   <defs>
-                    <linearGradient id="gVol" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <linearGradient id="gDensity" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                   <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="left" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${(val/1000).toFixed(0)}k`} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#8b5cf6" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}m`} />
+                  <YAxis stroke="#8b5cf6" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}kg`} />
                   <Tooltip 
                     contentStyle={TooltipStyle} 
                     labelFormatter={(l, p) => p[0]?.payload?.tooltipLabel || l} 
-                    formatter={(val: number, name, props) => {
-                        if (name === 'Volume (kg)') return [`${val.toLocaleString()} kg`, name];
-                        if (name === 'Duration (min)') {
-                            const density = props.payload.density;
-                            return [`${val} min`, `Duration`];
-                        }
+                    formatter={(val: number, name) => {
+                        if (name === 'Volume per Set (kg)') return [`${val} kg`, name];
                         return [val, name];
                     }}
                   />
                   <Legend />
-                  <Area yAxisId="left" type="monotone" dataKey="totalVolume" name="Volume (kg)" fill="url(#gVol)" stroke="#10b981" />
-                  <Line yAxisId="right" type="monotone" dataKey="durationMinutes" name="Duration (min)" stroke="#8b5cf6" strokeWidth={3} dot={{r:4, fill:'#8b5cf6'}} />
-                </ComposedChart>
+                  <Line type="monotone" dataKey="volumePerSet" name="Volume per Set (kg)" stroke="#8b5cf6" strokeWidth={3} dot={{r:4, fill:'#8b5cf6'}} activeDot={{r:6, strokeWidth: 0}} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
             <ChartDescription>
-              <span className="font-semibold text-slate-300">Analysis:</span> If volume (green) increases while duration (purple) stays flat, your training <strong className="text-white">Density</strong> is improving—meaning you are doing more work in less time.
+              <span className="font-semibold text-slate-300">Analysis:</span> Shows the average volume done per set. A higher volume per set indicates more intense or challenging sets, while trends reveal changes in your training intensity and work capacity.
             </ChartDescription>
           </div>
         )}
