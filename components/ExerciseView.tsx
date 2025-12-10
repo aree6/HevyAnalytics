@@ -119,16 +119,16 @@ const analyzeExerciseTrend = (stats: ExerciseStats): StatusResult => {
 // --- SUB-COMPONENTS ---
 
 const StatCard = ({ label, value, unit, icon: Icon }: any) => (
-  <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 p-4 rounded-xl flex items-center justify-between group hover:border-slate-700 transition-all duration-300">
+  <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 p-3 sm:p-4 rounded-xl flex items-center justify-between group hover:border-slate-700 transition-all duration-300">
     <div>
       <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">{label}</p>
       <div className="flex items-baseline gap-1">
-        <span className="text-2xl font-bold text-white tracking-tight">{value}</span>
-        {unit && <span className="text-sm font-medium text-slate-500">{unit}</span>}
+        <span className="text-xl sm:text-2xl font-bold text-white tracking-tight">{value}</span>
+        {unit && <span className="text-xs sm:text-sm font-medium text-slate-500">{unit}</span>}
       </div>
     </div>
-    <div className="h-10 w-10 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-blue-400 group-hover:bg-blue-500/10 transition-colors">
-      <Icon size={20} />
+    <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-blue-400 group-hover:bg-blue-500/10 transition-colors flex-shrink-0">
+      <Icon size={18} className="sm:w-5 sm:h-5" />
     </div>
   </div>
 );
@@ -196,7 +196,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
   const currentStatus = selectedStats ? statusMap[selectedStats.name] : null;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-100px)] max-h-[900px] text-slate-200">
+    <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 h-auto lg:h-[calc(100vh-100px)] lg:max-h-[900px] text-slate-200 pb-10 lg:pb-0">
       
       {/* --- SIDEBAR --- */}
       <div className="w-full lg:w-80 flex flex-col gap-4">
@@ -206,14 +206,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
           <input
             type="text"
             placeholder="Filter exercises..."
-            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
+            className="w-full bg-slate-900/50 border border-slate-800 rounded-xl pl-10 pr-4 py-2 sm:py-3 text-xs sm:text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
         {/* List */}
-        <div className="flex-1 bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
+        <div className="flex-1 bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden flex flex-col max-h-64 lg:max-h-none">
           <div className="overflow-y-auto p-2 space-y-1 custom-scrollbar">
             {filteredExercises.map((ex) => {
               const status = statusMap[ex.name];
@@ -230,14 +230,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                 <button
                   key={ex.name}
                   onClick={() => setSelectedExerciseName(ex.name)}
-                  className={`w-full text-left px-3 py-3 rounded-lg transition-all duration-200 flex items-center justify-between group border border-transparent ${
+                  className={`w-full text-left px-2 sm:px-3 py-2 sm:py-3 rounded-lg transition-all duration-200 flex items-center justify-between group border border-transparent ${
                     isSelected 
                       ? 'bg-blue-600/10 border-blue-500/30' 
                       : 'hover:bg-slate-800 hover:border-slate-700'
                   }`}
                 >
                   <div className="flex flex-col min-w-0 pr-2">
-                    <span className={`truncate font-medium text-sm ${isSelected ? 'text-blue-100' : 'text-slate-300 group-hover:text-white'}`}>
+                    <span className={`truncate font-medium text-xs sm:text-sm ${isSelected ? 'text-blue-100' : 'text-slate-300 group-hover:text-white'}`}>
                       {ex.name}
                     </span>
                     <span className="text-[10px] text-slate-500 truncate">
@@ -260,31 +260,27 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
       </div>
 
       {/* --- MAIN DASHBOARD --- */}
-      <div className="flex-1 flex flex-col gap-6 overflow-y-auto lg:overflow-hidden pr-1">
+      <div className="flex-1 flex flex-col gap-4 sm:gap-6 overflow-y-auto lg:overflow-hidden pr-1">
         {selectedStats && currentStatus ? (
           <>
             {/* 1. Header & Insight */}
-            <div className="flex flex-col xl:flex-row gap-6">
+            <div className="flex flex-col xl:flex-row gap-4 sm:gap-6">
               {/* Title Section */}
               <div className="flex-1">
-                <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">{selectedStats.name}</h2>
-                <div className="flex gap-2">
-                   <span className="px-2 py-1 bg-slate-800 rounded text-[10px] uppercase font-bold text-slate-400 tracking-wider">Strength</span>
-                   <span className="px-2 py-1 bg-slate-800 rounded text-[10px] uppercase font-bold text-slate-400 tracking-wider">Compound</span>
-                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 tracking-tight">{selectedStats.name}</h2>
               </div>
 
               {/* Insight Card */}
-              <div className={`flex-1 xl:max-w-md rounded-xl p-4 border ${currentStatus.borderColor} ${currentStatus.bgColor} relative overflow-hidden group`}>
-                <div className="relative z-10 flex gap-4">
-                  <div className={`p-3 rounded-lg bg-slate-950/40 h-fit ${currentStatus.color}`}>
-                    <currentStatus.icon size={24} />
+              <div className={`flex-1 xl:max-w-md rounded-xl p-3 sm:p-4 border ${currentStatus.borderColor} ${currentStatus.bgColor} relative overflow-hidden group`}>
+                <div className="relative z-10 flex gap-3 sm:gap-4">
+                  <div className={`p-2 sm:p-3 rounded-lg bg-slate-950/40 h-fit ${currentStatus.color} flex-shrink-0`}>
+                    <currentStatus.icon size={20} className="sm:w-6 sm:h-6" />
                   </div>
                   <div>
-                    <h4 className={`font-bold text-base ${currentStatus.color}`}>{currentStatus.title}</h4>
-                    <p className="text-slate-300 text-sm mt-1 leading-snug">{currentStatus.description}</p>
+                    <h4 className={`font-bold text-sm sm:text-base ${currentStatus.color}`}>{currentStatus.title}</h4>
+                    <p className="text-slate-300 text-xs sm:text-sm mt-1 leading-snug">{currentStatus.description}</p>
                     {currentStatus.subtext && (
-                       <div className="mt-2 text-xs font-mono opacity-80 flex items-center gap-1.5">
+                       <div className="mt-2 text-[11px] sm:text-xs font-mono opacity-80 flex items-center gap-1.5">
                          <span className="w-1 h-1 bg-current rounded-full" />
                          {currentStatus.subtext}
                        </div>
@@ -297,32 +293,32 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
             </div>
 
             {/* 2. Key Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
               <StatCard label="Personal Record" value={selectedStats.maxWeight} unit="kg" icon={Dumbbell} />
               <StatCard label="Total Volume" value={(selectedStats.totalVolume / 1000).toFixed(1)} unit="k" icon={Scale} />
               <StatCard label="Sessions" value={selectedStats.totalSets} unit="" icon={Layers} />
             </div>
 
             {/* 3. The Chart */}
-            <div className="flex-1 min-h-[350px] bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-6 relative">
-              <div className="flex justify-between items-end mb-6">
+            <div className="flex-1 min-h-[300px] sm:min-h-[350px] bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-3 sm:p-6 relative flex flex-col">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 sm:mb-6 gap-2">
                  <div>
-                    <h3 className="text-lg font-semibold text-white">Strength Progression</h3>
-                    <p className="text-xs text-slate-500">Estimated 1RM vs Actual Lift Weight</p>
+                    <h3 className="text-base sm:text-lg font-semibold text-white">Strength Progression</h3>
+                    <p className="text-[11px] sm:text-xs text-slate-500">Estimated 1RM vs Actual Lift Weight</p>
                  </div>
                  {/* Legend */}
-                 <div className="flex gap-4 text-xs font-medium">
+                 <div className="flex gap-3 sm:gap-4 text-[10px] sm:text-xs font-medium">
                     <div className="flex items-center gap-2 text-blue-400">
-                       <span className="w-3 h-3 rounded bg-blue-500/20 border border-blue-500"></span> Est. 1RM
+                       <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-blue-500/20 border border-blue-500"></span> Est. 1RM
                     </div>
                     <div className="flex items-center gap-2 text-slate-500">
-                       <span className="w-3 h-0.5 bg-slate-500 border-t border-dashed border-slate-500"></span> Lift Weight
+                       <span className="w-2.5 h-0.5 sm:w-3 bg-slate-500 border-t border-dashed border-slate-500"></span> Lift Weight
                     </div>
                  </div>
               </div>
 
-              <div className="w-full h-[calc(100%-60px)]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="w-full flex-1 min-h-[250px]">
+                <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="color1RM" x1="0" y1="0" x2="0" y2="1">
@@ -334,14 +330,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                     <XAxis 
                       dataKey="date" 
                       stroke="#64748b" 
-                      fontSize={11} 
+                      fontSize={10} 
                       tickLine={false} 
                       axisLine={false}
                       dy={10}
                     />
                     <YAxis 
                       stroke="#64748b" 
-                      fontSize={11} 
+                      fontSize={10} 
                       tickLine={false} 
                       axisLine={false}
                       tickFormatter={(val) => `${val}kg`}
@@ -356,7 +352,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                       strokeWidth={3}
                       fillOpacity={1} 
                       fill="url(#color1RM)" 
-                      activeDot={{ r: 6, strokeWidth: 0, fill: '#60a5fa' }}
+                      activeDot={{ r: 5, strokeWidth: 0, fill: '#60a5fa' }}
                     />
                     
                     {/* The Actual Weight Line (Context) */}
@@ -375,11 +371,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-600 gap-4 border border-dashed border-slate-800 rounded-xl bg-slate-900/20">
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-600 gap-4 border border-dashed border-slate-800 rounded-xl bg-slate-900/20 min-h-[300px]">
             <div className="p-4 bg-slate-900 rounded-full">
-              <Activity className="w-12 h-12 opacity-50" />
+              <Activity className="w-10 h-10 sm:w-12 sm:h-12 opacity-50" />
             </div>
-            <p className="font-medium">Select an exercise to analyze performance</p>
+            <p className="font-medium text-sm sm:text-base text-center px-4">Select an exercise to analyze performance</p>
           </div>
         )}
       </div>

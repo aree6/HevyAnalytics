@@ -155,26 +155,26 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data }) => {
   };
 
   return (
-    <div className="space-y-8 pb-20 max-w-5xl mx-auto">
+    <div className="space-y-4 sm:space-y-8 pb-20 max-w-5xl mx-auto px-1 sm:px-0">
       
       {/* --- Pagination Header --- */}
-      <div className="flex justify-between items-center bg-slate-900/50 p-3 rounded-2xl border border-slate-800/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="flex justify-between items-center bg-slate-900/50 p-2 sm:p-3 rounded-2xl border border-slate-800/50 backdrop-blur-sm sticky top-0 z-10">
         <button 
           onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
           disabled={currentPage === 1}
-          className="p-2 hover:bg-slate-800 rounded-full disabled:opacity-30 transition-all"
+          className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-full disabled:opacity-30 transition-all"
         >
-          <ChevronLeft className="w-5 h-5 text-slate-400" />
+          <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
         </button>
-        <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
+        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-slate-500">
           History • Page {currentPage}/{totalPages}
         </span>
         <button 
           onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
           disabled={currentPage === totalPages}
-          className="p-2 hover:bg-slate-800 rounded-full disabled:opacity-30 transition-all"
+          className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-full disabled:opacity-30 transition-all"
         >
-          <ChevronRight className="w-5 h-5 text-slate-400" />
+          <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
         </button>
       </div>
 
@@ -183,54 +183,54 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data }) => {
         const sessionStats = analyzeSession(allSessionSets);
 
         return (
-          <div key={session.key} className="space-y-4 animate-in slide-in-from-bottom-4 duration-500">
+          <div key={session.key} className="space-y-3 sm:space-y-4 animate-in slide-in-from-bottom-4 duration-500">
             
             {/* --- Session Header Card --- */}
-            <div className="bg-gradient-to-r from-slate-900 to-slate-900/50 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl relative overflow-hidden group">
+            <div className="bg-gradient-to-r from-slate-900 to-slate-900/50 border border-slate-800 rounded-2xl p-4 sm:p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-6 shadow-xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none group-hover:bg-blue-500/10 transition-all"></div>
               
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
-                    <Calendar className="w-5 h-5" />
+              <div className="relative z-10 flex-1">
+                <div className="flex items-center gap-2 sm:gap-3 mb-1">
+                  <div className="p-1.5 sm:p-2 bg-blue-500/10 rounded-lg text-blue-400 flex-shrink-0">
+                    <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white tracking-tight">{session.title}</h3>
+                  <h3 className="text-lg sm:text-2xl font-bold text-white tracking-tight truncate">{session.title}</h3>
                 </div>
-                <div className="flex items-center gap-4 text-sm text-slate-400 pl-1">
-                  <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {session.startTime}</span>
+                <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-slate-400 pl-1">
+                  <span className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"><Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" /> {session.startTime}</span>
                   <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-                  <span>{session.totalSets} Total Sets</span>
+                  <span className="whitespace-nowrap">{session.totalSets} Sets</span>
                 </div>
               </div>
 
               {/* Stats Pills */}
-              <div className="flex gap-3 relative z-10">
+              <div className="flex gap-2 sm:gap-3 relative z-10 w-full md:w-auto flex-wrap md:flex-nowrap">
                  <div 
                    onMouseEnter={(e) => handleMouseEnter(e, sessionStats, 'session')}
                    onMouseLeave={() => setTooltip(null)}
-                   className="px-4 py-2 bg-slate-950/50 border border-slate-700/50 rounded-xl flex flex-col items-center min-w-[80px] hover:border-blue-500/30 transition-colors cursor-help"
+                   className="px-3 sm:px-4 py-2 bg-slate-950/50 border border-slate-700/50 rounded-xl flex flex-col items-center min-w-[70px] hover:border-blue-500/30 transition-colors cursor-help text-xs sm:text-sm"
                  >
-                    <span className="text-[10px] uppercase font-bold text-slate-500">Focus</span>
-                    <span className="text-sm font-bold text-blue-400">{sessionStats.goalLabel}</span>
+                    <span className="text-[8px] sm:text-[10px] uppercase font-bold text-slate-500">Focus</span>
+                    <span className="font-bold text-blue-400">{sessionStats.goalLabel}</span>
                  </div>
-                 <div className="px-4 py-2 bg-slate-950/50 border border-slate-700/50 rounded-xl flex flex-col items-center min-w-[80px]">
-                    <span className="text-sm font-bold text-emerald-400">{sessionStats.avgReps} <span className="text-[10px] text-slate-600">reps/avg</span></span>
+                 <div className="px-3 sm:px-4 py-2 bg-slate-950/50 border border-slate-700/50 rounded-xl flex flex-col items-center min-w-[70px] text-xs sm:text-sm">
+                    <span className="font-bold text-emerald-400">{sessionStats.avgReps} <span className="text-[8px] sm:text-[10px] text-slate-600">reps/avg</span></span>
                  </div>
               </div>
             </div>
 
             {/* --- Exercises Grid --- */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               {session.exercises.map((group, idx) => {
                 const insights = analyzeSetProgression(group.sets);
                 const macroInsight = analyzeProgression(group.sets);
 
                 return (
-                  <div key={idx} className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-5 hover:border-slate-700 transition-all flex flex-col h-full">
+                  <div key={idx} className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-4 sm:p-5 hover:border-slate-700 transition-all flex flex-col h-full">
                     
                     {/* Exercise Title */}
                     <div className="flex justify-between items-start mb-4">
-                      <h4 className="font-semibold text-slate-200 text-lg line-clamp-1" title={group.exerciseName}>
+                      <h4 className="font-semibold text-slate-200 text-sm sm:text-lg line-clamp-1" title={group.exerciseName}>
                         {group.exerciseName}
                       </h4>
                       {/* Macro Badge (Promotion) */}
@@ -238,9 +238,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data }) => {
                         <div 
                            onMouseEnter={(e) => handleMouseEnter(e, macroInsight, 'macro')}
                            onMouseLeave={() => setTooltip(null)}
-                           className={`p-1.5 rounded-lg cursor-help ${getWisdomColor(macroInsight.type)}`}
+                           className={`p-1.5 rounded-lg cursor-help flex-shrink-0 ${getWisdomColor(macroInsight.type)}`}
                         >
-                           <Trophy className="w-4 h-4" />
+                           <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </div>
                       )}
                     </div>

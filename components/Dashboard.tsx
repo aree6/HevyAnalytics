@@ -127,6 +127,14 @@ const ChartHeader = ({ title, icon: Icon, color, mode, onToggle }: { title: stri
 const Heatmap = ({ dailyData, totalPrs, onDayClick }: { dailyData: DailySummary[], totalPrs: number, onDayClick?: (date: Date) => void }) => {
   const heatmapData = useMemo(() => getHeatmapData(dailyData), [dailyData]);
   const [tooltip, setTooltip] = useState<any | null>(null);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to latest (rightmost) position
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
+    }
+  }, [heatmapData]);
 
   if (heatmapData.length === 0) return null;
 
@@ -151,28 +159,28 @@ const Heatmap = ({ dailyData, totalPrs, onDayClick }: { dailyData: DailySummary[
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg flex flex-col md:flex-row gap-6 overflow-hidden">
-      <div className="flex-shrink-0 flex flex-col justify-between min-w-[180px] border-r border-slate-800/50 pr-6 mr-2">
+    <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg flex flex-col md:flex-row gap-4 sm:gap-6 overflow-hidden">
+      <div className="flex-shrink-0 flex flex-col justify-between min-w-full md:min-w-[180px] border-b md:border-b-0 md:border-r border-slate-800/50 pb-4 md:pb-0 md:pr-6 md:mr-2">
         <div>
-          <h3 className="text-lg font-semibold text-white flex items-center mb-1">
+          <h3 className="text-base sm:text-lg font-semibold text-white flex items-center mb-1">
             <Calendar className="w-5 h-5 mr-2 text-blue-500" />
             Consistency
           </h3>
-          <p className="text-sm text-slate-500">Last 365 Days</p>
+          <p className="text-xs sm:text-sm text-slate-500">Last 365 Days</p>
         </div>
         <div className="mt-4">
            <div className="flex items-center gap-3">
               <div className="p-2 bg-yellow-500/10 rounded-lg">
-                <Dumbbell className="w-6 h-6 text-yellow-500" />
+                <Dumbbell className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{totalPrs}</p>
+                <p className="text-xl sm:text-2xl font-bold text-white">{totalPrs}</p>
                 <p className="text-xs font-medium text-slate-400 uppercase">PRs Set</p>
               </div>
            </div>
         </div>
       </div>
-      <div className="flex-1 w-full overflow-x-auto pb-2 custom-scrollbar">
+      <div className="flex-1 w-full overflow-x-auto pb-2 custom-scrollbar" ref={scrollContainerRef}>
          <div className="grid grid-flow-col grid-rows-7 gap-1 min-w-max">
             {heatmapData.map((day) => (
               <div 
@@ -301,31 +309,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#ef4444'];
 
   return (
-    <div className="space-y-6 pb-20 animate-in fade-in duration-500">
+    <div className="space-y-4 sm:space-y-6 pb-20 animate-in fade-in duration-500">
       
       {/* HEADER & CONTROLS */}
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-900/50 p-4 rounded-xl border border-slate-800 gap-4">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-900/50 p-3 sm:p-4 rounded-xl border border-slate-800 gap-3 sm:gap-4">
+        <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
           <Layout className="w-5 h-5 text-blue-500" />
           Analytics Dashboard
         </h2>
         
         {/* View Toggle Dropdown */}
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <button 
             onClick={() => setIsMenuOpen(!isMenuOpen)} 
-            className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium border border-slate-700 text-slate-200 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs sm:text-sm font-medium border border-slate-700 text-slate-200 transition-colors w-full sm:w-auto justify-center sm:justify-start"
           >
             <Eye className="w-4 h-4" /> Configure View <ChevronDown className={`w-4 h-4 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
           </button>
           {isMenuOpen && (
-            <div className="absolute right-0 top-full mt-2 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 p-2 animate-in fade-in slide-in-from-top-2">
+            <div className="absolute right-0 top-full mt-2 w-48 sm:w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 p-2 animate-in fade-in slide-in-from-top-2">
               <p className="text-[10px] uppercase font-bold text-slate-500 px-3 py-1">Visible Charts</p>
               {Object.entries(CHART_LABELS).map(([key, label]) => (
                 <button 
                   key={key} 
                   onClick={() => toggleChart(key as ChartKey)} 
-                  className="w-full flex justify-between px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
+                  className="w-full flex justify-between px-3 py-2 text-xs sm:text-sm text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
                 >
                   <span>{label}</span>
                   <div className={`w-3 h-3 rounded-full border ${visibleCharts[key as ChartKey] ? 'bg-blue-500 border-blue-500' : 'bg-transparent border-slate-600'}`} />
@@ -339,11 +347,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
       {/* 1. HEATMAP (Full Width) */}
       {visibleCharts.heatmap && <Heatmap dailyData={dailyData} totalPrs={totalPrs} onDayClick={onDayClick} />}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         
         {/* 2. PR TRENDS (Line) */}
         {visibleCharts.prTrend && (
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg min-h-[480px] flex flex-col">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col">
             <ChartHeader 
               title="PRs Over Time" 
               icon={Trophy} 
@@ -351,12 +359,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               mode={chartModes.prTrend}
               onToggle={(m) => toggleChartMode('prTrend', m)}
             />
-            <div className="flex-1 w-full min-h-[300px]">
+            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={prsData}>
+                <LineChart data={prsData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                  <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
                   <Tooltip contentStyle={TooltipStyle} cursor={{stroke: 'rgba(255,255,255,0.1)'}} />
                   <Line 
                     type="monotone" 
@@ -364,21 +372,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     name="PRs Set" 
                     stroke="#eab308" 
                     strokeWidth={3} 
-                    dot={{r:4, fill:'#eab308'}} 
-                    activeDot={{r:6, strokeWidth: 0}} 
+                    dot={{r:3, fill:'#eab308'}} 
+                    activeDot={{r:5, strokeWidth: 0}} 
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
             <ChartDescription>
-              <span className="font-semibold text-slate-300">Analysis:</span> This chart tracks the cumulative number of Personal Records set over time. A steep upward slope indicates periods of rapid strength gain (e.g., beginner gains or peaking blocks), while a plateau suggests maintenance.
+              <span className="font-semibold text-slate-300"> </span> This chart tracks the cumulative number of Personal Records set over time. A steep upward slope indicates periods of rapid strength gain (e.g., beginner gains or peaking blocks), while a plateau suggests maintenance.
             </ChartDescription>
           </div>
         )}
 
         {/* 3. VOLUME DENSITY (Line) */}
         {visibleCharts.volumeVsDuration && (
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg min-h-[480px] flex flex-col">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col">
             <ChartHeader 
               title="Volume Density" 
               icon={Timer} 
@@ -386,9 +394,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               mode={chartModes.volumeVsDuration}
               onToggle={(m) => toggleChartMode('volumeVsDuration', m)}
             />
-            <div className="flex-1 w-full min-h-[300px]">
+            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={volumeDurationData}>
+                <LineChart data={volumeDurationData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gDensity" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
@@ -396,8 +404,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                  <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#8b5cf6" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}kg`} />
+                  <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#8b5cf6" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}kg`} />
                   <Tooltip 
                     contentStyle={TooltipStyle} 
                     labelFormatter={(l, p) => p[0]?.payload?.tooltipLabel || l} 
@@ -407,12 +415,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     }}
                   />
                   <Legend />
-                  <Line type="monotone" dataKey="volumePerSet" name="Volume per Set (kg)" stroke="#8b5cf6" strokeWidth={3} dot={{r:4, fill:'#8b5cf6'}} activeDot={{r:6, strokeWidth: 0}} />
+                  <Line type="monotone" dataKey="volumePerSet" name="Volume per Set (kg)" stroke="#8b5cf6" strokeWidth={3} dot={{r:3, fill:'#8b5cf6'}} activeDot={{r:5, strokeWidth: 0}} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
             <ChartDescription>
-              <span className="font-semibold text-slate-300">Analysis:</span> Shows the average volume done per set. A higher volume per set indicates more intense or challenging sets, while trends reveal changes in your training intensity and work capacity.
+              <span className="font-semibold text-slate-300"> </span> Shows the average volume done per set. A higher volume per set indicates more intense or challenging sets, while trends reveal changes in your training intensity and work capacity.
             </ChartDescription>
           </div>
         )}
@@ -420,7 +428,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
       {/* 4. INTENSITY EVOLUTION (Stacked Area) */}
       {visibleCharts.intensityEvo && (
-        <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg min-h-[480px] flex flex-col">
+        <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col">
           <ChartHeader 
             title="Training Style Evolution (Sets per Month)" 
             icon={Layers} 
@@ -429,19 +437,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             onToggle={(m) => toggleChartMode('intensityEvo', m)} 
           />
           {intensityData && intensityData.length > 0 ? (
-            <div className="flex-1 w-full" style={{minHeight: '300px', height: '100%'}}>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={intensityData}>
+            <div className="flex-1 w-full" style={{minHeight: '250px', height: '100%'}}>
+              <ResponsiveContainer width="100%" height={250}>
+                <AreaChart data={intensityData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gStrength" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient>
                     <linearGradient id="gHyper" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
                     <linearGradient id="gEndure" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#a855f7" stopOpacity={0.8}/><stop offset="95%" stopColor="#a855f7" stopOpacity={0}/></linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                  <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                  <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip contentStyle={TooltipStyle} />
-                  <Legend />
+                  <Legend wrapperStyle={{fontSize: '11px'}} />
                   <Area type="monotone" dataKey="Strength" name="Strength (1-5)" stackId="1" stroke="#3b82f6" fill="url(#gStrength)" />
                   <Area type="monotone" dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" stroke="#10b981" fill="url(#gHyper)" />
                   <Area type="monotone" dataKey="Endurance" name="Endurance (13+)" stackId="1" stroke="#a855f7" fill="url(#gEndure)" />
@@ -449,7 +457,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="flex-1 w-full min-h-[300px] flex items-center justify-center bg-slate-800/50 rounded-lg border border-slate-700/50">
+            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] flex items-center justify-center bg-slate-800/50 rounded-lg border border-slate-700/50">
               <div className="text-center">
                 <Layers className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                 <p className="text-slate-400">No data available for Training Style Evolution</p>
@@ -458,23 +466,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             </div>
           )}
           <ChartDescription>
-             <span className="font-semibold text-slate-300">Analysis:</span> Visualizes your rep ranges over time. <span className="text-blue-400">Strength</span> (1-5 reps) builds power, <span className="text-emerald-400">Hypertrophy</span> (6-12 reps) builds size, and <span className="text-purple-400">Endurance</span> (13+) builds stamina.
+             <span className="font-semibold text-slate-300"> </span> Visualizes your rep ranges over time. <span className="text-blue-400">Strength</span> (1-5 reps) builds power, <span className="text-emerald-400">Hypertrophy</span> (6-12 reps) builds size, and <span className="text-purple-400">Endurance</span> (13+) builds stamina.
           </ChartDescription>
         </div>
       )}
 
       {/* 5. RADAR & PIE */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         
         {/* Radar Chart: Weekly Rhythm */}
         {visibleCharts.weekShape && (
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg min-h-[520px] flex flex-col">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col">
             <ChartHeader title="Weekly Rhythm" icon={Clock} color="text-pink-500" />
-            <div className="flex-1 w-full min-h-[300px]">
+            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart cx="50%" cy="50%" outerRadius="70%" data={weekShapeData}>
                   <PolarGrid stroke="#334155" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                   <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
                   <Radar name="Workouts" dataKey="A" stroke="#ec4899" strokeWidth={3} fill="#ec4899" fillOpacity={0.4} />
                   <Tooltip contentStyle={TooltipStyle} />
@@ -482,16 +490,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               </ResponsiveContainer>
             </div>
             <ChartDescription>
-              <span className="font-semibold text-slate-300">Analysis:</span> Shows workout frequency by day of the week. A balanced shape indicates consistent daily habits, while a skewed shape reveals your preferred "gym days."
+              <span className="font-semibold text-slate-300"> </span> Shows workout frequency by day of the week. A balanced shape indicates consistent daily habits, while a skewed shape reveals your preferred "gym days."
             </ChartDescription>
           </div>
         )}
 
         {/* Donut Chart: Top Exercises */}
         {visibleCharts.topExercises && (
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg min-h-[520px] flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2 sm:gap-0">
+              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
                 <Zap className="w-5 h-5 text-amber-500" />
                 Most Frequent Exercises
               </h3>
@@ -503,20 +511,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                   max="8" 
                   value={topExerciseLimit} 
                   onChange={(e) => setTopExerciseLimit(parseInt(e.target.value))}
-                  className="w-20 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  className="w-16 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                 />
               </div>
             </div>
             
-            <div className="flex-1 w-full min-h-[300px] relative">
+            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] relative">
                <ResponsiveContainer width="100%" height="100%">
                  <PieChart>
                    <Pie 
                      data={topExercisesData} 
                      cx="50%" 
                      cy="50%" 
-                     innerRadius={60} 
-                     outerRadius={100} 
+                     innerRadius={50} 
+                     outerRadius={85} 
                      paddingAngle={4} 
                      dataKey="count"
                      cornerRadius={6}
@@ -530,18 +538,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                      layout="horizontal" 
                      verticalAlign="bottom" 
                      align="center"
-                     wrapperStyle={{ fontSize: '11px', color: '#94a3b8', paddingTop: '20px' }}
+                     wrapperStyle={{ fontSize: '10px', color: '#94a3b8', paddingTop: '12px' }}
                    />
                  </PieChart>
                </ResponsiveContainer>
                {/* Center Text for Donut */}
-               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-12">
-                  <span className="text-3xl font-bold text-white">{topExercisesData.reduce((a,b) => a + b.count, 0)}</span>
+               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8 sm:pb-12">
+                  <span className="text-2xl sm:text-3xl font-bold text-white">{topExercisesData.reduce((a,b) => a + b.count, 0)}</span>
                   <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Sets</span>
                </div>
             </div>
             <ChartDescription>
-              <span className="font-semibold text-slate-300">Analysis:</span> Highlights your most practiced movements by total set count. Ideally, your "Big 3" compounds should be the largest slices here.
+              <span className="font-semibold text-slate-300"> </span> Highlights your most practiced movements by total set count. Ideally, your "Big 3" compounds should be the largest slices here.
             </ChartDescription>
           </div>
         )}

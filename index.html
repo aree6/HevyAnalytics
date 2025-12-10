@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0, user-scalable=yes" />
     <title>HevyAnalytics - Workout Visualizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -20,6 +20,20 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #64748b;
+      }
+      
+      /* Mobile touch improvements */
+      @media (max-width: 640px) {
+        * {
+          -webkit-user-select: none;
+          user-select: none;
+          -webkit-touch-callout: none;
+        }
+        input, textarea, button {
+          -webkit-user-select: text;
+          user-select: text;
+          -webkit-touch-callout: default;
+        }
       }
     </style>
   <script type="importmap">
