@@ -40,3 +40,30 @@ export const clearCSVData = (): void => {
     console.error('Failed to clear CSV data from local storage:', error);
   }
 };
+
+// Chart Modes Storage
+const CHART_MODES_KEY = 'hevy_analytics_chart_modes';
+
+/**
+ * Save chart modes to local storage
+ */
+export const saveChartModes = (chartModes: Record<string, 'monthly' | 'daily'>): void => {
+  try {
+    localStorage.setItem(CHART_MODES_KEY, JSON.stringify(chartModes));
+  } catch (error) {
+    console.error('Failed to save chart modes to local storage:', error);
+  }
+};
+
+/**
+ * Retrieve chart modes from local storage
+ */
+export const getChartModes = (): Record<string, 'monthly' | 'daily'> | null => {
+  try {
+    const data = localStorage.getItem(CHART_MODES_KEY);
+    return data ? JSON.parse(data) : null;
+  } catch (error) {
+    console.error('Failed to retrieve chart modes from local storage:', error);
+    return null;
+  }
+};

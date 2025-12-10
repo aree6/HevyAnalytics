@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { DailySummary, ExerciseStats } from '../types';
 import { 
   getHeatmapData, 
@@ -7,6 +7,7 @@ import {
   getTopExercisesRadial,
   getPrsOverTime 
 } from '../utils/analytics';
+import { saveChartModes, getChartModes } from '../utils/localStorage';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   Legend, ComposedChart, AreaChart, Area, 
@@ -98,7 +99,7 @@ const ChartDescription = ({ children }: { children: React.ReactNode }) => (
 
 // 3. Reusable Chart Header with Toggles
 const ChartHeader = ({ title, icon: Icon, color, mode, onToggle }: { title: string, icon: any, color: string, mode?: 'daily'|'monthly', onToggle?: (m: 'daily'|'monthly') => void }) => (
-  <div className="flex justify-between items-start mb-6">
+  <div className="flex justify-between items-center mb-6">
     <h3 className="text-lg font-semibold text-white flex items-center gap-2">
       <Icon className={`w-5 h-5 ${color}`} />
       {title}
@@ -194,12 +195,32 @@ const Heatmap = ({ dailyData, totalPrs, onDayClick }: { dailyData: DailySummary[
 // --- MAIN DASHBOARD ---
 
 export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick }) => {
-  // Chart View State
-  const [chartModes, setChartModes] = useState<Record<string, 'monthly'|'daily'>>({
+  // Default chart modes: all 'daily' except volumeVsDuration which is 'monthly' (average)
+  const DEFAULT_CHART_MODES: Record<string, 'monthly'|'daily'> = {
     volumeVsDuration: 'monthly',
-    intensityEvo: 'monthly',
-    prTrend: 'monthly'
-  });
+    intensityEvo: 'daily',
+    prTrend: 'daily'
+  };
+
+  // Chart View State - Initialize from localStorage or use defaults
+  const [chartModes, setChartModes] = useState<Record<string, 'monthly'|'daily'>>(
+    getChartModes() || DEFAULT_CHART_MODES
+  );
+
+  // Load chart modes from localStorage on component mount
+  useEffect(() => {
+    const savedModes = getChartModes();
+    if (savedModes) {
+      setChartModes(savedModes);
+    }
+  }, []);
+
+  // Save chart modes to localStorage whenever they change
+  const toggleChartMode = (chart: string, mode: 'daily'|'monthly') => {
+    const newModes = { ...chartModes, [chart]: mode };
+    setChartModes(newModes);
+    saveChartModes(newModes);
+  };
 
   const [visibleCharts, setVisibleCharts] = useState<Record<ChartKey, boolean>>({
     heatmap: true,
@@ -212,10 +233,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [topExerciseLimit, setTopExerciseLimit] = useState(5);
-
-  const toggleChartMode = (chart: string, mode: 'daily'|'monthly') => {
-    setChartModes(prev => ({ ...prev, [chart]: mode }));
-  };
 
   const toggleChart = (key: ChartKey) => {
     setVisibleCharts(prev => ({ ...prev, [key]: !prev[key] }));
