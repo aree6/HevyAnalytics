@@ -1,6 +1,9 @@
 import React, { useRef } from 'react';
 import { Upload } from 'lucide-react';
 
+// ❌ DELETED: Do not import files located in the public folder.
+// The build tool automatically serves everything in 'public' at the root URL.
+
 interface CSVImportModalProps {
   onFileSelect: (file: File) => void;
   isLoading?: boolean;
@@ -72,16 +75,17 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ onFileSelect, is
         <div className="w-full mb-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="flex flex-col items-center gap-2">
-              <img src="/Step1.png" className="w-full h-auto rounded-lg border border-slate-700" />
+              {/* ✅ FIXED: Use string paths pointing to root (files are in public/) */}
+              <img src="/Step1.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 1" />
             </div>
             <div className="flex flex-col items-center gap-2">
-              <img src="/Step2.png" className="w-full h-auto rounded-lg border border-slate-700" />
+              <img src="/Step2.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 2" />
             </div>
             <div className="flex flex-col items-center gap-2">
-              <img src="/Step3.png" className="w-full h-auto rounded-lg border border-slate-700" />
+              <img src="/Step3.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 3" />
             </div>
             <div className="flex flex-col items-center gap-2">
-              <img src="/Step4.png" className="w-full h-auto rounded-lg border border-slate-700" />
+              <img src="/Step4.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 4" />
             </div>
           </div>
         </div>
