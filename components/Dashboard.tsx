@@ -132,7 +132,15 @@ const Heatmap = ({ dailyData, totalPrs, onDayClick }: { dailyData: DailySummary[
   // Auto-scroll to latest (rightmost) position
   useEffect(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
+      // Use requestAnimationFrame to ensure DOM is fully rendered, especially on mobile
+      requestAnimationFrame(() => {
+        // Add a small delay for mobile browsers to complete layout
+        setTimeout(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
+          }
+        }, 100);
+      });
     }
   }, [heatmapData]);
 
