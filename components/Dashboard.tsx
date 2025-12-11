@@ -90,8 +90,8 @@ const DashboardTooltip: React.FC<{ data: { rect: DOMRect, title: string, body: s
 };
 
 // 2. Chart Interpretation Footer
-const ChartDescription = ({ children }: { children: React.ReactNode }) => (
-  <div className="mt-4 pt-4 border-t border-slate-800 flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+const ChartDescription = ({ children, isMounted = true }: { children: React.ReactNode, isMounted?: boolean }) => (
+  <div className={`mt-4 pt-4 border-t border-slate-800 flex items-start gap-3 transition-opacity duration-700 ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
     <Info className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0 transition-opacity duration-200 hover:opacity-80" />
     <div className="text-xs text-slate-400 leading-relaxed space-y-2">
       {children}
@@ -108,7 +108,8 @@ const ChartHeader = ({
   onToggle,
   viewType,
   onViewToggle,
-  viewOptions
+  viewOptions,
+  isMounted = true
 }: { 
   title: string, 
   icon: any, 
@@ -117,9 +118,10 @@ const ChartHeader = ({
   onToggle?: (m: 'daily'|'monthly') => void,
   viewType?: string,
   onViewToggle?: (v: string) => void,
-  viewOptions?: { value: string, label: string }[]
+  viewOptions?: { value: string, label: string }[],
+  isMounted?: boolean
 }) => (
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3 sm:gap-0 animate-in fade-in slide-in-from-top-2 duration-300">
+  <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3 sm:gap-0 transition-opacity duration-700 ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
     <h3 className="text-lg font-semibold text-white flex items-center gap-2 transition-opacity duration-200 hover:opacity-90">
       <Icon className={`w-5 h-5 ${color} transition-opacity duration-200 hover:opacity-80`} />
       {title}
@@ -267,17 +269,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     prTrend: 'daily'
   };
 
-  // Chart View State - Initialize from localStorage or use defaults
-  const [chartModes, setChartModes] = useState<Record<string, 'monthly'|'daily'>>(
-    getChartModes() || DEFAULT_CHART_MODES
-  );
+  // State to control animation retriggering on mount
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Load chart modes from localStorage on component mount
+  // FIXED: Initialize state lazily from local storage to prevent double-render
+  const [chartModes, setChartModes] = useState<Record<string, 'monthly'|'daily'>>(() => {
+    return getChartModes() || DEFAULT_CHART_MODES;
+  });
+
+  // FIXED: Simple effect to trigger animation after mount
   useEffect(() => {
-    const savedModes = getChartModes();
-    if (savedModes) {
-      setChartModes(savedModes);
-    }
+    // A small timeout ensures the DOM nodes exist and layout is calculated
+    // before we toggle opacity, preventing the "start-stop" glitch.
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 50);
+    return () => clearTimeout(timer);
   }, []);
 
   // Save chart modes to localStorage whenever they change
@@ -323,7 +330,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   // 2. Intensity Evolution Data
   const intensityData = useMemo(() => {
     const result = getIntensityEvolution(fullData, chartModes.intensityEvo);
-    console.log('Dashboard intensityData memo - fullData length:', fullData.length, 'intensityData:', result);
     return result;
   }, [fullData, chartModes.intensityEvo]);
 
@@ -380,7 +386,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#ef4444'];
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-20 animate-in fade-in duration-500">
+    <div className={`space-y-4 sm:space-y-6 pb-20 transition-opacity duration-700 ease-out ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
       
       {/* HEADER & CONTROLS */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-900/50 p-3 sm:p-4 rounded-xl border border-slate-800 gap-3 sm:gap-4">
@@ -422,7 +428,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         
         {/* 2. PR TRENDS (Area/Bar) */}
         {visibleCharts.prTrend && (
-          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl animate-in fade-in slide-in-from-bottom-2">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl">
             <ChartHeader 
               title="PRs Over Time" 
               icon={Trophy} 
@@ -432,10 +438,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               viewType={prTrendView}
               onViewToggle={setPrTrendView}
               viewOptions={[{ value: 'area', label: 'Area' }, { value: 'bar', label: 'Bar' }]}
+              isMounted={isMounted}
             />
-            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-500">
+            <div className={`flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
               <ResponsiveContainer width="100%" height="100%">
-                <div key={prTrendView} className="animate-in fade-in duration-500">
+                <div key={prTrendView} className="h-full w-full">
                   {prTrendView === 'area' ? (
                   <AreaChart data={prsData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                     <defs>
@@ -454,9 +461,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     name="PRs Set" 
                     stroke="#eab308" 
                     strokeWidth={3} 
-                      fill="url(#gPRs)"
+                    fill="url(#gPRs)"
                     dot={{r:3, fill:'#eab308'}} 
                     activeDot={{r:5, strokeWidth: 0}} 
+                    animationDuration={1500}
                   />
                   </AreaChart>
                 ) : (
@@ -465,13 +473,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                     <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip contentStyle={TooltipStyle} />
-                    <Bar dataKey="count" name="PRs Set" fill="#eab308" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="count" name="PRs Set" fill="#eab308" radius={[8, 8, 0, 0]} animationDuration={1500} />
                   </BarChart>
                   )}
                 </div>
               </ResponsiveContainer>
             </div>
-            <ChartDescription>
+            <ChartDescription isMounted={isMounted}>
               <p>
                 <span className="font-semibold text-slate-300">Track your strength milestones.</span> This chart reveals when you're hitting new personal records—those breakthrough moments that define your progress.
               </p>
@@ -487,7 +495,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
         {/* 3. VOLUME DENSITY (Area/Bar) */}
         {visibleCharts.volumeVsDuration && (
-          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl animate-in fade-in slide-in-from-bottom-2">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl">
             <ChartHeader 
               title="Volume Density" 
               icon={Timer} 
@@ -497,10 +505,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               viewType={volumeView}
               onViewToggle={setVolumeView}
               viewOptions={[{ value: 'area', label: 'Area' }, { value: 'bar', label: 'Bar' }]}
+              isMounted={isMounted}
             />
-            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-500">
+            <div className={`flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
               <ResponsiveContainer width="100%" height="100%">
-                <div key={volumeView} className="animate-in fade-in duration-500">
+                <div key={volumeView} className="h-full w-full">
                 {volumeView === 'area' ? (
                   <AreaChart data={volumeDurationData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                   <defs>
@@ -521,7 +530,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     }}
                   />
                   <Legend />
-                    <Area type="monotone" dataKey="volumePerSet" name="Volume per Set (kg)" stroke="#8b5cf6" strokeWidth={3} fill="url(#gDensityArea)" dot={{r:3, fill:'#8b5cf6'}} activeDot={{r:5, strokeWidth: 0}} />
+                    <Area type="monotone" dataKey="volumePerSet" name="Volume per Set (kg)" stroke="#8b5cf6" strokeWidth={3} fill="url(#gDensityArea)" dot={{r:3, fill:'#8b5cf6'}} activeDot={{r:5, strokeWidth: 0}} animationDuration={1500} />
                   </AreaChart>
                 ) : (
                   <BarChart data={volumeDurationData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
@@ -537,13 +546,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="volumePerSet" name="Volume per Set (kg)" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="volumePerSet" name="Volume per Set (kg)" fill="#8b5cf6" radius={[8, 8, 0, 0]} animationDuration={1500} />
                   </BarChart>
                 )}
                 </div>
               </ResponsiveContainer>
             </div>
-            <ChartDescription>
+            <ChartDescription isMounted={isMounted}>
               <p>
                 <span className="font-semibold text-slate-300">Measure your training intensity.</span> This metric shows how much volume you're moving per set—a key indicator of workout difficulty.
               </p>
@@ -560,7 +569,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
       {/* 4. INTENSITY EVOLUTION (Area/Stacked Bar) */}
       {visibleCharts.intensityEvo && (
-        <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl animate-in fade-in slide-in-from-bottom-2">
+        <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl">
           <ChartHeader 
             title="Training Style Evolution (Sets per Month)" 
             icon={Layers} 
@@ -570,11 +579,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             viewType={intensityView}
             onViewToggle={setIntensityView}
             viewOptions={[{ value: 'area', label: 'Area' }, { value: 'stackedBar', label: 'Stacked' }]}
+            isMounted={isMounted}
           />
           {intensityData && intensityData.length > 0 ? (
-            <div className="flex-1 w-full" style={{minHeight: '250px', height: '100%'}}>
+            <div className={`flex-1 w-full transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`} style={{minHeight: '250px', height: '100%'}}>
               <ResponsiveContainer width="100%" height={250}>
-                <div key={intensityView} className="animate-in fade-in duration-500">
+                <div key={intensityView} className="h-full w-full">
                 {intensityView === 'area' ? (
                 <AreaChart data={intensityData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                   <defs>
@@ -587,9 +597,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                   <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip contentStyle={TooltipStyle} />
                   <Legend wrapperStyle={{fontSize: '11px'}} />
-                  <Area type="monotone" dataKey="Strength" name="Strength (1-5)" stackId="1" stroke="#3b82f6" fill="url(#gStrength)" />
-                  <Area type="monotone" dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" stroke="#10b981" fill="url(#gHyper)" />
-                  <Area type="monotone" dataKey="Endurance" name="Endurance (13+)" stackId="1" stroke="#a855f7" fill="url(#gEndure)" />
+                  <Area type="monotone" dataKey="Strength" name="Strength (1-5)" stackId="1" stroke="#3b82f6" fill="url(#gStrength)" animationDuration={1500} />
+                  <Area type="monotone" dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" stroke="#10b981" fill="url(#gHyper)" animationDuration={1500} />
+                  <Area type="monotone" dataKey="Endurance" name="Endurance (13+)" stackId="1" stroke="#a855f7" fill="url(#gEndure)" animationDuration={1500} />
                 </AreaChart>
                 ) : (
                   <BarChart data={intensityData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
@@ -598,9 +608,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={TooltipStyle} />
                     <Legend wrapperStyle={{fontSize: '11px'}} />
-                    <Bar dataKey="Strength" name="Strength (1-5)" stackId="1" fill="#3b82f6" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" fill="#10b981" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="Endurance" name="Endurance (13+)" stackId="1" fill="#a855f7" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="Strength" name="Strength (1-5)" stackId="1" fill="#3b82f6" radius={[0, 0, 0, 0]} animationDuration={1500} />
+                    <Bar dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" fill="#10b981" radius={[0, 0, 0, 0]} animationDuration={1500} />
+                    <Bar dataKey="Endurance" name="Endurance (13+)" stackId="1" fill="#a855f7" radius={[8, 8, 0, 0]} animationDuration={1500} />
                   </BarChart>
                 )}
                 </div>
@@ -615,7 +625,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               </div>
             </div>
           )}
-          <ChartDescription>
+          <ChartDescription isMounted={isMounted}>
              <p>
                <span className="font-semibold text-slate-300">Discover your training style.</span> This chart breaks down your workouts by rep ranges, revealing what you're actually training for.
              </p>
@@ -634,7 +644,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         
         {/* Weekly Rhythm: Radar/Bar */}
         {visibleCharts.weekShape && (
-          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl animate-in fade-in slide-in-from-bottom-2">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl">
             <ChartHeader 
               title="Weekly Rhythm" 
               icon={Clock} 
@@ -642,16 +652,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               viewType={weekShapeView}
               onViewToggle={setWeekShapeView}
               viewOptions={[{ value: 'radar', label: 'Radar' }, { value: 'bar', label: 'Bar' }]}
+              isMounted={isMounted}
             />
-            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-500">
+            <div className={`flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
               <ResponsiveContainer width="100%" height="100%">
-                <div key={weekShapeView} className="animate-in fade-in duration-500">
+                <div key={weekShapeView} className="h-full w-full">
                 {weekShapeView === 'radar' ? (
                 <RadarChart cx="50%" cy="50%" outerRadius="70%" data={weekShapeData}>
                   <PolarGrid stroke="#334155" />
                   <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                   <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
-                  <Radar name="Workouts" dataKey="A" stroke="#ec4899" strokeWidth={3} fill="#ec4899" fillOpacity={0.4} />
+                  <Radar name="Workouts" dataKey="A" stroke="#ec4899" strokeWidth={3} fill="#ec4899" fillOpacity={0.4} animationDuration={1500} />
                   <Tooltip contentStyle={TooltipStyle} />
                 </RadarChart>
                 ) : (
@@ -660,13 +671,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     <XAxis dataKey="subject" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                     <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={TooltipStyle} />
-                    <Bar dataKey="A" name="Workouts" fill="#ec4899" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="A" name="Workouts" fill="#ec4899" radius={[8, 8, 0, 0]} animationDuration={1500} />
                   </BarChart>
                 )}
                 </div>
               </ResponsiveContainer>
             </div>
-            <ChartDescription>
+            <ChartDescription isMounted={isMounted}>
               <p>
                 <span className="font-semibold text-slate-300">Find your rhythm.</span> This chart reveals your workout patterns—when you train and how consistently.
               </p>
@@ -682,8 +693,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
         {/* Top Exercises: Pie Chart or Line Graph */}
         {visibleCharts.topExercises && (
-          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 sm:gap-0">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl">
+            <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 sm:gap-0 transition-opacity duration-700 ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
               <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
                 <Zap className="w-5 h-5 text-amber-500" />
                 Most Frequent Exercises
@@ -751,120 +762,124 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               </div>
             </div>
             
-            {topExerciseView === 'pie' ? (
-              <div key="pie" className="flex-1 w-full flex flex-col animate-in fade-in duration-500">
-                 {/* Pie Chart Container - Fixed height, stays in place */}
-                 <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] relative flex-shrink-0">
-               <ResponsiveContainer width="100%" height="100%">
-                 <PieChart>
-                   <Pie 
-                     data={topExercisesData} 
-                     cx="50%" 
-                     cy="50%" 
-                     innerRadius={50} 
-                     outerRadius={85} 
-                     paddingAngle={4} 
-                     dataKey="count"
-                     cornerRadius={6}
-                   >
-                     {topExercisesData.map((entry, index) => (
-                       <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="none" />
-                     ))}
-                   </Pie>
-                   <Tooltip contentStyle={TooltipStyle} formatter={(val, name) => [`${val} sets`, name]} />
-                 </PieChart>
-               </ResponsiveContainer>
-                   {/* Center Text for Donut (truly centered vertically and horizontally) */}
-                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-1xl sm:text-2xl font-bold text-white">{topExercisesData.reduce((a,b) => a + b.count, 0)}</span>
-                      <span className="text-[7px] font-medium text-slate-400 uppercase tracking-widest opacity-60">Total Sets</span>
+            <div className={`flex-1 w-full flex flex-col transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              {topExerciseView === 'pie' ? (
+                <div key="pie" className="flex-1 w-full flex flex-col">
+                   {/* Pie Chart Container - Fixed height, stays in place */}
+                   <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] relative flex-shrink-0">
+                 <ResponsiveContainer width="100%" height="100%">
+                   <PieChart>
+                     <Pie 
+                       data={topExercisesData} 
+                       cx="50%" 
+                       cy="50%" 
+                       innerRadius={50} 
+                       outerRadius={85} 
+                       paddingAngle={4} 
+                       dataKey="count"
+                       cornerRadius={6}
+                       animationDuration={1500}
+                     >
+                       {topExercisesData.map((entry, index) => (
+                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="none" />
+                       ))}
+                     </Pie>
+                     <Tooltip contentStyle={TooltipStyle} formatter={(val, name) => [`${val} sets`, name]} />
+                   </PieChart>
+                 </ResponsiveContainer>
+                     {/* Center Text for Donut (truly centered vertically and horizontally) */}
+                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-1xl sm:text-2xl font-bold text-white">{topExercisesData.reduce((a,b) => a + b.count, 0)}</span>
+                        <span className="text-[7px] font-medium text-slate-400 uppercase tracking-widest opacity-60">Total Sets</span>
+                     </div>
                    </div>
-                 </div>
-                 {/* Legend Container - Expands below chart, doesn't push chart up */}
-                 <div className="w-full pt-4 mt-auto border-t border-slate-800/50">
-                   <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
-                     {topExercisesData.map((entry, index) => (
-                       <div key={entry.name} className="flex items-center gap-1.5">
-                         <div 
-                           className="w-3 h-3 rounded-sm flex-shrink-0" 
-                           style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
-                         />
-                         <span className="text-[10px] text-slate-400">{entry.name}</span>
-                       </div>
-                     ))}
+                   {/* Legend Container - Expands below chart, doesn't push chart up */}
+                   <div className="w-full pt-4 mt-auto border-t border-slate-800/50">
+                     <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
+                       {topExercisesData.map((entry, index) => (
+                         <div key={entry.name} className="flex items-center gap-1.5">
+                           <div 
+                             className="w-3 h-3 rounded-sm flex-shrink-0" 
+                             style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                           />
+                           <span className="text-[10px] text-slate-400">{entry.name}</span>
+                         </div>
+                       ))}
+                     </div>
                    </div>
+                </div>
+              ) : (
+                <div key="area" className="flex-1 w-full flex flex-col">
+                  {/* Area Chart Container */}
+                  <div className="flex-1 w-full min-h-[300px] sm:min-h-[350px] relative flex-shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={topExercisesOverTimeData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                        <defs>
+                          {topExercisesData.map((entry, index) => (
+                            <linearGradient key={`gradient-${entry.name}`} id={`gradient-${index}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={PIE_COLORS[index % PIE_COLORS.length]} stopOpacity={0.4}/>
+                              <stop offset="95%" stopColor={PIE_COLORS[index % PIE_COLORS.length]} stopOpacity={0}/>
+                            </linearGradient>
+                          ))}
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                        <XAxis 
+                          dataKey="date" 
+                          stroke="#64748b" 
+                          style={{ fontSize: '11px' }}
+                          tick={{ fill: '#94a3b8' }}
+                        />
+                        <YAxis 
+                          stroke="#64748b" 
+                          style={{ fontSize: '11px' }}
+                          tick={{ fill: '#94a3b8' }}
+                          label={{ value: 'Sets', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#94a3b8', fontSize: '11px' } }}
+                        />
+                        <Tooltip 
+                          contentStyle={TooltipStyle}
+                          labelFormatter={(label, payload) => {
+                            if (payload && payload[0]) {
+                              return payload[0].payload.dateFormatted;
+                            }
+                            return label;
+                          }}
+                          formatter={(value: number) => [`${value} sets`, '']}
+                        />
+                        {topExercisesData.map((entry, index) => (
+                          <Area 
+                            key={entry.name}
+                            type="monotone" 
+                            dataKey={entry.name} 
+                            stroke={PIE_COLORS[index % PIE_COLORS.length]}
+                            strokeWidth={2.5}
+                            fill={`url(#gradient-${index})`}
+                            dot={{ fill: PIE_COLORS[index % PIE_COLORS.length], r: 3 }}
+                            activeDot={{ r: 5 }}
+                            name={entry.name}
+                            animationDuration={1500}
+                          />
+                        ))}
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {/* Legend Container - Same style as pie chart, expands below chart */}
+                  <div className="w-full pt-4 mt-auto border-t border-slate-800/50">
+                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
+                      {topExercisesData.map((entry, index) => (
+                        <div key={entry.name} className="flex items-center gap-1.5">
+                          <div 
+                            className="w-3 h-3 rounded-sm flex-shrink-0" 
+                            style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                          />
+                          <span className="text-[10px] text-slate-400">{entry.name}</span>
+                        </div>
+                      ))}
+                    </div>
                  </div>
               </div>
-            ) : (
-              <div key="area" className="flex-1 w-full flex flex-col animate-in fade-in duration-500">
-                {/* Area Chart Container */}
-                <div className="flex-1 w-full min-h-[300px] sm:min-h-[350px] relative flex-shrink-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={topExercisesOverTimeData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                      <defs>
-                        {topExercisesData.map((entry, index) => (
-                          <linearGradient key={`gradient-${entry.name}`} id={`gradient-${index}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={PIE_COLORS[index % PIE_COLORS.length]} stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor={PIE_COLORS[index % PIE_COLORS.length]} stopOpacity={0}/>
-                          </linearGradient>
-                        ))}
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
-                      <XAxis 
-                        dataKey="date" 
-                        stroke="#64748b" 
-                        style={{ fontSize: '11px' }}
-                        tick={{ fill: '#94a3b8' }}
-                      />
-                      <YAxis 
-                        stroke="#64748b" 
-                        style={{ fontSize: '11px' }}
-                        tick={{ fill: '#94a3b8' }}
-                        label={{ value: 'Sets', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#94a3b8', fontSize: '11px' } }}
-                      />
-                      <Tooltip 
-                        contentStyle={TooltipStyle}
-                        labelFormatter={(label, payload) => {
-                          if (payload && payload[0]) {
-                            return payload[0].payload.dateFormatted;
-                          }
-                          return label;
-                        }}
-                        formatter={(value: number) => [`${value} sets`, '']}
-                      />
-                      {topExercisesData.map((entry, index) => (
-                        <Area 
-                          key={entry.name}
-                          type="monotone" 
-                          dataKey={entry.name} 
-                          stroke={PIE_COLORS[index % PIE_COLORS.length]}
-                          strokeWidth={2.5}
-                          fill={`url(#gradient-${index})`}
-                          dot={{ fill: PIE_COLORS[index % PIE_COLORS.length], r: 3 }}
-                          activeDot={{ r: 5 }}
-                          name={entry.name}
-                        />
-                      ))}
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-                {/* Legend Container - Same style as pie chart, expands below chart */}
-                <div className="w-full pt-4 mt-auto border-t border-slate-800/50">
-                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-2">
-                    {topExercisesData.map((entry, index) => (
-                      <div key={entry.name} className="flex items-center gap-1.5">
-                        <div 
-                          className="w-3 h-3 rounded-sm flex-shrink-0" 
-                          style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
-                        />
-                        <span className="text-[10px] text-slate-400">{entry.name}</span>
-                      </div>
-                    ))}
-                  </div>
-               </div>
+              )}
             </div>
-            )}
-            <ChartDescription>
+            <ChartDescription isMounted={isMounted}>
               {topExerciseView === 'pie' ? (
                 <>
                   <p>

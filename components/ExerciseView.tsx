@@ -4,16 +4,17 @@ import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { 
-  Search, 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle, 
-  Minus, 
-  Activity,
-  Dumbbell,
-  Layers,
-  Scale
+  Search, TrendingUp, TrendingDown, AlertTriangle, Minus, Activity,
+  Dumbbell, Layers, Scale
 } from 'lucide-react';
+
+// --- STYLES ---
+// Applying the requested font style
+const FANCY_FONT: React.CSSProperties = {
+  fontFamily: '"Libre Baskerville", "Poppins", sans-serif',
+  fontWeight: 600,
+  fontStyle: 'italic',
+};
 
 // --- TYPES & LOGIC ---
 
@@ -122,7 +123,12 @@ const StatCard = ({ label, value, unit, icon: Icon }: any) => (
     <div>
       <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-0.5">{label}</p>
       <div className="flex items-baseline gap-1">
-        <span className="text-lg sm:text-xl font-bold text-white tracking-tight">{value}</span>
+        <span 
+          className="text-lg sm:text-xl text-white tracking-tight"
+          style={FANCY_FONT}
+        >
+          {value}
+        </span>
         {unit && <span className="text-xs font-medium text-slate-500">{unit}</span>}
       </div>
     </div>
@@ -135,12 +141,12 @@ const StatCard = ({ label, value, unit, icon: Icon }: any) => (
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg shadow-2xl shadow-black/50">
+      <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg shadow-2xl shadow-black/50 animate-in fade-in zoom-in-95 duration-200">
         <p className="text-slate-400 text-xs mb-2 font-mono">{label}</p>
         <div className="space-y-1">
           <p className="text-sm font-bold text-blue-400 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-            1RM: {payload[0].value} kg
+            1RM: <span style={FANCY_FONT}>{payload[0].value} kg</span>
           </p>
           {payload[1] && (
             <p className="text-xs text-slate-500 flex items-center gap-2">
@@ -195,7 +201,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
   const currentStatus = selectedStats ? statusMap[selectedStats.name] : null;
 
   return (
-    <div className="flex flex-col gap-6 w-full text-slate-200 pb-10">
+    <div className="flex flex-col gap-6 w-full text-slate-200 pb-10 animate-in fade-in duration-500">
       
       {/* 
           TOP SECTION: GRID LAYOUT
@@ -203,7 +209,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* --- LEFT: SIDEBAR --- */}
-        <div className="lg:col-span-1 flex flex-col gap-3 max-h-[30vh]">
+        <div className="lg:col-span-1 flex flex-col gap-3 max-h-[400px]">
           {/* Search Header */}
           <div className="relative shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
@@ -218,7 +224,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
 
           {/* 
              LIST WRAPPER
-             Using flex-1 to match the height of Header & Insight section
           */}
           <div className="flex-1 bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden flex flex-col">
             <div className="overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar flex-1">
@@ -243,7 +248,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                     }`}
                   >
                     <div className="flex flex-col min-w-0 pr-2">
-                      <span className={`truncate font-medium text-xs ${isSelected ? 'text-blue-100' : 'text-slate-300 group-hover:text-white'}`}>
+                      <span className={`truncate text-xs ${isSelected ? 'text-blue-100 font-semibold' : 'text-slate-300 group-hover:text-white'}`}>
                         {ex.name}
                       </span>
                       <span className="text-[10px] text-slate-500 truncate">
@@ -252,11 +257,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                     </div>
                     
                     {isSelected ? (
-                       <div className={`p-1 rounded-md ${status.bgColor}`}>
+                       <div className={`p-1 rounded-md ${status.bgColor} animate-in zoom-in-50 duration-200`}>
                           <IndicatorIcon className={`w-3 h-3 ${status.color}`} />
                        </div>
                     ) : (
-                      <div className={`w-2 h-2 rounded-full ${indicatorColor.replace('text-', 'bg-')} opacity-40 group-hover:opacity-100`} />
+                      <div className={`w-2 h-2 rounded-full ${indicatorColor.replace('text-', 'bg-')} opacity-40 group-hover:opacity-100 transition-opacity`} />
                     )}
                   </button>
                 );
@@ -268,29 +273,39 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
         {/* --- RIGHT: HEADER & METRICS --- */}
         <div className="lg:col-span-2 flex flex-col gap-6">
           {selectedStats && currentStatus ? (
-            <>
+            <div className="animate-in fade-in slide-in-from-right-4 duration-500">
               {/* 1. Header & Insight */}
-              <div className="flex flex-col xl:flex-row gap-2 sm:gap-3">
+              <div className="flex flex-col xl:flex-row gap-2 sm:gap-3 mb-6">
                 <div className="flex-1">
-                  <h2 className="text-2xl sm:text-2xl font-bold text-white mb-1 tracking-tight">{selectedStats.name}</h2>
+                  <h2 
+                    className="text-2xl sm:text-3xl text-white mb-1 tracking-tight drop-shadow-lg"
+                    style={FANCY_FONT}
+                  >
+                    {selectedStats.name}
+                  </h2>
                 </div>
-                <div className={`flex-1 xl:max-w-md rounded-lg p-2.5 sm:p-3 border ${currentStatus.borderColor} ${currentStatus.bgColor} relative overflow-hidden group`}>
+                <div className={`flex-1 xl:max-w-md rounded-lg p-2.5 sm:p-3 border ${currentStatus.borderColor} ${currentStatus.bgColor} relative overflow-hidden group transition-all duration-500`}>
                   <div className="relative z-10 flex gap-2 sm:gap-2.5">
                     <div className={`p-1.5 sm:p-2 rounded-lg bg-slate-950/40 h-fit ${currentStatus.color} flex-shrink-0`}>
                       <currentStatus.icon size={18} className="sm:w-5 sm:h-5" />
                     </div>
                     <div>
-                      <h4 className={`font-bold text-xs sm:text-sm ${currentStatus.color}`}>{currentStatus.title}</h4>
-                      <p className="text-slate-300 text-xs leading-tight mt-0.5">{currentStatus.description}</p>
+                      <h4 
+                        className={`text-xs sm:text-sm ${currentStatus.color} mb-0.5`}
+                        style={FANCY_FONT}
+                      >
+                        {currentStatus.title}
+                      </h4>
+                      <p className="text-slate-300 text-xs leading-tight">{currentStatus.description}</p>
                       {currentStatus.subtext && (
-                         <div className="mt-0.5 mb-1 text-[10px] sm:text-xs font-mono opacity-80 flex items-center gap-1">
+                         <div className="mt-1 mb-0.5 text-[10px] sm:text-xs font-mono opacity-80 flex items-center gap-1">
                            <span className="w-1 h-1 bg-current rounded-full" />
                            {currentStatus.subtext}
                          </div>
                       )}
                     </div>
                   </div>
-                  <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl opacity-20 ${currentStatus.color.replace('text', 'bg')}`} />
+                  <div className={`absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl opacity-20 transition-all duration-700 group-hover:opacity-30 ${currentStatus.color.replace('text', 'bg')}`} />
                 </div>
               </div>
 
@@ -300,7 +315,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                 <StatCard label="Total Volume" value={(selectedStats.totalVolume / 1000).toFixed(1)} unit="k" icon={Scale} />
                 <StatCard label="Sessions" value={selectedStats.totalSets} unit="" icon={Layers} />
               </div>
-            </>
+            </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-600 gap-4 border border-dashed border-slate-800 rounded-xl bg-slate-900/20 min-h-[300px]">
               <div className="p-4 bg-slate-900 rounded-full">
@@ -316,7 +331,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
           BOTTOM SECTION: CHART 
       */}
       {selectedStats && (
-        <div className="w-full bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-3 sm:p-6 relative flex flex-col h-[400px]">
+        <div className="w-full bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-3 sm:p-6 relative flex flex-col h-[400px] animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 sm:mb-6 gap-2">
              <div>
                 <h3 className="text-base sm:text-lg font-semibold text-white">Strength Progression</h3>
@@ -367,6 +382,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                   fillOpacity={1} 
                   fill="url(#color1RM)" 
                   activeDot={{ r: 5, strokeWidth: 0, fill: '#60a5fa' }}
+                  animationDuration={1500}
                 />
                 
                 <Line 
@@ -377,6 +393,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                   strokeDasharray="4 4" 
                   dot={false}
                   activeDot={false}
+                  animationDuration={1500}
                 />
               </AreaChart>
             </ResponsiveContainer>
