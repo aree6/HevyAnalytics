@@ -91,11 +91,11 @@ const DashboardTooltip: React.FC<{ data: { rect: DOMRect, title: string, body: s
 
 // 2. Chart Interpretation Footer
 const ChartDescription = ({ children }: { children: React.ReactNode }) => (
-  <div className="mt-4 pt-4 border-t border-slate-800 flex items-start gap-3">
-    <Info className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
-    <p className="text-xs text-slate-400 leading-relaxed">
+  <div className="mt-4 pt-4 border-t border-slate-800 flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <Info className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0 transition-opacity duration-200 hover:opacity-80" />
+    <div className="text-xs text-slate-400 leading-relaxed space-y-2">
       {children}
-    </p>
+    </div>
   </div>
 );
 
@@ -119,20 +119,24 @@ const ChartHeader = ({
   onViewToggle?: (v: string) => void,
   viewOptions?: { value: string, label: string }[]
 }) => (
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3 sm:gap-0">
-    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-      <Icon className={`w-5 h-5 ${color}`} />
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3 sm:gap-0 animate-in fade-in slide-in-from-top-2 duration-300">
+    <h3 className="text-lg font-semibold text-white flex items-center gap-2 transition-opacity duration-200 hover:opacity-90">
+      <Icon className={`w-5 h-5 ${color} transition-opacity duration-200 hover:opacity-80`} />
       {title}
     </h3>
     <div className="flex items-center gap-2 flex-wrap">
       {/* View Type Toggle (Line/Area, Area/Line, Radar/Bar) */}
       {viewType && onViewToggle && viewOptions && (
-        <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800">
+        <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
           {viewOptions.map((option) => (
             <button
               key={option.value}
               onClick={() => onViewToggle(option.value)}
-              className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${viewType === option.value ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+              className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-all duration-200 ${
+                viewType === option.value 
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+              }`}
             >
               {option.label}
             </button>
@@ -141,16 +145,24 @@ const ChartHeader = ({
       )}
       {/* Daily/Monthly Toggle */}
     {mode && onToggle && (
-      <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800">
+      <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
         <button 
           onClick={() => onToggle('monthly')} 
-          className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${mode === 'monthly' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+          className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-all duration-200 transform hover:scale-105 active:scale-95 ${
+            mode === 'monthly' 
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
+              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+          }`}
         >
           Avg
         </button>
         <button 
           onClick={() => onToggle('daily')} 
-          className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${mode === 'daily' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+          className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-all duration-200 transform hover:scale-105 active:scale-95 ${
+            mode === 'daily' 
+              ? 'bg-blue-600 text-white shadow-lg shadow-lg shadow-blue-600/30' 
+              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+          }`}
         >
           Day
         </button>
@@ -230,7 +242,7 @@ const Heatmap = ({ dailyData, totalPrs, onDayClick }: { dailyData: DailySummary[
             {heatmapData.map((day) => (
               <div 
                 key={day.date.toISOString()}
-                className={`w-3 h-3 rounded-sm ${getColor(day.count)} transition-all duration-300 ${day.count > 0 ? 'cursor-pointer hover:scale-125 hover:z-10 ring-0 hover:ring-2 ring-white/20' : 'cursor-default'}`}
+                className={`w-3 h-3 rounded-sm ${getColor(day.count)} transition-all duration-300 ${day.count > 0 ? 'cursor-pointer hover:z-10 ring-0 hover:ring-2 ring-white/20' : 'cursor-default'}`}
                 onClick={() => day.count > 0 && onDayClick?.(day.date)}
                 onMouseEnter={(e) => handleMouseEnter(e, day)}
                 onMouseLeave={() => setTooltip(null)}
@@ -410,7 +422,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         
         {/* 2. PR TRENDS (Area/Bar) */}
         {visibleCharts.prTrend && (
-          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl animate-in fade-in slide-in-from-bottom-2">
             <ChartHeader 
               title="PRs Over Time" 
               icon={Trophy} 
@@ -421,9 +433,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               onViewToggle={setPrTrendView}
               viewOptions={[{ value: 'area', label: 'Area' }, { value: 'bar', label: 'Bar' }]}
             />
-            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px]">
+            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-500">
               <ResponsiveContainer width="100%" height="100%">
-                {prTrendView === 'area' ? (
+                <div key={prTrendView} className="animate-in fade-in duration-500">
+                  {prTrendView === 'area' ? (
                   <AreaChart data={prsData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                     <defs>
                       <linearGradient id="gPRs" x1="0" y1="0" x2="0" y2="1">
@@ -454,18 +467,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     <Tooltip contentStyle={TooltipStyle} />
                     <Bar dataKey="count" name="PRs Set" fill="#eab308" radius={[8, 8, 0, 0]} />
                   </BarChart>
-                )}
+                  )}
+                </div>
               </ResponsiveContainer>
             </div>
             <ChartDescription>
-              <span className="font-semibold text-slate-300"> </span> This chart tracks the cumulative number of Personal Records set over time. A steep upward slope indicates periods of rapid strength gain (e.g., beginner gains or peaking blocks), while a plateau suggests maintenance.
+              <p>
+                <span className="font-semibold text-slate-300">Track your strength milestones.</span> This chart reveals when you're hitting new personal records—those breakthrough moments that define your progress.
+              </p>
+              <p>
+                Higher values indicate periods of rapid strength gain (beginner gains, peaking blocks), while lower values suggest maintenance or deload phases.
+              </p>
+              <p className="text-slate-500 italic">
+                💡 Switch between <span className="text-blue-400">Area</span> and <span className="text-blue-400">Bar</span> views to see smooth trends or compare discrete periods.
+              </p>
             </ChartDescription>
           </div>
         )}
 
         {/* 3. VOLUME DENSITY (Area/Bar) */}
         {visibleCharts.volumeVsDuration && (
-          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl animate-in fade-in slide-in-from-bottom-2">
             <ChartHeader 
               title="Volume Density" 
               icon={Timer} 
@@ -476,8 +498,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               onViewToggle={setVolumeView}
               viewOptions={[{ value: 'area', label: 'Area' }, { value: 'bar', label: 'Bar' }]}
             />
-            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px]">
+            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-500">
               <ResponsiveContainer width="100%" height="100%">
+                <div key={volumeView} className="animate-in fade-in duration-500">
                 {volumeView === 'area' ? (
                   <AreaChart data={volumeDurationData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                   <defs>
@@ -517,10 +540,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     <Bar dataKey="volumePerSet" name="Volume per Set (kg)" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 )}
+                </div>
               </ResponsiveContainer>
             </div>
             <ChartDescription>
-              <span className="font-semibold text-slate-300"> </span> Shows the average volume done per set. A higher volume per set indicates more intense or challenging sets, while trends reveal changes in your training intensity and work capacity.
+              <p>
+                <span className="font-semibold text-slate-300">Measure your training intensity.</span> This metric shows how much volume you're moving per set—a key indicator of workout difficulty.
+              </p>
+              <p>
+                Higher values mean you're pushing heavier weights or doing more reps per set. Watch the trends to see how your work capacity evolves over time.
+              </p>
+              <p className="text-slate-500 italic">
+                💡 Switch between <span className="text-purple-400">Area</span> and <span className="text-purple-400">Bar</span> views to see smooth trends or compare discrete periods.
+              </p>
             </ChartDescription>
           </div>
         )}
@@ -528,7 +560,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
       {/* 4. INTENSITY EVOLUTION (Area/Stacked Bar) */}
       {visibleCharts.intensityEvo && (
-        <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col">
+        <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl animate-in fade-in slide-in-from-bottom-2">
           <ChartHeader 
             title="Training Style Evolution (Sets per Month)" 
             icon={Layers} 
@@ -542,6 +574,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
           {intensityData && intensityData.length > 0 ? (
             <div className="flex-1 w-full" style={{minHeight: '250px', height: '100%'}}>
               <ResponsiveContainer width="100%" height={250}>
+                <div key={intensityView} className="animate-in fade-in duration-500">
                 {intensityView === 'area' ? (
                 <AreaChart data={intensityData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                   <defs>
@@ -570,6 +603,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     <Bar dataKey="Endurance" name="Endurance (13+)" stackId="1" fill="#a855f7" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 )}
+                </div>
               </ResponsiveContainer>
             </div>
           ) : (
@@ -582,7 +616,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             </div>
           )}
           <ChartDescription>
-             <span className="font-semibold text-slate-300"> </span> Visualizes your rep ranges over time. <span className="text-blue-400">Strength</span> (1-5 reps) builds power, <span className="text-emerald-400">Hypertrophy</span> (6-12 reps) builds size, and <span className="text-purple-400">Endurance</span> (13+) builds stamina.
+             <p>
+               <span className="font-semibold text-slate-300">Discover your training style.</span> This chart breaks down your workouts by rep ranges, revealing what you're actually training for.
+             </p>
+             <p>
+               <span className="text-blue-400">Strength</span> (1-5 reps) builds raw power, <span className="text-emerald-400">Hypertrophy</span> (6-12 reps) builds muscle size, and <span className="text-purple-400">Endurance</span> (13+ reps) builds stamina. The balance between these tells your training story.
+             </p>
+             <p className="text-slate-500 italic">
+               💡 Switch between <span className="text-orange-400">Area</span> and <span className="text-orange-400">Stacked Bar</span> views to see layered trends or detailed composition breakdowns.
+             </p>
           </ChartDescription>
         </div>
       )}
@@ -592,7 +634,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         
         {/* Weekly Rhythm: Radar/Bar */}
         {visibleCharts.weekShape && (
-          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl animate-in fade-in slide-in-from-bottom-2">
             <ChartHeader 
               title="Weekly Rhythm" 
               icon={Clock} 
@@ -601,8 +643,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               onViewToggle={setWeekShapeView}
               viewOptions={[{ value: 'radar', label: 'Radar' }, { value: 'bar', label: 'Bar' }]}
             />
-            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px]">
+            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-500">
               <ResponsiveContainer width="100%" height="100%">
+                <div key={weekShapeView} className="animate-in fade-in duration-500">
                 {weekShapeView === 'radar' ? (
                 <RadarChart cx="50%" cy="50%" outerRadius="70%" data={weekShapeData}>
                   <PolarGrid stroke="#334155" />
@@ -620,17 +663,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     <Bar dataKey="A" name="Workouts" fill="#ec4899" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 )}
+                </div>
               </ResponsiveContainer>
             </div>
             <ChartDescription>
-              <span className="font-semibold text-slate-300"> </span> Shows workout frequency by day of the week. A balanced shape indicates consistent daily habits, while a skewed shape reveals your preferred "gym days."
+              <p>
+                <span className="font-semibold text-slate-300">Find your rhythm.</span> This chart reveals your workout patterns—when you train and how consistently.
+              </p>
+              <p>
+                A balanced pattern shows consistent daily habits, while a skewed shape reveals your preferred "gym days." Are you a weekend warrior or a weekday warrior?
+              </p>
+              <p className="text-slate-500 italic">
+                💡 Switch between <span className="text-pink-400">Radar</span> and <span className="text-pink-400">Bar</span> views to see a circular pattern or traditional comparison.
+              </p>
             </ChartDescription>
           </div>
         )}
 
         {/* Top Exercises: Pie Chart or Line Graph */}
         {visibleCharts.topExercises && (
-          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col">
+          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl animate-in fade-in slide-in-from-bottom-2">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 sm:gap-0">
               <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
                 <Zap className="w-5 h-5 text-amber-500" />
@@ -638,31 +690,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
                 {/* View Toggle: Pie vs Area */}
-                <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800">
+                <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
                   <button 
                     onClick={() => setTopExerciseView('pie')} 
-                    className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${topExerciseView === 'pie' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-all duration-200 ${
+                      topExerciseView === 'pie' 
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
+                        : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                    }`}
                   >
                     Pie
                   </button>
                   <button 
                     onClick={() => setTopExerciseView('area')} 
-                    className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${topExerciseView === 'area' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-all duration-200 ${
+                      topExerciseView === 'area' 
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
+                        : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                    }`}
                   >
                     Area
                   </button>
                 </div>
                 {/* Daily/Monthly Toggle (available for both pie and line) */}
-                <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800">
+                <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
                   <button 
                     onClick={() => setTopExerciseMode('monthly')} 
-                    className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${topExerciseMode === 'monthly' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-all duration-200 ${
+                      topExerciseMode === 'monthly' 
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
+                        : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                    }`}
                   >
                     Avg
                   </button>
                   <button 
                     onClick={() => setTopExerciseMode('daily')} 
-                    className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${topExerciseMode === 'daily' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-all duration-200 ${
+                      topExerciseMode === 'daily' 
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
+                        : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                    }`}
                   >
                     Day
                   </button>
@@ -684,7 +752,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             </div>
             
             {topExerciseView === 'pie' ? (
-              <div className="flex-1 w-full flex flex-col">
+              <div key="pie" className="flex-1 w-full flex flex-col animate-in fade-in duration-500">
                  {/* Pie Chart Container - Fixed height, stays in place */}
                  <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] relative flex-shrink-0">
                <ResponsiveContainer width="100%" height="100%">
@@ -728,7 +796,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                  </div>
               </div>
             ) : (
-              <div className="flex-1 w-full flex flex-col">
+              <div key="area" className="flex-1 w-full flex flex-col animate-in fade-in duration-500">
                 {/* Area Chart Container */}
                 <div className="flex-1 w-full min-h-[300px] sm:min-h-[350px] relative flex-shrink-0">
                   <ResponsiveContainer width="100%" height="100%">
@@ -797,11 +865,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             </div>
             )}
             <ChartDescription>
-              <span className="font-semibold text-slate-300"> </span> 
-              {topExerciseView === 'pie' 
-                ? "Highlights your most practiced movements by total set count. Ideally, your \"Big 3\" compounds should be the largest slices here."
-                : `Shows how your favorite exercises have been changing over time. Track consistency and trends in your ${topExerciseMode === 'monthly' ? 'monthly averages' : 'daily' } training patterns with beautiful area gradients.`
-              }
+              {topExerciseView === 'pie' ? (
+                <>
+                  <p>
+                    <span className="font-semibold text-slate-300">Your exercise portfolio.</span> This donut chart shows which movements you practice most—your training DNA.
+                  </p>
+                  <p>
+                    Ideally, your "Big 3" compounds (squat, bench, deadlift) should dominate. If isolation exercises are largest, consider rebalancing your program.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    <span className="font-semibold text-slate-300">Watch your favorites evolve.</span> See how your most-used exercises change over time—are you staying consistent or exploring new movements?
+                  </p>
+                  <p>
+                    Track trends in your {topExerciseMode === 'monthly' ? 'monthly averages' : 'daily'} training patterns. The overlapping gradients show when exercises peak and fade.
+                  </p>
+                  <p className="text-slate-500 italic">
+                    💡 Switch between <span className="text-amber-400">Pie</span> and <span className="text-amber-400">Area</span> views to see totals or time-based trends.
+                  </p>
+                </>
+              )}
             </ChartDescription>
           </div>
         )}

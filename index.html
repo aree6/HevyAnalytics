@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0, user-scalable=yes" />
     <title>HevyAnalytics - Workout Visualizer</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><circle cx='100' cy='100' r='100' fill='%23000000'/><g fill='%23ffffff'><path d='M60 120 L85 85 L110 100 L140 60 L150 70 L110 120 Z' stroke='%23ffffff' stroke-width='8' stroke-linecap='round' stroke-linejoin='round' fill='none'/><rect x='60' y='110' width='15' height='20' rx='2'/><rect x='85' y='105' width='15' height='25' rx='2'/><rect x='110' y='100' width='15' height='30' rx='2'/><rect x='135' y='95' width='15' height='35' rx='2'/></g></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       /* Custom Scrollbar for a sleeker look */
@@ -35,6 +38,61 @@
           user-select: text;
           -webkit-touch-callout: default;
         }
+      }
+      
+      /* Smooth animations */
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateX(-10px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      
+      @keyframes scaleIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      
+      .animate-in {
+        animation: fadeIn 0.3s ease-out;
+      }
+      
+      .fade-in {
+        animation: fadeIn 0.3s ease-out;
+      }
+      
+      .slide-in-from-top-2 {
+        animation: slideIn 0.3s ease-out;
+      }
+      
+      .slide-in-from-bottom-2 {
+        animation: slideIn 0.3s ease-out reverse;
+      }
+      
+      /* Italic text styling with Libre Baskerville */
+      em, i, [class*="italic"] {
+        font-family: "Libre Baskerville", "Poppins", sans-serif !important;
+        font-weight: 600;
+        font-style: italic;
+      }
+      
+      /* Smooth transitions for all interactive elements */
+      * {
+        transition-property: color, background-color, border-color, opacity, box-shadow;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 150ms;
+      }
+      
+      /* Chart container animations */
+      [class*="bg-slate-900 border"] {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      [class*="bg-slate-900 border"]:hover {
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
       }
     </style>
   <script type="importmap">
