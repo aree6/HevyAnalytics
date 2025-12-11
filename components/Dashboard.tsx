@@ -13,7 +13,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   Legend, AreaChart, Area, 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
-  PieChart, Pie, Cell
+  PieChart, Pie, Cell,
+  BarChart, Bar
 } from 'recharts';
 import { 
   Calendar, Zap, Layers, Eye, Layout, ChevronDown, 
@@ -99,12 +100,46 @@ const ChartDescription = ({ children }: { children: React.ReactNode }) => (
 );
 
 // 3. Reusable Chart Header with Toggles
-const ChartHeader = ({ title, icon: Icon, color, mode, onToggle }: { title: string, icon: any, color: string, mode?: 'daily'|'monthly', onToggle?: (m: 'daily'|'monthly') => void }) => (
-  <div className="flex justify-between items-center mb-6">
+const ChartHeader = ({ 
+  title, 
+  icon: Icon, 
+  color, 
+  mode, 
+  onToggle,
+  viewType,
+  onViewToggle,
+  viewOptions
+}: { 
+  title: string, 
+  icon: any, 
+  color: string, 
+  mode?: 'daily'|'monthly', 
+  onToggle?: (m: 'daily'|'monthly') => void,
+  viewType?: string,
+  onViewToggle?: (v: string) => void,
+  viewOptions?: { value: string, label: string }[]
+}) => (
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3 sm:gap-0">
     <h3 className="text-lg font-semibold text-white flex items-center gap-2">
       <Icon className={`w-5 h-5 ${color}`} />
       {title}
     </h3>
+    <div className="flex items-center gap-2 flex-wrap">
+      {/* View Type Toggle (Line/Area, Area/Line, Radar/Bar) */}
+      {viewType && onViewToggle && viewOptions && (
+        <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800">
+          {viewOptions.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onViewToggle(option.value)}
+              className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${viewType === option.value ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {/* Daily/Monthly Toggle */}
     {mode && onToggle && (
       <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800">
         <button 
@@ -121,6 +156,7 @@ const ChartHeader = ({ title, icon: Icon, color, mode, onToggle }: { title: stri
         </button>
       </div>
     )}
+    </div>
   </div>
 );
 
@@ -137,8 +173,8 @@ const Heatmap = ({ dailyData, totalPrs, onDayClick }: { dailyData: DailySummary[
       requestAnimationFrame(() => {
         // Add a small delay for mobile browsers to complete layout
         setTimeout(() => {
-          if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
           }
         }, 100);
       });
@@ -250,8 +286,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [topExerciseLimit, setTopExerciseLimit] = useState(3);
-  const [topExerciseView, setTopExerciseView] = useState<'pie' | 'line'>('line');
+  const [topExerciseView, setTopExerciseView] = useState<'pie' | 'area'>('area');
   const [topExerciseMode, setTopExerciseMode] = useState<'daily' | 'monthly'>('monthly');
+  
+  // Chart view type states (defaults keep existing chart types)
+  const [prTrendView, setPrTrendView] = useState<'area' | 'bar'>('area');
+  const [volumeView, setVolumeView] = useState<'area' | 'bar'>('area');
+  const [intensityView, setIntensityView] = useState<'area' | 'stackedBar'>('area');
+  const [weekShapeView, setWeekShapeView] = useState<'radar' | 'bar'>('radar');
 
   const toggleChart = (key: ChartKey) => {
     setVisibleCharts(prev => ({ ...prev, [key]: !prev[key] }));
@@ -366,7 +408,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         
-        {/* 2. PR TRENDS (Line) */}
+        {/* 2. PR TRENDS (Area/Bar) */}
         {visibleCharts.prTrend && (
           <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col">
             <ChartHeader 
@@ -375,24 +417,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               color="text-yellow-500" 
               mode={chartModes.prTrend}
               onToggle={(m) => toggleChartMode('prTrend', m)}
+              viewType={prTrendView}
+              onViewToggle={setPrTrendView}
+              viewOptions={[{ value: 'area', label: 'Area' }, { value: 'bar', label: 'Bar' }]}
             />
             <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={prsData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                {prTrendView === 'area' ? (
+                  <AreaChart data={prsData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gPRs" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#eab308" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                   <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
                   <Tooltip contentStyle={TooltipStyle} cursor={{stroke: 'rgba(255,255,255,0.1)'}} />
-                  <Line 
+                    <Area 
                     type="monotone" 
                     dataKey="count" 
                     name="PRs Set" 
                     stroke="#eab308" 
                     strokeWidth={3} 
+                      fill="url(#gPRs)"
                     dot={{r:3, fill:'#eab308'}} 
                     activeDot={{r:5, strokeWidth: 0}} 
                   />
-                </LineChart>
+                  </AreaChart>
+                ) : (
+                  <BarChart data={prsData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <Tooltip contentStyle={TooltipStyle} />
+                    <Bar dataKey="count" name="PRs Set" fill="#eab308" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                )}
               </ResponsiveContainer>
             </div>
             <ChartDescription>
@@ -401,7 +463,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
           </div>
         )}
 
-        {/* 3. VOLUME DENSITY (Line) */}
+        {/* 3. VOLUME DENSITY (Area/Bar) */}
         {visibleCharts.volumeVsDuration && (
           <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col">
             <ChartHeader 
@@ -410,13 +472,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               color="text-purple-500" 
               mode={chartModes.volumeVsDuration}
               onToggle={(m) => toggleChartMode('volumeVsDuration', m)}
+              viewType={volumeView}
+              onViewToggle={setVolumeView}
+              viewOptions={[{ value: 'area', label: 'Area' }, { value: 'bar', label: 'Bar' }]}
             />
             <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={volumeDurationData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                {volumeView === 'area' ? (
+                  <AreaChart data={volumeDurationData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="gDensity" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                      <linearGradient id="gDensityArea" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.5}/>
                       <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
@@ -432,8 +498,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     }}
                   />
                   <Legend />
-                  <Line type="monotone" dataKey="volumePerSet" name="Volume per Set (kg)" stroke="#8b5cf6" strokeWidth={3} dot={{r:3, fill:'#8b5cf6'}} activeDot={{r:5, strokeWidth: 0}} />
-                </LineChart>
+                    <Area type="monotone" dataKey="volumePerSet" name="Volume per Set (kg)" stroke="#8b5cf6" strokeWidth={3} fill="url(#gDensityArea)" dot={{r:3, fill:'#8b5cf6'}} activeDot={{r:5, strokeWidth: 0}} />
+                  </AreaChart>
+                ) : (
+                  <BarChart data={volumeDurationData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#8b5cf6" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}kg`} />
+                    <Tooltip 
+                      contentStyle={TooltipStyle} 
+                      labelFormatter={(l, p) => p[0]?.payload?.tooltipLabel || l} 
+                      formatter={(val: number, name) => {
+                          if (name === 'Volume per Set (kg)') return [`${val} kg`, name];
+                          return [val, name];
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="volumePerSet" name="Volume per Set (kg)" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                )}
               </ResponsiveContainer>
             </div>
             <ChartDescription>
@@ -443,7 +526,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         )}
       </div>
 
-      {/* 4. INTENSITY EVOLUTION (Stacked Area) */}
+      {/* 4. INTENSITY EVOLUTION (Area/Stacked Bar) */}
       {visibleCharts.intensityEvo && (
         <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col">
           <ChartHeader 
@@ -452,10 +535,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             color="text-orange-500"
             mode={chartModes.intensityEvo}
             onToggle={(m) => toggleChartMode('intensityEvo', m)} 
+            viewType={intensityView}
+            onViewToggle={setIntensityView}
+            viewOptions={[{ value: 'area', label: 'Area' }, { value: 'stackedBar', label: 'Stacked' }]}
           />
           {intensityData && intensityData.length > 0 ? (
             <div className="flex-1 w-full" style={{minHeight: '250px', height: '100%'}}>
               <ResponsiveContainer width="100%" height={250}>
+                {intensityView === 'area' ? (
                 <AreaChart data={intensityData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gStrength" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient>
@@ -471,6 +558,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                   <Area type="monotone" dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" stroke="#10b981" fill="url(#gHyper)" />
                   <Area type="monotone" dataKey="Endurance" name="Endurance (13+)" stackId="1" stroke="#a855f7" fill="url(#gEndure)" />
                 </AreaChart>
+                ) : (
+                  <BarChart data={intensityData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={TooltipStyle} />
+                    <Legend wrapperStyle={{fontSize: '11px'}} />
+                    <Bar dataKey="Strength" name="Strength (1-5)" stackId="1" fill="#3b82f6" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" fill="#10b981" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="Endurance" name="Endurance (13+)" stackId="1" fill="#a855f7" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                )}
               </ResponsiveContainer>
             </div>
           ) : (
@@ -491,12 +590,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
       {/* 5. RADAR & PIE */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         
-        {/* Radar Chart: Weekly Rhythm */}
+        {/* Weekly Rhythm: Radar/Bar */}
         {visibleCharts.weekShape && (
           <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col">
-            <ChartHeader title="Weekly Rhythm" icon={Clock} color="text-pink-500" />
+            <ChartHeader 
+              title="Weekly Rhythm" 
+              icon={Clock} 
+              color="text-pink-500"
+              viewType={weekShapeView}
+              onViewToggle={setWeekShapeView}
+              viewOptions={[{ value: 'radar', label: 'Radar' }, { value: 'bar', label: 'Bar' }]}
+            />
             <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
+                {weekShapeView === 'radar' ? (
                 <RadarChart cx="50%" cy="50%" outerRadius="70%" data={weekShapeData}>
                   <PolarGrid stroke="#334155" />
                   <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
@@ -504,6 +611,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                   <Radar name="Workouts" dataKey="A" stroke="#ec4899" strokeWidth={3} fill="#ec4899" fillOpacity={0.4} />
                   <Tooltip contentStyle={TooltipStyle} />
                 </RadarChart>
+                ) : (
+                  <BarChart data={weekShapeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis dataKey="subject" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={TooltipStyle} />
+                    <Bar dataKey="A" name="Workouts" fill="#ec4899" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                )}
               </ResponsiveContainer>
             </div>
             <ChartDescription>
@@ -521,7 +637,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                 Most Frequent Exercises
               </h3>
               <div className="flex items-center gap-2 flex-wrap">
-                {/* View Toggle: Pie vs Line */}
+                {/* View Toggle: Pie vs Area */}
                 <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800">
                   <button 
                     onClick={() => setTopExerciseView('pie')} 
@@ -530,10 +646,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     Pie
                   </button>
                   <button 
-                    onClick={() => setTopExerciseView('line')} 
-                    className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${topExerciseView === 'line' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    onClick={() => setTopExerciseView('area')} 
+                    className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-colors ${topExerciseView === 'area' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                   >
-                    Line
+                    Area
                   </button>
                 </div>
                 {/* Daily/Monthly Toggle (available for both pie and line) */}
@@ -552,11 +668,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                   </button>
                 </div>
                 {/* Exercise Count Dropdown */}
-                <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
+              <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
                   <span className="text-xs text-slate-400 font-medium">Show:</span>
                   <select 
-                    value={topExerciseLimit} 
-                    onChange={(e) => setTopExerciseLimit(parseInt(e.target.value))}
+                  value={topExerciseLimit} 
+                  onChange={(e) => setTopExerciseLimit(parseInt(e.target.value))}
                     className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
                     {[3, 4, 5, 6, 7, 8].map(num => (
@@ -571,25 +687,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               <div className="flex-1 w-full flex flex-col">
                  {/* Pie Chart Container - Fixed height, stays in place */}
                  <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] relative flex-shrink-0">
-                   <ResponsiveContainer width="100%" height="100%">
-                     <PieChart>
-                       <Pie 
-                         data={topExercisesData} 
-                         cx="50%" 
-                         cy="50%" 
-                         innerRadius={50} 
-                         outerRadius={85} 
-                         paddingAngle={4} 
-                         dataKey="count"
-                         cornerRadius={6}
-                       >
-                         {topExercisesData.map((entry, index) => (
-                           <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="none" />
-                         ))}
-                       </Pie>
-                       <Tooltip contentStyle={TooltipStyle} formatter={(val, name) => [`${val} sets`, name]} />
-                     </PieChart>
-                   </ResponsiveContainer>
+               <ResponsiveContainer width="100%" height="100%">
+                 <PieChart>
+                   <Pie 
+                     data={topExercisesData} 
+                     cx="50%" 
+                     cy="50%" 
+                     innerRadius={50} 
+                     outerRadius={85} 
+                     paddingAngle={4} 
+                     dataKey="count"
+                     cornerRadius={6}
+                   >
+                     {topExercisesData.map((entry, index) => (
+                       <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="none" />
+                     ))}
+                   </Pie>
+                   <Tooltip contentStyle={TooltipStyle} formatter={(val, name) => [`${val} sets`, name]} />
+                 </PieChart>
+               </ResponsiveContainer>
                    {/* Center Text for Donut (truly centered vertically and horizontally) */}
                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                       <span className="text-1xl sm:text-2xl font-bold text-white">{topExercisesData.reduce((a,b) => a + b.count, 0)}</span>
@@ -613,10 +729,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               </div>
             ) : (
               <div className="flex-1 w-full flex flex-col">
-                {/* Line Chart Container */}
+                {/* Area Chart Container */}
                 <div className="flex-1 w-full min-h-[300px] sm:min-h-[350px] relative flex-shrink-0">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={topExercisesOverTimeData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                    <AreaChart data={topExercisesOverTimeData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <defs>
+                        {topExercisesData.map((entry, index) => (
+                          <linearGradient key={`gradient-${entry.name}`} id={`gradient-${index}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={PIE_COLORS[index % PIE_COLORS.length]} stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor={PIE_COLORS[index % PIE_COLORS.length]} stopOpacity={0}/>
+                          </linearGradient>
+                        ))}
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                       <XAxis 
                         dataKey="date" 
@@ -641,18 +765,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                         formatter={(value: number) => [`${value} sets`, '']}
                       />
                       {topExercisesData.map((entry, index) => (
-                        <Line 
+                        <Area 
                           key={entry.name}
                           type="monotone" 
                           dataKey={entry.name} 
                           stroke={PIE_COLORS[index % PIE_COLORS.length]}
                           strokeWidth={2.5}
+                          fill={`url(#gradient-${index})`}
                           dot={{ fill: PIE_COLORS[index % PIE_COLORS.length], r: 3 }}
                           activeDot={{ r: 5 }}
                           name={entry.name}
                         />
                       ))}
-                    </LineChart>
+                    </AreaChart>
                   </ResponsiveContainer>
                 </div>
                 {/* Legend Container - Same style as pie chart, expands below chart */}
@@ -668,14 +793,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                       </div>
                     ))}
                   </div>
-                </div>
-              </div>
+               </div>
+            </div>
             )}
             <ChartDescription>
               <span className="font-semibold text-slate-300"> </span> 
               {topExerciseView === 'pie' 
                 ? "Highlights your most practiced movements by total set count. Ideally, your \"Big 3\" compounds should be the largest slices here."
-                : `Shows how your favorite exercises have been changing over time. Track consistency and trends in your ${topExerciseMode === 'monthly' ? 'monthly averages' : 'daily' } training patterns.`
+                : `Shows how your favorite exercises have been changing over time. Track consistency and trends in your ${topExerciseMode === 'monthly' ? 'monthly averages' : 'daily' } training patterns with beautiful area gradients.`
               }
             </ChartDescription>
           </div>
