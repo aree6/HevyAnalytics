@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Upload, AlertCircle } from 'lucide-react';
+import { Upload } from 'lucide-react';
 
 interface CSVImportModalProps {
   onFileSelect: (file: File) => void;
@@ -11,7 +11,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ onFileSelect, is
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && file.type === 'text/csv' || file?.name.endsWith('.csv')) {
+    if (file && (file.type === 'text/csv' || file.name.endsWith('.csv'))) {
       onFileSelect(file);
     } else {
       alert('Please select a valid CSV file');
@@ -72,20 +72,16 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ onFileSelect, is
         <div className="w-full mb-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="flex flex-col items-center gap-2">
-              <img src="./Step1.png" alt="Export data from Hevy app" className="w-full h-auto rounded-lg border border-slate-700" />
-
+              <img src="/Step1.png" className="w-full h-auto rounded-lg border border-slate-700" />
             </div>
             <div className="flex flex-col items-center gap-2">
-              <img src="./Step2.png" alt="Upload CSV to HevyAnalytics" className="w-full h-auto rounded-lg border border-slate-700" />
-           
+              <img src="/Step2.png" className="w-full h-auto rounded-lg border border-slate-700" />
             </div>
             <div className="flex flex-col items-center gap-2">
-              <img src="./Step3.png" alt="Explore analytics dashboard" className="w-full h-auto rounded-lg border border-slate-700" />
-           
+              <img src="/Step3.png" className="w-full h-auto rounded-lg border border-slate-700" />
             </div>
             <div className="flex flex-col items-center gap-2">
-              <img src="./Step4.png" alt="Get real-time feedback and filter data" className="w-full h-auto rounded-lg border border-slate-700" />
-             
+              <img src="/Step4.png" className="w-full h-auto rounded-lg border border-slate-700" />
             </div>
           </div>
         </div>
