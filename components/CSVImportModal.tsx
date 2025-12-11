@@ -68,15 +68,24 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ onFileSelect, is
           disabled={isLoading}
         />
 
-        {/* Info Box */}
-        <div className="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-4 mb-6">
-          <div className="flex gap-3">
-            <AlertCircle className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-semibold text-slate-300 mb-1">Expected CSV Format</p>
-              <p className="text-[11px] sm:text-xs text-slate-400">
-                Your CSV should include: title, start_time, end_time, description, exercise_title, superset_id, exercise_notes, set_index, set_type, weight_kg, reps, distance_km, duration_seconds, rpe
-              </p>
+        {/* Welcome Steps */}
+        <div className="w-full mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="flex flex-col items-center gap-2">
+              <img src="./Step1.png" alt="Export data from Hevy app" className="w-full h-auto rounded-lg border border-slate-700" />
+
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <img src="./Step2.png" alt="Upload CSV to HevyAnalytics" className="w-full h-auto rounded-lg border border-slate-700" />
+           
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <img src="./Step3.png" alt="Explore analytics dashboard" className="w-full h-auto rounded-lg border border-slate-700" />
+           
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <img src="./Step4.png" alt="Get real-time feedback and filter data" className="w-full h-auto rounded-lg border border-slate-700" />
+             
             </div>
           </div>
         </div>
