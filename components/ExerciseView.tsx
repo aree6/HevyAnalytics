@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { ExerciseStats } from '../types';
 import { 
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
@@ -7,9 +6,9 @@ import {
   Search, TrendingUp, TrendingDown, AlertTriangle, Minus, Activity,
   Dumbbell, Layers, Scale
 } from 'lucide-react';
+import { ExerciseStats } from '../types';
 
 // --- STYLES ---
-// Applying the requested font style
 const FANCY_FONT: React.CSSProperties = {
   fontFamily: '"Libre Baskerville", "Poppins", sans-serif',
   fontWeight: 600,
@@ -17,7 +16,6 @@ const FANCY_FONT: React.CSSProperties = {
 };
 
 // --- TYPES & LOGIC ---
-
 type ExerciseStatus = 'overload' | 'stagnant' | 'regression' | 'neutral' | 'new';
 
 interface StatusResult {
@@ -31,13 +29,9 @@ interface StatusResult {
   subtext?: string;
 }
 
-/**
- * MASTER LOGIC: Analyzes the long-term trend of an exercise
- */
 const analyzeExerciseTrend = (stats: ExerciseStats): StatusResult => {
   const history = [...stats.history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
-  // 1. Not enough data
   if (history.length < 3) {
     return {
       status: 'new',
@@ -59,7 +53,6 @@ const analyzeExerciseTrend = (stats: ExerciseStats): StatusResult => {
   const minReps = Math.min(...reps);
   const isRepStatic = (maxReps - minReps) <= 1;
 
-  // 2. CHECK FOR STAGNATION
   if (isWeightStatic && isRepStatic) {
     return {
       status: 'stagnant',
@@ -73,10 +66,9 @@ const analyzeExerciseTrend = (stats: ExerciseStats): StatusResult => {
     };
   }
 
-  // 3. CHECK FOR TREND
   const current1RM = (recent[0].oneRepMax + recent[1].oneRepMax) / 2;
   const previous1RM = (recent[2].oneRepMax + (recent[3]?.oneRepMax || recent[2].oneRepMax)) / 2;
-  const diffPct = ((current1RM - previous1RM) / previous1RM) * 100;
+  const diffPct = previous1RM > 0 ? ((current1RM - previous1RM) / previous1RM) * 100 : 0;
 
   if (diffPct > 2.5) {
     return {
@@ -119,12 +111,12 @@ const analyzeExerciseTrend = (stats: ExerciseStats): StatusResult => {
 // --- SUB-COMPONENTS ---
 
 const StatCard = ({ label, value, unit, icon: Icon }: any) => (
-  <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 p-2.5 sm:p-3 rounded-lg flex items-center justify-between group hover:border-slate-700 transition-all duration-300 h-full">
+  <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 p-3 rounded-lg flex items-center justify-between group hover:border-slate-700 transition-colors duration-300 h-full">
     <div>
       <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-0.5">{label}</p>
       <div className="flex items-baseline gap-1">
         <span 
-          className="text-lg sm:text-xl text-white tracking-tight"
+          className="text-xl text-white tracking-tight"
           style={FANCY_FONT}
         >
           {value}
@@ -132,8 +124,8 @@ const StatCard = ({ label, value, unit, icon: Icon }: any) => (
         {unit && <span className="text-xs font-medium text-slate-500">{unit}</span>}
       </div>
     </div>
-    <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-md bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-blue-400 group-hover:bg-blue-500/10 transition-colors flex-shrink-0">
-      <Icon size={16} className="sm:w-4 sm:h-4" />
+    <div className="h-9 w-9 rounded-md bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-blue-400 group-hover:bg-blue-500/10 transition-colors flex-shrink-0">
+      <Icon size={16} />
     </div>
   </div>
 );
@@ -141,7 +133,7 @@ const StatCard = ({ label, value, unit, icon: Icon }: any) => (
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg shadow-2xl shadow-black/50 animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg shadow-2xl shadow-black/50">
         <p className="text-slate-400 text-xs mb-2 font-mono">{label}</p>
         <div className="space-y-1">
           <p className="text-sm font-bold text-blue-400 flex items-center gap-2">
@@ -171,6 +163,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>(stats[0]?.name || "");
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Memoize status map to prevent recalc on every render
   const statusMap = useMemo(() => {
     const map: Record<string, StatusResult> = {};
     stats.forEach(s => {
@@ -204,101 +197,109 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
     <div className="flex flex-col gap-6 w-full text-slate-200 pb-10 animate-in fade-in duration-500">
       
       {/* 
-          TOP SECTION: GRID LAYOUT
+          TOP SECTION: GRID LAYOUT 
+          We use lg:h-[380px] to enforce equal height for Sidebar and Metrics on Desktop.
+          On mobile, it falls back to auto (stacked).
       */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 ">
         
         {/* --- LEFT: SIDEBAR --- */}
-        <div className="lg:col-span-1 flex flex-col gap-3 max-h-[400px]">
-          {/* Search Header */}
-          <div className="relative shrink-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Filter exercises..."
-              className="w-full bg-slate-900/50 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 sm:py-2 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+    {/* UPDATED: Changed max-h-[400px] to h-[25vh] to limit to 1/4 screen height */}
+    <div className="lg:col-span-1 flex flex-col gap-1 h-[34.5vh] min-h-[220px]">
+      {/* Search Header */}
+      <div className="relative shrink-0">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+        <input
+          type="text"
+          placeholder="Filter..."
+          className="w-full bg-slate-900/50 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 sm:py-2 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
 
-          {/* 
-             LIST WRAPPER
-          */}
-          <div className="flex-1 bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden flex flex-col">
-            <div className="overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar flex-1">
-              {filteredExercises.map((ex) => {
-                const status = statusMap[ex.name];
-                const isSelected = selectedExerciseName === ex.name;
+      {/* LIST WRAPPER
+         flex-1 ensures it takes remaining space within the 25vh
+      */}
+      <div className="flex-1 bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden flex flex-col min-h-0">
+        <div className="overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar flex-1">
+          {filteredExercises.map((ex) => {
+            const status = statusMap[ex.name];
+            const isSelected = selectedExerciseName === ex.name;
+            
+            let IndicatorIcon = Activity;
+            let indicatorColor = "text-slate-500";
+            if (status.status === 'overload') { IndicatorIcon = TrendingUp; indicatorColor = "text-emerald-400"; }
+            if (status.status === 'regression') { IndicatorIcon = TrendingDown; indicatorColor = "text-rose-400"; }
+            if (status.status === 'stagnant') { IndicatorIcon = AlertTriangle; indicatorColor = "text-amber-400"; }
+
+            return (
+              <button
+                key={ex.name}
+                onClick={() => setSelectedExerciseName(ex.name)}
+                className={`w-full text-left px-2 py-1.5 rounded-md transition-all duration-200 flex items-center justify-between group border border-transparent ${
+                  isSelected 
+                    ? 'bg-blue-600/10 border-blue-500/30' 
+                    : 'hover:bg-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex flex-col min-w-0 pr-2">
+                  <span className={`truncate text-xs ${isSelected ? 'text-blue-100 font-semibold' : 'text-slate-300 group-hover:text-white'}`}>
+                    {ex.name}
+                  </span>
+                  <span className="text-[10px] text-slate-500 truncate">
+                    Last: {new Date(ex.history[0].date).toLocaleDateString()}
+                  </span>
+                </div>
                 
-                let IndicatorIcon = Activity;
-                let indicatorColor = "text-slate-500";
-                if (status.status === 'overload') { IndicatorIcon = TrendingUp; indicatorColor = "text-emerald-400"; }
-                if (status.status === 'regression') { IndicatorIcon = TrendingDown; indicatorColor = "text-rose-400"; }
-                if (status.status === 'stagnant') { IndicatorIcon = AlertTriangle; indicatorColor = "text-amber-400"; }
-
-                return (
-                  <button
-                    key={ex.name}
-                    onClick={() => setSelectedExerciseName(ex.name)}
-                    className={`w-full text-left px-2 py-1.5 rounded-md transition-all duration-200 flex items-center justify-between group border border-transparent ${
-                      isSelected 
-                        ? 'bg-blue-600/10 border-blue-500/30' 
-                        : 'hover:bg-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="flex flex-col min-w-0 pr-2">
-                      <span className={`truncate text-xs ${isSelected ? 'text-blue-100 font-semibold' : 'text-slate-300 group-hover:text-white'}`}>
-                        {ex.name}
-                      </span>
-                      <span className="text-[10px] text-slate-500 truncate">
-                        Last: {new Date(ex.history[0].date).toLocaleDateString()}
-                      </span>
-                    </div>
-                    
-                    {isSelected ? (
-                       <div className={`p-1 rounded-md ${status.bgColor} animate-in zoom-in-50 duration-200`}>
-                          <IndicatorIcon className={`w-3 h-3 ${status.color}`} />
-                       </div>
-                    ) : (
-                      <div className={`w-2 h-2 rounded-full ${indicatorColor.replace('text-', 'bg-')} opacity-40 group-hover:opacity-100 transition-opacity`} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                {isSelected ? (
+                   <div className={`p-1 rounded-md ${status.bgColor} animate-in zoom-in-50 duration-200`}>
+                      <IndicatorIcon className={`w-3 h-3 ${status.color}`} />
+                   </div>
+                ) : (
+                  <div className={`w-2 h-2 rounded-full ${indicatorColor.replace('text-', 'bg-')} opacity-40 group-hover:opacity-100 transition-opacity`} />
+                )}
+              </button>
+            );
+          })}
         </div>
+      </div>
+    </div>
 
         {/* --- RIGHT: HEADER & METRICS --- */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
+        <div className="lg:col-span-2 flex flex-col gap-6 h-full min-h-0">
           {selectedStats && currentStatus ? (
-            <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-              {/* 1. Header & Insight */}
-              <div className="flex flex-col xl:flex-row gap-2 sm:gap-3 mb-6">
-                <div className="flex-1">
+            <div className="flex flex-col h-full gap-6 animate-in fade-in duration-300">
+              
+              {/* 1. Header & Insight (Top Half) */}
+              <div className="flex flex-col xl:flex-row gap-3 h-auto shrink-0">
+                <div className="flex-1 flex flex-col justify-center">
                   <h2 
-                    className="text-2xl sm:text-3xl text-white mb-1 tracking-tight drop-shadow-lg"
+                    className="text-2xl sm:text-3xl text-white tracking-tight drop-shadow-lg"
                     style={FANCY_FONT}
                   >
                     {selectedStats.name}
                   </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Analyzing {selectedStats.history.length} sessions
+                  </p>
                 </div>
-                <div className={`flex-1 xl:max-w-md rounded-lg p-2.5 sm:p-3 border ${currentStatus.borderColor} ${currentStatus.bgColor} relative overflow-hidden group transition-all duration-500`}>
-                  <div className="relative z-10 flex gap-2 sm:gap-2.5">
-                    <div className={`p-1.5 sm:p-2 rounded-lg bg-slate-950/40 h-fit ${currentStatus.color} flex-shrink-0`}>
-                      <currentStatus.icon size={18} className="sm:w-5 sm:h-5" />
+                
+                <div className={`flex-1 xl:max-w-md rounded-lg p-3 border ${currentStatus.borderColor} ${currentStatus.bgColor} relative overflow-hidden group transition-all duration-500`}>
+                  <div className="relative z-10 flex gap-3 h-full items-center">
+                    <div className={`p-2 rounded-lg bg-slate-950/40 h-fit ${currentStatus.color} flex-shrink-0`}>
+                      <currentStatus.icon size={30} />
                     </div>
                     <div>
                       <h4 
-                        className={`text-xs sm:text-sm ${currentStatus.color} mb-0.5`}
+                        className={`text-m ${currentStatus.color} mb-0.5`}
                         style={FANCY_FONT}
                       >
                         {currentStatus.title}
                       </h4>
-                      <p className="text-slate-300 text-xs leading-tight">{currentStatus.description}</p>
+                      <p className="text-slate-300 text-s leading-tight">{currentStatus.description}</p>
                       {currentStatus.subtext && (
-                         <div className="mt-1 mb-0.5 text-[10px] sm:text-xs font-mono opacity-80 flex items-center gap-1">
+                         <div className="mt-1.5 text-[13px] font-mono opacity-75 flex items-center gap-1">
                            <span className="w-1 h-1 bg-current rounded-full" />
                            {currentStatus.subtext}
                          </div>
@@ -309,19 +310,19 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                 </div>
               </div>
 
-              {/* 2. Key Metrics Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3 flex-1">
+              {/* 2. Key Metrics Grid (Bottom Half - Fills Remaining Height) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-5 min-h-0">
                 <StatCard label="Personal Record" value={selectedStats.maxWeight} unit="kg" icon={Dumbbell} />
                 <StatCard label="Total Volume" value={(selectedStats.totalVolume / 1000).toFixed(1)} unit="k" icon={Scale} />
-                <StatCard label="Sessions" value={selectedStats.totalSets} unit="" icon={Layers} />
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-600 gap-4 border border-dashed border-slate-800 rounded-xl bg-slate-900/20 min-h-[300px]">
+            // Empty State
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-600 gap-4 border border-dashed border-slate-800 rounded-xl bg-slate-900/20">
               <div className="p-4 bg-slate-900 rounded-full">
-                <Activity className="w-10 h-10 sm:w-12 sm:h-12 opacity-50" />
+                <Activity className="w-10 h-10 opacity-50" />
               </div>
-              <p className="font-medium text-sm sm:text-base text-center px-4">Select an exercise to analyze performance</p>
+              <p className="font-medium text-sm text-center px-4">Select an exercise</p>
             </div>
           )}
         </div>
@@ -329,20 +330,21 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
 
       {/* 
           BOTTOM SECTION: CHART 
+          Full width, sits below the grid.
       */}
       {selectedStats && (
-        <div className="w-full bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-3 sm:p-6 relative flex flex-col h-[400px] animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 sm:mb-6 gap-2">
+        <div className="w-full bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-4 sm:p-6 relative flex flex-col h-[400px] animate-in fade-in duration-700">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 sm:mb-6 gap-2 shrink-0">
              <div>
                 <h3 className="text-base sm:text-lg font-semibold text-white">Strength Progression</h3>
                 <p className="text-[11px] sm:text-xs text-slate-500">Estimated 1RM vs Actual Lift Weight</p>
              </div>
-             <div className="flex gap-3 sm:gap-4 text-[10px] sm:text-xs font-medium">
+             <div className="flex gap-4 text-[10px] sm:text-xs font-medium">
                 <div className="flex items-center gap-2 text-blue-400">
-                   <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-blue-500/20 border border-blue-500"></span> Est. 1RM
+                   <span className="w-2.5 h-2.5 rounded bg-blue-500/20 border border-blue-500"></span> Est. 1RM
                 </div>
                 <div className="flex items-center gap-2 text-slate-500">
-                   <span className="w-2.5 h-0.5 sm:w-3 bg-slate-500 border-t border-dashed border-slate-500"></span> Lift Weight
+                   <span className="w-2.5 h-0.5 bg-slate-500 border-t border-dashed border-slate-500"></span> Lift Weight
                 </div>
              </div>
           </div>
@@ -382,7 +384,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                   fillOpacity={1} 
                   fill="url(#color1RM)" 
                   activeDot={{ r: 5, strokeWidth: 0, fill: '#60a5fa' }}
-                  animationDuration={1500}
+                  isAnimationActive={true}
+                  animationDuration={1000}
                 />
                 
                 <Line 
@@ -393,7 +396,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                   strokeDasharray="4 4" 
                   dot={false}
                   activeDot={false}
-                  animationDuration={1500}
+                  isAnimationActive={true}
+                  animationDuration={1000}
                 />
               </AreaChart>
             </ResponsiveContainer>
