@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { parseWorkoutCSV } from './utils/csvParser';
+import React, { useState, useEffect, useMemo, Suspense, useRef } from 'react';
+import { parseWorkoutCSV, parseWorkoutCSVAsync } from './utils/csvParser';
 import { getDailySummaries, getExerciseStats, identifyPersonalRecords } from './utils/analytics';
 import { WorkoutSet } from './types';
 import { DEFAULT_CSV_DATA } from './constants';
-import { Dashboard } from './components/Dashboard';
-import { ExerciseView } from './components/ExerciseView';
-import { HistoryView } from './components/HistoryView';
+const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
+const ExerciseView = React.lazy(() => import('./components/ExerciseView').then(m => ({ default: m.ExerciseView })));
+const HistoryView = React.lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
 import { CSVImportModal } from './components/CSVImportModal';
 import { saveCSVData, getCSVData, hasCSVData, clearCSVData } from './utils/localStorage';
-import { LayoutDashboard, Dumbbell, History, Upload, BarChart3, Filter, Loader2, CheckCircle2, X, Trash2, Menu } from 'lucide-react';
-import { format, isSameDay } from 'date-fns';
+import { LayoutDashboard, Dumbbell, History, Upload, BarChart3, Filter, Loader2, CheckCircle2, X, Trash2, Menu, Calendar } from 'lucide-react';
+import { format, isSameDay, isWithinInterval } from 'date-fns';
+import { CalendarSelector } from './components/CalendarSelector';
+import { trackPageView } from './utils/ga';
 
 enum Tab {
   DASHBOARD = 'dashboard',
@@ -27,30 +29,91 @@ const App: React.FC = () => {
   // Loading State
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0); // 0: Parse, 1: Analyze, 2: Visualize
+  const [progress, setProgress] = useState(0);
+  const progressTimerRef = useRef<number | null>(null);
+
+  const startProgress = () => {
+    setProgress(0);
+    if (progressTimerRef.current) window.clearInterval(progressTimerRef.current);
+    const start = Date.now();
+    const t = window.setInterval(() => {
+      setProgress(prev => Math.min(90, Math.round(prev + Math.max(1, (90 - prev) * 0.05))));
+    }, 100);
+    progressTimerRef.current = t;
+    return start;
+  };
+
+  const finishProgress = (startedAt: number) => {
+    const MIN_MS = 1200;
+    const elapsed = Date.now() - startedAt;
+    const remaining = Math.max(0, MIN_MS - elapsed);
+    window.setTimeout(() => {
+      if (progressTimerRef.current) {
+        window.clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
+      setProgress(100);
+      setTimeout(() => {
+        setIsAnalyzing(false);
+        setProgress(0);
+      }, 200);
+    }, remaining);
+  };
   
   // Filter States
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [selectedRange, setSelectedRange] = useState<{ start: Date; end: Date } | null>(null);
+  const [selectedWeeks, setSelectedWeeks] = useState<Array<{ start: Date; end: Date }>>([]);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // Initial Load: Check local storage, otherwise show modal
   useEffect(() => {
     const storedCSV = getCSVData();
-    
     if (storedCSV) {
-      // Load from local storage
-      const result = parseWorkoutCSV(storedCSV);
-      const enriched = identifyPersonalRecords(result);
-      setParsedData(enriched);
       setRawData(storedCSV);
+      setIsAnalyzing(true);
+      setLoadingStep(0);
+      const startedAt = startProgress();
+      // Defer heavy parsing to next tick and run in worker to avoid blocking LCP
+      setTimeout(() => {
+        setLoadingStep(1);
+        parseWorkoutCSVAsync(storedCSV)
+          .then(result => {
+            setLoadingStep(2);
+            return identifyPersonalRecords(result);
+          })
+          .then(enriched => setParsedData(enriched))
+          .catch(() => {
+            // Fallback to sync parser if worker parsing fails
+            const fallback = identifyPersonalRecords(parseWorkoutCSV(storedCSV));
+            setParsedData(fallback);
+          })
+          .finally(() => {
+            finishProgress(startedAt);
+          });
+      }, 0);
     } else {
-      // Show CSV import modal if no data in storage
       setShowCSVModal(true);
-      // Still load default data for fallback
       const result = parseWorkoutCSV(DEFAULT_CSV_DATA);
       const enriched = identifyPersonalRecords(result);
       setParsedData(enriched);
     }
   }, []);
+
+  // Prefetch heavy views to avoid first-time lag when navigating
+  useEffect(() => {
+    const idle = (cb: () => void) => (('requestIdleCallback' in window) ? (window as any).requestIdleCallback(cb) : setTimeout(cb, 300));
+    idle(() => {
+      import('./components/ExerciseView');
+      import('./components/HistoryView');
+    });
+  }, []);
+
+  // Track "page" views when switching tabs (simple SPA routing)
+  useEffect(() => {
+    trackPageView(`/${activeTab}`);
+  }, [activeTab]);
 
   // Derive unique months for filter
   const availableMonths = useMemo(() => {
@@ -66,20 +129,33 @@ const App: React.FC = () => {
   // Apply filters
   const filteredData = useMemo(() => {
     return parsedData.filter(d => {
-      // 1. Specific Day Filter (Takes priority)
-      if (selectedDay && d.parsedDate) {
-        return isSameDay(d.parsedDate, selectedDay);
-      }
-
-      // 2. Month Filter
-      let matchMonth = true;
-      if (selectedMonth !== 'all' && d.parsedDate) {
-        matchMonth = format(d.parsedDate, 'yyyy-MM') === selectedMonth;
-      }
-
-      return matchMonth;
+      if (!d.parsedDate) return false;
+      if (selectedDay) return isSameDay(d.parsedDate, selectedDay);
+      if (selectedWeeks.length > 0) return selectedWeeks.some(r => isWithinInterval(d.parsedDate as Date, r));
+      if (selectedRange) return isWithinInterval(d.parsedDate as Date, selectedRange);
+      if (selectedMonth !== 'all') return format(d.parsedDate, 'yyyy-MM') === selectedMonth;
+      return true;
     });
-  }, [parsedData, selectedMonth, selectedDay]);
+  }, [parsedData, selectedMonth, selectedDay, selectedRange, selectedWeeks]);
+
+  // Calendar boundaries and available dates (for blur/disable)
+  const { minDate, maxDate, availableDatesSet } = useMemo(() => {
+    let minTs = Number.POSITIVE_INFINITY;
+    let maxTs = 0;
+    const set = new Set<string>();
+    parsedData.forEach(d => {
+      if (!d.parsedDate) return;
+      const ts = d.parsedDate.getTime();
+      if (ts < minTs) minTs = ts;
+      if (ts > maxTs) maxTs = ts;
+      set.add(format(d.parsedDate, 'yyyy-MM-dd'));
+    });
+    const today = new Date();
+    const minDate = isFinite(minTs) ? new Date(minTs) : null;
+    const maxInData = maxTs > 0 ? new Date(maxTs) : null;
+    const maxDate = maxInData ? (maxInData > today ? today : maxInData) : today;
+    return { minDate, maxDate, availableDatesSet: set };
+  }, [parsedData]);
 
   const dailySummaries = useMemo(() => getDailySummaries(filteredData), [filteredData]);
   const exerciseStats = useMemo(() => getExerciseStats(filteredData), [filteredData]);
@@ -87,6 +163,7 @@ const App: React.FC = () => {
   // Handler for heatmap click
   const handleDayClick = (date: Date) => {
     setSelectedDay(date);
+    setSelectedRange(null);
     setActiveTab(Tab.HISTORY);
   };
 
@@ -120,25 +197,27 @@ const App: React.FC = () => {
     // Start Loading Sequence
     setIsAnalyzing(true);
     setLoadingStep(0);
+    const startedAt = startProgress();
 
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result;
       if (typeof text === 'string') {
-        // Save to local storage
         saveCSVData(text);
-
         setRawData(text);
-        const result = parseWorkoutCSV(text);
-        // Identify PRs on the full dataset before setting it
-        const enriched = identifyPersonalRecords(result);
-        setParsedData(enriched);
-        
-        // Reset filters on new upload
-        setSelectedMonth('all');
-        setSelectedDay(null);
-        
-        setIsAnalyzing(false);
+        setLoadingStep(1);
+        parseWorkoutCSVAsync(text)
+          .then(result => {
+            setLoadingStep(2);
+            const enriched = identifyPersonalRecords(result);
+            setParsedData(enriched);
+          })
+          .finally(() => {
+            // Reset filters on new upload
+            setSelectedMonth('all');
+            setSelectedDay(null);
+            finishProgress(startedAt);
+          });
       }
     };
     reader.readAsText(file);
@@ -173,6 +252,14 @@ const App: React.FC = () => {
                   {loadingStep >= 2 ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <div className="w-5 h-5 rounded-full border-2 border-slate-700"></div>}
                   <span className={loadingStep >= 2 ? "text-slate-200" : "text-slate-600"}>Generating visualizations...</span>
                </div>
+
+               {/* Progress bar */}
+               <div className="mt-4">
+                 <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                   <div className="h-full bg-blue-600 transition-all duration-200" style={{ width: `${progress}%` }} />
+                 </div>
+                 <div className="text-right text-[10px] text-slate-500 mt-1">{progress}%</div>
+               </div>
             </div>
           </div>
         </div>
@@ -184,7 +271,7 @@ const App: React.FC = () => {
           {/* Top Row: Logo and Nav Buttons */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-4">
-              <img src="/HevyAnalytics.png" alt="HevyAnalytics Logo" className="w-7 h-7 sm:w-8 sm:h-8" />
+              <img src="/HevyAnalytics.png" alt="HevyAnalytics Logo" className="w-7 h-7 sm:w-8 sm:h-8" decoding="async" />
               <span className="font-bold text-lg sm:text-xl tracking-tight text-white">HevyAnalytics</span>
             </div>
             
@@ -315,7 +402,7 @@ const App: React.FC = () => {
             </div>
 
             {/* Filter Controls */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 bg-slate-950 p-2 rounded-xl border border-slate-800 shadow-sm items-start sm:items-center">
+            <div className="relative flex flex-col sm:flex-row gap-2 sm:gap-3 bg-slate-950 p-2 rounded-xl border border-slate-800 shadow-sm items-start sm:items-center">
                <div className="flex items-center px-2">
                   <Filter className="w-4 h-4 text-slate-500 mr-2" />
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Filters</span>
@@ -332,21 +419,56 @@ const App: React.FC = () => {
                  </button>
                )}
 
-               {/* Month Filter (Disabled if Day Selected to avoid confusion, or allowed but hidden) */}
-               {!selectedDay && (
-                 <select 
-                   value={selectedMonth} 
-                   onChange={(e) => setSelectedMonth(e.target.value)}
-                   className="bg-slate-900 text-slate-200 text-xs sm:text-sm border border-slate-700 rounded-lg px-2 sm:px-3 py-2 focus:outline-none focus:border-blue-500 hover:border-slate-600 transition-colors cursor-pointer"
+               {/* Selected Weeks Chip */}
+               {selectedWeeks.length > 0 && (
+                 <button 
+                   onClick={() => setSelectedWeeks([])}
+                   className="flex items-center gap-2 bg-emerald-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+                   title={selectedWeeks.length === 1 ? `${format(selectedWeeks[0].start, 'MMM d')} – ${format(selectedWeeks[0].end, 'MMM d, yyyy')}` : ''}
                  >
-                   <option value="all">All Months</option>
-                   {availableMonths.map(month => (
-                     <option key={month} value={month}>
-                       {format(new Date(month), 'MMMM yyyy')}
-                     </option>
-                   ))}
-                 </select>
+                   <span>{selectedWeeks.length === 1 ? `Week: ${format(selectedWeeks[0].start, 'MMM d')} – ${format(selectedWeeks[0].end, 'MMM d, yyyy')}` : `Weeks selected (${selectedWeeks.length})`}</span>
+                   <X className="w-3 h-3" />
+                 </button>
                )}
+
+               {/* Selected Range Chip (Month/Year/Custom) */}
+               {selectedRange && (
+                 <button 
+                   onClick={() => setSelectedRange(null)}
+                   className="flex items-center gap-2 bg-purple-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                 >
+                   <span>Range: {format(selectedRange.start, 'MMM d, yyyy')} – {format(selectedRange.end, 'MMM d, yyyy')}</span>
+                   <X className="w-3 h-3" />
+                 </button>
+               )}
+
+               {/* Calendar selector (master) */}
+               <div className="relative">
+                 <button
+                   onClick={() => setCalendarOpen(!calendarOpen)}
+                   className="flex items-center gap-2 px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs sm:text-sm hover:bg-slate-800"
+                 >
+                   <Calendar className="w-4 h-4 text-slate-400" /> Calendar
+                 </button>
+                 {calendarOpen && (
+                   <div className="fixed inset-0 z-50 grid place-items-center p-4">
+                     <div className="absolute inset-0 bg-black/40" onClick={() => setCalendarOpen(false)} />
+                     <CalendarSelector
+                       mode="both"
+                       minDate={minDate}
+                       maxDate={maxDate}
+                       availableDates={availableDatesSet}
+                       multipleWeeks={true}
+                       onSelectWeeks={(ranges) => { setSelectedWeeks(ranges); setSelectedDay(null); setSelectedRange(null); setCalendarOpen(false); }}
+                       onSelectDay={(d) => { setSelectedDay(d); setSelectedWeeks([]); setSelectedRange(null); setCalendarOpen(false); }}
+                       onSelectWeek={(r) => { setSelectedWeeks([r]); setSelectedDay(null); setSelectedRange(null); setCalendarOpen(false); }}
+                       onSelectMonth={(r) => { setSelectedRange(r); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
+                       onSelectYear={(r) => { setSelectedRange(r); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
+                       onClear={() => { setSelectedRange(null); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
+                     />
+                   </div>
+                 )}
+               </div>
             </div>
           </div>
         </div>
@@ -355,16 +477,18 @@ const App: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-950 p-3 sm:p-4 md:p-6 lg:p-8">
 
-        {activeTab === Tab.DASHBOARD && (
-          <Dashboard 
-            dailyData={dailySummaries} 
-            exerciseStats={exerciseStats} 
-            fullData={filteredData} 
-            onDayClick={handleDayClick} // Pass handler
-          />
-        )}
-        {activeTab === Tab.EXERCISES && <ExerciseView stats={exerciseStats} />}
-        {activeTab === Tab.HISTORY && <HistoryView data={filteredData} />}
+        <Suspense fallback={<div className="text-slate-400 p-4">Loading...</div>}>
+          {activeTab === Tab.DASHBOARD && (
+            <Dashboard 
+              dailyData={dailySummaries} 
+              exerciseStats={exerciseStats} 
+              fullData={filteredData} 
+              onDayClick={handleDayClick}
+            />
+          )}
+          {activeTab === Tab.EXERCISES && <ExerciseView stats={exerciseStats} />}
+          {activeTab === Tab.HISTORY && <HistoryView data={filteredData} />}
+        </Suspense>
       </main>
     </div>
   );
