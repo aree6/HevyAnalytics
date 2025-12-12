@@ -160,6 +160,83 @@ const App: React.FC = () => {
   const dailySummaries = useMemo(() => getDailySummaries(filteredData), [filteredData]);
   const exerciseStats = useMemo(() => getExerciseStats(filteredData), [filteredData]);
 
+  const filterControls = (
+    <div className={`relative flex flex-col sm:flex-row gap-2 sm:gap-3 p-2 rounded-xl shadow-sm items-start sm:items-center transition-all duration-300 ${
+      (selectedDay || selectedWeeks.length > 0 || selectedRange)
+        ? 'bg-blue-950/40 border-2 border-blue-500/50 ring-2 ring-blue-500/20'
+        : 'bg-slate-950 border border-slate-800'
+    }`}>
+       <div className="flex items-center px-2">
+          <Filter className={`w-4 h-4 mr-2 transition-colors ${(selectedDay || selectedWeeks.length > 0 || selectedRange) ? 'text-blue-400' : 'text-slate-500'}`} />
+          <span className={`text-xs font-bold uppercase tracking-wide transition-colors ${(selectedDay || selectedWeeks.length > 0 || selectedRange) ? 'text-blue-400' : 'text-slate-500'}`}>
+            {(selectedDay || selectedWeeks.length > 0 || selectedRange) ? 'Filter Active' : 'Filters'}
+          </span>
+       </div>
+       
+       {/* Specific Day Active Chip */}
+       {selectedDay && (
+         <button 
+           onClick={() => setSelectedDay(null)}
+           className="flex items-center gap-2 bg-blue-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+         >
+           <span>{format(selectedDay, 'MMM d, yyyy')}</span>
+           <X className="w-3 h-3" />
+         </button>
+       )}
+
+       {/* Selected Weeks Chip */}
+       {selectedWeeks.length > 0 && (
+         <button 
+           onClick={() => setSelectedWeeks([])}
+           className="flex items-center gap-2 bg-emerald-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+           title={selectedWeeks.length === 1 ? `${format(selectedWeeks[0].start, 'MMM d')} – ${format(selectedWeeks[0].end, 'MMM d, yyyy')}` : ''}
+         >
+           <span>{selectedWeeks.length === 1 ? `Week: ${format(selectedWeeks[0].start, 'MMM d')} – ${format(selectedWeeks[0].end, 'MMM d, yyyy')}` : `Weeks selected (${selectedWeeks.length})`}</span>
+           <X className="w-3 h-3" />
+         </button>
+       )}
+
+       {/* Selected Range Chip (Month/Year/Custom) */}
+       {selectedRange && (
+         <button 
+           onClick={() => setSelectedRange(null)}
+           className="flex items-center gap-2 bg-purple-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+         >
+           <span>Range: {format(selectedRange.start, 'MMM d, yyyy')} – {format(selectedRange.end, 'MMM d, yyyy')}</span>
+           <X className="w-3 h-3" />
+         </button>
+       )}
+
+       {/* Calendar selector (master) */}
+       <div className="relative">
+         <button
+           onClick={() => setCalendarOpen(!calendarOpen)}
+           className="flex items-center gap-2 px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs sm:text-sm hover:bg-slate-800"
+         >
+           <Calendar className="w-4 h-4 text-slate-400" /> Calendar
+         </button>
+         {calendarOpen && (
+           <div className="fixed inset-0 z-50 grid place-items-center p-4">
+             <div className="absolute inset-0 bg-black/40" onClick={() => setCalendarOpen(false)} />
+             <CalendarSelector
+               mode="both"
+               minDate={minDate}
+               maxDate={maxDate}
+               availableDates={availableDatesSet}
+               multipleWeeks={true}
+               onSelectWeeks={(ranges) => { setSelectedWeeks(ranges); setSelectedDay(null); setSelectedRange(null); setCalendarOpen(false); }}
+               onSelectDay={(d) => { setSelectedDay(d); setSelectedWeeks([]); setSelectedRange(null); setCalendarOpen(false); }}
+               onSelectWeek={(r) => { setSelectedWeeks([r]); setSelectedDay(null); setSelectedRange(null); setCalendarOpen(false); }}
+               onSelectMonth={(r) => { setSelectedRange(r); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
+               onSelectYear={(r) => { setSelectedRange(r); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
+               onClear={() => { setSelectedRange(null); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
+             />
+           </div>
+         )}
+       </div>
+    </div>
+  );
+
   // Handler for heatmap click
   const handleDayClick = (date: Date) => {
     setSelectedDay(date);
@@ -280,7 +357,6 @@ const App: React.FC = () => {
               <button 
                 onClick={() => {
                   setActiveTab(Tab.DASHBOARD);
-                  setSelectedDay(null);
                   setIsMobileMenuOpen(false);
                 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.DASHBOARD ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
@@ -341,7 +417,6 @@ const App: React.FC = () => {
               <button 
                 onClick={() => {
                   setActiveTab(Tab.DASHBOARD);
-                  setSelectedDay(null);
                   setIsMobileMenuOpen(false);
                 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 w-full text-left ${activeTab === Tab.DASHBOARD ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
@@ -390,86 +465,20 @@ const App: React.FC = () => {
 
           {/* Filter Controls Row */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white">
-                {activeTab === Tab.DASHBOARD && 'Overview'}
-                {activeTab === Tab.EXERCISES && 'Exercise Analytics'}
-                {activeTab === Tab.HISTORY && 'Workout History'}
-              </h1>
-              <p className="text-slate-400 text-xs sm:text-sm">
-                 {filteredData.length > 0 ? `Analyzing ${filteredData.length} sets based on filters.` : 'No data available for current filters.'}
-              </p>
-            </div>
+            {activeTab !== Tab.DASHBOARD && (
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">
+                  {activeTab === Tab.EXERCISES && 'Exercise Analytics'}
+                  {activeTab === Tab.HISTORY && 'Workout History'}
+                </h1>
+                <p className="text-slate-400 text-xs sm:text-sm">
+                  {filteredData.length > 0 ? `Analyzing ${filteredData.length} sets based on filters.` : 'No data available for current filters.'}
+                </p>
+              </div>
+            )}
 
             {/* Filter Controls */}
-            <div className="relative flex flex-col sm:flex-row gap-2 sm:gap-3 bg-slate-950 p-2 rounded-xl border border-slate-800 shadow-sm items-start sm:items-center">
-               <div className="flex items-center px-2">
-                  <Filter className="w-4 h-4 text-slate-500 mr-2" />
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Filters</span>
-               </div>
-               
-               {/* Specific Day Active Chip */}
-               {selectedDay && (
-                 <button 
-                   onClick={() => setSelectedDay(null)}
-                   className="flex items-center gap-2 bg-blue-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                 >
-                   <span>{format(selectedDay, 'MMM d, yyyy')}</span>
-                   <X className="w-3 h-3" />
-                 </button>
-               )}
-
-               {/* Selected Weeks Chip */}
-               {selectedWeeks.length > 0 && (
-                 <button 
-                   onClick={() => setSelectedWeeks([])}
-                   className="flex items-center gap-2 bg-emerald-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
-                   title={selectedWeeks.length === 1 ? `${format(selectedWeeks[0].start, 'MMM d')} – ${format(selectedWeeks[0].end, 'MMM d, yyyy')}` : ''}
-                 >
-                   <span>{selectedWeeks.length === 1 ? `Week: ${format(selectedWeeks[0].start, 'MMM d')} – ${format(selectedWeeks[0].end, 'MMM d, yyyy')}` : `Weeks selected (${selectedWeeks.length})`}</span>
-                   <X className="w-3 h-3" />
-                 </button>
-               )}
-
-               {/* Selected Range Chip (Month/Year/Custom) */}
-               {selectedRange && (
-                 <button 
-                   onClick={() => setSelectedRange(null)}
-                   className="flex items-center gap-2 bg-purple-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-                 >
-                   <span>Range: {format(selectedRange.start, 'MMM d, yyyy')} – {format(selectedRange.end, 'MMM d, yyyy')}</span>
-                   <X className="w-3 h-3" />
-                 </button>
-               )}
-
-               {/* Calendar selector (master) */}
-               <div className="relative">
-                 <button
-                   onClick={() => setCalendarOpen(!calendarOpen)}
-                   className="flex items-center gap-2 px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs sm:text-sm hover:bg-slate-800"
-                 >
-                   <Calendar className="w-4 h-4 text-slate-400" /> Calendar
-                 </button>
-                 {calendarOpen && (
-                   <div className="fixed inset-0 z-50 grid place-items-center p-4">
-                     <div className="absolute inset-0 bg-black/40" onClick={() => setCalendarOpen(false)} />
-                     <CalendarSelector
-                       mode="both"
-                       minDate={minDate}
-                       maxDate={maxDate}
-                       availableDates={availableDatesSet}
-                       multipleWeeks={true}
-                       onSelectWeeks={(ranges) => { setSelectedWeeks(ranges); setSelectedDay(null); setSelectedRange(null); setCalendarOpen(false); }}
-                       onSelectDay={(d) => { setSelectedDay(d); setSelectedWeeks([]); setSelectedRange(null); setCalendarOpen(false); }}
-                       onSelectWeek={(r) => { setSelectedWeeks([r]); setSelectedDay(null); setSelectedRange(null); setCalendarOpen(false); }}
-                       onSelectMonth={(r) => { setSelectedRange(r); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
-                       onSelectYear={(r) => { setSelectedRange(r); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
-                       onClear={() => { setSelectedRange(null); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
-                     />
-                   </div>
-                 )}
-               </div>
-            </div>
+            {activeTab !== Tab.DASHBOARD && filterControls}
           </div>
         </div>
       </header>
@@ -483,6 +492,7 @@ const App: React.FC = () => {
               dailyData={dailySummaries} 
               exerciseStats={exerciseStats} 
               fullData={filteredData} 
+              filtersSlot={filterControls}
               onDayClick={handleDayClick}
             />
           )}

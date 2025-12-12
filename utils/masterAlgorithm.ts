@@ -1,176 +1,169 @@
-import { WorkoutSet, SessionAnalysis, AnalysisResult, SetWisdom } from "../types";
+import { WorkoutSet, SessionAnalysis, AnalysisResult, SetWisdom, AnalysisStatus } from '../types';
+import { roundTo } from './formatters';
 
-/**
- * HELPER: Epley Formula to estimate 1-Rep Max
- * 1RM = Weight * (1 + Reps/30)
- */
+const EPLEY_FACTOR = 30;
+const DROP_THRESHOLD = 25.0;
+const FATIGUE_BUFFER = 1.5;
+
 const calculateEpley1RM = (weight: number, reps: number): number => {
-  if (reps === 0 || weight === 0) return 0;
-  return weight * (1 + reps / 30);
+  if (reps <= 0 || weight <= 0) return 0;
+  return weight * (1 + reps / EPLEY_FACTOR);
 };
 
-/**
- * HELPER: Predict Reps for a new weight based on previous 1RM
- * Reps = 30 * ((1RM / NewWeight) - 1)
- */
-const predictReps = (old1RM: number, newWeight: number): number => {
-  if (newWeight === 0) return 0;
-  const predicted = 30 * ((old1RM / newWeight) - 1);
-  return Math.max(0, Math.round(predicted * 10) / 10); // Round to 1 decimal
+const predictReps = (oneRM: number, newWeight: number): number => {
+  if (newWeight <= 0 || oneRM <= 0) return 0;
+  const predicted = EPLEY_FACTOR * ((oneRM / newWeight) - 1);
+  return Math.max(0, roundTo(predicted, 1));
 };
 
-/**
- * MASTER ALGORITHM
- * Analyzes strength progression set-by-set.
- */
+const calculatePercentChange = (oldVal: number, newVal: number): number => {
+  if (oldVal <= 0) return 0;
+  return ((newVal - oldVal) / oldVal) * 100;
+};
+
+interface SetMetrics {
+  weight: number;
+  reps: number;
+  volume: number;
+  oneRM: number;
+}
+
+const extractSetMetrics = (set: WorkoutSet): SetMetrics => ({
+  weight: set.weight_kg,
+  reps: set.reps,
+  volume: set.weight_kg * set.reps,
+  oneRM: calculateEpley1RM(set.weight_kg, set.reps),
+});
+
+const createAnalysisResult = (
+  transition: string,
+  status: AnalysisStatus,
+  weightChangePct: number,
+  volDropPct: number,
+  actualReps: number,
+  expectedReps: string,
+  shortMessage: string,
+  tooltip: string
+): AnalysisResult => ({
+  transition,
+  status,
+  metrics: {
+    weight_change_pct: weightChangePct === 0 ? '0%' : `${weightChangePct > 0 ? '+' : ''}${roundTo(weightChangePct, 1)}%`,
+    vol_drop_pct: `${roundTo(volDropPct, 1)}%`,
+    actual_reps: actualReps,
+    expected_reps: expectedReps,
+  },
+  shortMessage,
+  tooltip,
+});
+
+const analyzeSameWeight = (
+  transition: string,
+  volDropPct: number,
+  reps: number
+): AnalysisResult | null => {
+  if (volDropPct < -5.0) {
+    return createAnalysisResult(
+      transition, 'success', 0, volDropPct, reps, '-',
+      'Second Wind',
+      `Second Wind: Performance increased by ${Math.abs(roundTo(volDropPct, 0))}% on the same weight. You likely held back on the previous set or rested longer than usual.`
+    );
+  }
+  if (volDropPct <= DROP_THRESHOLD) {
+    return createAnalysisResult(
+      transition, 'info', 0, volDropPct, reps, '-',
+      'Optimal Fatigue',
+      `Optimal Fatigue: Volume dropped by ${roundTo(volDropPct, 0)}%. This range (0-25%) is often optimal for hypertrophy, indicating effort without metabolic collapse.`
+    );
+  }
+  return createAnalysisResult(
+    transition, 'danger', 0, volDropPct, reps, '-',
+    'Significant Drop',
+    `Significant Drop: Volume dropped by ${roundTo(volDropPct, 0)}%. Two likely causes:\n1. The previous set was taken to absolute failure.\n2. Your rest time was too short.\nAdvice: If you rested plenty, leave 1 rep in reserve next time. If you rushed, rest longer.`
+  );
+};
+
+const analyzeWeightIncrease = (
+  transition: string,
+  weightChangePct: number,
+  volDropPct: number,
+  reps: number,
+  bestOneRM: number,
+  newWeight: number
+): AnalysisResult => {
+  const expectedRepsRaw = predictReps(bestOneRM, newWeight);
+  const expectedRepsInt = Math.round(expectedRepsRaw);
+  const passed = reps >= (expectedRepsRaw - FATIGUE_BUFFER);
+
+  if (passed) {
+    return createAnalysisResult(
+      transition, 'success', weightChangePct, volDropPct, reps, `~${expectedRepsInt}`,
+      'Good Overload',
+      `Good Overload: Weight +${roundTo(weightChangePct, 0)}% and you hit ${reps} reps (Expected based on best performance: ~${expectedRepsInt}). You are getting stronger.`
+    );
+  }
+  return createAnalysisResult(
+    transition, 'warning', weightChangePct, volDropPct, reps, `~${expectedRepsInt}`,
+    'Premature Jump',
+    `Premature Jump: Weight +${roundTo(weightChangePct, 0)}% but reps dropped more than expected (Got ${reps}, Expected ~${expectedRepsInt} based on your best set). Advice: Stay at the lower weight until you can hit more reps.`
+  );
+};
+
 export const analyzeSetProgression = (sets: WorkoutSet[]): AnalysisResult[] => {
-  const analysisLog: AnalysisResult[] = [];
-  const DROP_THRESHOLD = 25.0; 
-
   if (sets.length < 2) return [];
 
-  // LOGIC FIX: Track the highest 1RM demonstrated in the session so far.
-  // This prevents "feeder sets" (low reps, not to failure) from ruining the 
-  // prediction for the next heavy set.
-  let bestSession1RM = 0;
-
-  // Initialize with the first set's performance
-  if (sets.length > 0) {
-    bestSession1RM = calculateEpley1RM(sets[0].weight_kg, sets[0].reps);
-  }
+  const results: AnalysisResult[] = [];
+  let bestSession1RM = extractSetMetrics(sets[0]).oneRM;
 
   for (let i = 1; i < sets.length; i++) {
-    const prev = sets[i - 1];
-    const curr = sets[i];
+    const prev = extractSetMetrics(sets[i - 1]);
+    const curr = extractSetMetrics(sets[i]);
+    const transition = `Set ${i} -> Set ${i + 1}`;
 
-    const w_prev = prev.weight_kg;
-    const r_prev = prev.reps;
-    const w_curr = curr.weight_kg;
-    const r_curr = curr.reps;
+    bestSession1RM = Math.max(bestSession1RM, prev.oneRM);
 
-    const vol_prev = w_prev * r_prev;
-    const vol_curr = w_curr * r_curr;
-
-    // Check if the previous set established a new peak strength for this session
-    const prev_set_1rm = calculateEpley1RM(w_prev, r_prev);
-    if (prev_set_1rm > bestSession1RM) {
-      bestSession1RM = prev_set_1rm;
-    }
-
-    const weight_change_pct = w_prev > 0 
-      ? ((w_curr - w_prev) / w_prev) * 100 
-      : 0;
-
-    const vol_drop_pct = vol_prev > 0 
-      ? ((vol_prev - vol_curr) / vol_prev) * 100 
-      : 0;
+    const weightChangePct = calculatePercentChange(prev.weight, curr.weight);
+    const volDropPct = calculatePercentChange(curr.volume, prev.volume);
 
     let result: AnalysisResult | null = null;
-    const transitionLabel = `Set ${i} -> Set ${i + 1}`;
 
-    // --- SCENARIO 1: SAME WEIGHT ---
-    if (Math.abs(weight_change_pct) < 1.0) {
-      if (vol_drop_pct < -5.0) {
-        result = {
-          transition: transitionLabel,
-          status: 'success',
-          metrics: {
-            weight_change_pct: '0%',
-            vol_drop_pct: `${vol_drop_pct.toFixed(1)}%`,
-            actual_reps: r_curr,
-            expected_reps: '-',
-          },
-          shortMessage: 'Second Wind',
-          tooltip: `Second Wind: Performance increased by ${Math.abs(vol_drop_pct).toFixed(0)}% on the same weight. You likely held back on the previous set or rested longer than usual.`
-        };
-      }
-      else if (vol_drop_pct >= -5.0 && vol_drop_pct <= DROP_THRESHOLD) {
-         result = {
-          transition: transitionLabel,
-          status: 'info',
-          metrics: {
-            weight_change_pct: '0%',
-            vol_drop_pct: `${vol_drop_pct.toFixed(1)}%`,
-            actual_reps: r_curr,
-            expected_reps: '-',
-          },
-          shortMessage: 'Optimal Fatigue',
-          tooltip: `Optimal Fatigue: Volume dropped by ${vol_drop_pct.toFixed(0)}%. This range (0-25%) is often optimal for hypertrophy, indicating effort without metabolic collapse.`
-        };
-      }
-      else if (vol_drop_pct > DROP_THRESHOLD) {
-        result = {
-          transition: transitionLabel,
-          status: 'danger',
-          metrics: {
-            weight_change_pct: '0%',
-            vol_drop_pct: `${vol_drop_pct.toFixed(1)}%`,
-            actual_reps: r_curr,
-            expected_reps: '-',
-          },
-          shortMessage: 'Significant Drop',
-          tooltip: `Significant Drop: Volume dropped by ${vol_drop_pct.toFixed(0)}%. Two likely causes:\n1. The previous set was taken to absolute failure.\n2. Your rest time was too short.\nAdvice: If you rested plenty, leave 1 rep in reserve next time. If you rushed, rest longer.`
-        };
-      }
-    }
-    // --- SCENARIO 2: WEIGHT INCREASED ---
-    else if (weight_change_pct > 0) {
-      // LOGIC FIX: Use bestSession1RM instead of just the previous set's 1RM
-      const expected_reps_raw = predictReps(bestSession1RM, w_curr);
-      const expected_reps_int = Math.round(expected_reps_raw);
-      
-      // We allow a small buffer (1.5 reps) because math is perfect but fatigue is real.
-      // If prediction is 6.2 reps, hitting 5 is technically a "pass" in a fatigued state.
-      const passed = r_curr >= (expected_reps_raw - 1.5);
-
-      if (passed) {
-        result = {
-          transition: transitionLabel,
-          status: 'success',
-          metrics: {
-            weight_change_pct: `+${weight_change_pct.toFixed(1)}%`,
-            vol_drop_pct: `${vol_drop_pct.toFixed(1)}%`,
-            actual_reps: r_curr,
-            expected_reps: `~${expected_reps_int}`,
-          },
-          shortMessage: 'Good Overload',
-          tooltip: `Good Overload: Weight +${weight_change_pct.toFixed(0)}% and you hit ${r_curr} reps (Expected based on best performance: ~${expected_reps_int}). You are getting stronger.`
-        };
-      } else {
-        result = {
-          transition: transitionLabel,
-          status: 'warning',
-          metrics: {
-            weight_change_pct: `+${weight_change_pct.toFixed(1)}%`,
-            vol_drop_pct: `${vol_drop_pct.toFixed(1)}%`,
-            actual_reps: r_curr,
-            expected_reps: `~${expected_reps_int}`,
-          },
-          shortMessage: 'Premature Jump',
-          tooltip: `Premature Jump: Weight +${weight_change_pct.toFixed(0)}% but reps dropped more than expected (Got ${r_curr}, Expected ~${expected_reps_int} based on your best set). Advice: Stay at the lower weight until you can hit more reps.`
-        };
-      }
-    }
-    // --- SCENARIO 3: WEIGHT DECREASED ---
-    else if (weight_change_pct < 0) {
-       result = {
-          transition: transitionLabel,
-          status: 'info',
-          metrics: {
-            weight_change_pct: `${weight_change_pct.toFixed(1)}%`,
-            vol_drop_pct: `${vol_drop_pct.toFixed(1)}%`,
-            actual_reps: r_curr,
-            expected_reps: '-',
-          },
-          shortMessage: 'Backoff Set',
-          tooltip: `Backoff: Weight reduced by ${Math.abs(weight_change_pct).toFixed(0)}%. Good for accumulating volume with less neural fatigue.`
-        };
+    if (Math.abs(weightChangePct) < 1.0) {
+      result = analyzeSameWeight(transition, volDropPct, curr.reps);
+    } else if (weightChangePct > 0) {
+      result = analyzeWeightIncrease(transition, weightChangePct, volDropPct, curr.reps, bestSession1RM, curr.weight);
+    } else {
+      result = createAnalysisResult(
+        transition, 'info', weightChangePct, volDropPct, curr.reps, '-',
+        'Backoff Set',
+        `Backoff: Weight reduced by ${Math.abs(roundTo(weightChangePct, 0))}%. Good for accumulating volume with less neural fatigue.`
+      );
     }
 
-    if (result) analysisLog.push(result);
+    if (result) results.push(result);
   }
 
-  return analysisLog;
+  return results;
+};
+
+type GoalLabel = 'Strength' | 'Hypertrophy' | 'Endurance' | 'Mixed' | 'N/A';
+
+interface GoalConfig {
+  label: GoalLabel;
+  tooltip: string;
+}
+
+const GOAL_CONFIGS: Record<GoalLabel, string> = {
+  'Strength': 'Average reps are low (≤5). This zone prioritizes Neural Adaptation and Max Strength.',
+  'Hypertrophy': 'Average reps are moderate (6-15). This is the "Golden Zone" for Muscle Growth (Hypertrophy).',
+  'Endurance': 'Average reps are high (>15). This zone prioritizes Metabolic Conditioning and Muscular Endurance.',
+  'Mixed': '',
+  'N/A': '',
+};
+
+const determineGoal = (avgReps: number): GoalConfig => {
+  if (avgReps <= 5) return { label: 'Strength', tooltip: GOAL_CONFIGS['Strength'] };
+  if (avgReps <= 15) return { label: 'Hypertrophy', tooltip: GOAL_CONFIGS['Hypertrophy'] };
+  return { label: 'Endurance', tooltip: GOAL_CONFIGS['Endurance'] };
 };
 
 export const analyzeSession = (sets: WorkoutSet[]): SessionAnalysis => {
@@ -178,71 +171,66 @@ export const analyzeSession = (sets: WorkoutSet[]): SessionAnalysis => {
     return { goalLabel: 'N/A', avgReps: 0, setCount: 0 };
   }
 
-  const totalReps = sets.reduce((acc, s) => acc + (s.reps || 0), 0);
-  const avgReps = Math.round(totalReps / sets.length);
-  
-  let goalLabel = 'Mixed';
-  let tooltip = '';
-
-  if (avgReps <= 5) {
-    goalLabel = 'Strength';
-    tooltip = 'Average reps are low (≤5). This zone prioritizes Neural Adaptation and Max Strength.';
-  } else if (avgReps >= 6 && avgReps <= 15) {
-    goalLabel = 'Hypertrophy';
-    tooltip = 'Average reps are moderate (6-15). This is the "Golden Zone" for Muscle Growth (Hypertrophy).';
-  } else if (avgReps > 15) {
-    goalLabel = 'Endurance';
-    tooltip = 'Average reps are high (>15). This zone prioritizes Metabolic Conditioning and Muscular Endurance.';
+  let totalReps = 0;
+  for (const s of sets) {
+    totalReps += s.reps || 0;
   }
+  const avgReps = Math.round(totalReps / sets.length);
+  const { label, tooltip } = determineGoal(avgReps);
 
-  return {
-    goalLabel,
-    avgReps,
-    setCount: sets.length,
-    tooltip
-  };
+  return { goalLabel: label, avgReps, setCount: sets.length, tooltip };
 };
 
-export const analyzeProgression = (allSetsForExercise: WorkoutSet[], targetReps: number = 10): SetWisdom | null => {
+const DEFAULT_TARGET_REPS = 10;
+const MIN_HYPERTROPHY_REPS = 5;
+
+export const analyzeProgression = (
+  allSetsForExercise: WorkoutSet[], 
+  targetReps: number = DEFAULT_TARGET_REPS
+): SetWisdom | null => {
   if (allSetsForExercise.length === 0) return null;
 
-  const minReps = Math.min(...allSetsForExercise.map(s => s.reps));
+  const reps = allSetsForExercise.map(s => s.reps);
+  const minReps = Math.min(...reps);
+  const maxReps = Math.max(...reps);
   
   if (minReps >= targetReps) {
     return { 
       type: 'promote', 
       message: 'Increase Weight',
-      tooltip: `You hit ${targetReps}+ reps on ALL sets. To force adaptation (Progressive Overload), increase the weight next session.`
+      tooltip: `You hit ${targetReps}+ reps on ALL sets. To force adaptation (Progressive Overload), increase the weight next session.`,
     };
   }
   
-  const maxReps = Math.max(...allSetsForExercise.map(s => s.reps));
-  if (maxReps < 5) {
-     return { 
-       type: 'demote', 
-       message: 'Decrease Weight', 
-       tooltip: `Reps dropped below 5. Unless doing powerlifting, this volume might be too low for muscle growth. Lower weight by 5-10%.`
-     };
+  if (maxReps < MIN_HYPERTROPHY_REPS) {
+    return { 
+      type: 'demote', 
+      message: 'Decrease Weight', 
+      tooltip: 'Reps dropped below 5. Unless doing powerlifting, this volume might be too low for muscle growth. Lower weight by 5-10%.',
+    };
   }
 
   return null;
 };
 
-// --- COLOR HELPER FOR UI ---
-export const getStatusColor = (status: AnalysisResult['status']) => {
-  switch (status) {
-    case 'success': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/50';
-    case 'info': return 'bg-blue-500/10 text-blue-400 border-blue-500/50';
-    case 'warning': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/50';
-    case 'danger': return 'bg-red-500/10 text-red-400 border-red-500/50';
-    default: return 'bg-slate-800 text-slate-400 border-slate-700';
-  }
+const STATUS_COLORS: Readonly<Record<AnalysisStatus, string>> = {
+  success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/50',
+  info: 'bg-blue-500/10 text-blue-400 border-blue-500/50',
+  warning: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/50',
+  danger: 'bg-red-500/10 text-red-400 border-red-500/50',
 };
 
-export const getWisdomColor = (type: string) => {
-  switch (type) {
-    case 'promote': return 'bg-purple-500/10 text-purple-400 border-purple-500/50';
-    case 'demote': return 'bg-orange-500/10 text-orange-400 border-orange-500/50';
-    default: return 'bg-slate-800 text-slate-400 border-slate-700';
-  }
+const WISDOM_COLORS: Readonly<Record<string, string>> = {
+  promote: 'bg-purple-500/10 text-purple-400 border-purple-500/50',
+  demote: 'bg-orange-500/10 text-orange-400 border-orange-500/50',
+};
+
+const DEFAULT_COLOR = 'bg-slate-800 text-slate-400 border-slate-700';
+
+export const getStatusColor = (status: AnalysisStatus): string => {
+  return STATUS_COLORS[status] ?? DEFAULT_COLOR;
+};
+
+export const getWisdomColor = (type: string): string => {
+  return WISDOM_COLORS[type] ?? DEFAULT_COLOR;
 };

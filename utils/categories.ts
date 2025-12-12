@@ -1,32 +1,53 @@
-export const getMuscleGroup = (title: string): string => {
-  const t = title.toLowerCase();
+export type MuscleGroup = 'Chest' | 'Back' | 'Legs' | 'Shoulders' | 'Arms' | 'Core' | 'Other';
+
+const MUSCLE_KEYWORDS: ReadonlyArray<[MuscleGroup, ReadonlyArray<string>]> = [
+  ['Chest', ['bench', 'chest', 'pec', 'fly', 'push-up', 'pushup']],
+  ['Back', ['lat', 'row', 'pull-up', 'pullup', 'chin-up', 'back extension', 'face pull']],
+  ['Legs', ['squat', 'leg', 'calf', 'lunge', 'deadlift', 'glute']],
+  ['Shoulders', ['shoulder', 'overhead', 'military', 'lateral raise', 'upright row', 'deltoid']],
+  ['Arms', ['curl', 'tricep', 'dip', 'skull', 'hammer', 'bicep', 'arm']],
+  ['Core', ['crunch', 'plank', 'sit-up', 'core', 'ab']],
+];
+
+const muscleGroupCache = new Map<string, MuscleGroup>();
+
+export const getMuscleGroup = (title: string): MuscleGroup => {
+  const key = title.toLowerCase();
   
-  if (t.includes('bench') || t.includes('chest') || t.includes('pec') || t.includes('fly') || t.includes('push-up') || t.includes('pushup')) return 'Chest';
-  if (t.includes('lat') || t.includes('row') || t.includes('pull-up') || t.includes('pullup') || t.includes('chin-up') || t.includes('back extension') || t.includes('face pull')) return 'Back';
-  if (t.includes('squat') || t.includes('leg') || t.includes('calf') || t.includes('lunge') || t.includes('deadlift') || t.includes('glute')) return 'Legs';
-  if (t.includes('shoulder') || t.includes('overhead') || t.includes('military') || t.includes('lateral raise') || t.includes('upright row') || t.includes('deltoid')) return 'Shoulders';
-  if (t.includes('curl') || t.includes('tricep') || t.includes('dip') || t.includes('skull') || t.includes('hammer') || t.includes('bicep') || t.includes('arm')) return 'Arms';
-  if (t.includes('crunch') || t.includes('plank') || t.includes('sit-up') || t.includes('core') || t.includes('ab')) return 'Core';
+  const cached = muscleGroupCache.get(key);
+  if (cached) return cached;
   
+  for (const [group, keywords] of MUSCLE_KEYWORDS) {
+    for (const keyword of keywords) {
+      if (key.includes(keyword)) {
+        muscleGroupCache.set(key, group);
+        return group;
+      }
+    }
+  }
+  
+  muscleGroupCache.set(key, 'Other');
   return 'Other';
 };
 
-export const MUSCLE_COLORS: Record<string, string> = {
-  'Chest': '#ef4444', // Red-500
-  'Back': '#3b82f6', // Blue-500
-  'Legs': '#10b981', // Emerald-500
-  'Shoulders': '#f59e0b', // Amber-500
-  'Arms': '#8b5cf6', // Violet-500
-  'Core': '#ec4899', // Pink-500
-  'Other': '#64748b', // Slate-500
+export const MUSCLE_GROUPS: readonly MuscleGroup[] = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Other'];
+
+export const MUSCLE_COLORS: Readonly<Record<MuscleGroup, string>> = {
+  Chest: '#ef4444',
+  Back: '#3b82f6',
+  Legs: '#10b981',
+  Shoulders: '#f59e0b',
+  Arms: '#8b5cf6',
+  Core: '#ec4899',
+  Other: '#64748b',
 };
 
-export const MUSCLE_FILL_COLORS: Record<string, string> = {
-  'Chest': '#7f1d1d', 
-  'Back': '#1e3a8a', 
-  'Legs': '#064e3b', 
-  'Shoulders': '#78350f', 
-  'Arms': '#4c1d95', 
-  'Core': '#831843', 
-  'Other': '#334155', 
+export const MUSCLE_FILL_COLORS: Readonly<Record<MuscleGroup, string>> = {
+  Chest: '#7f1d1d',
+  Back: '#1e3a8a',
+  Legs: '#064e3b',
+  Shoulders: '#78350f',
+  Arms: '#4c1d95',
+  Core: '#831843',
+  Other: '#334155',
 };

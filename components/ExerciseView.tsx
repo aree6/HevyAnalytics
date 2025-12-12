@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { ExerciseStats } from '../types';
 import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
+import { getDateKey, TimePeriod } from '../utils/dateUtils';
 
 // --- STYLES ---
 const FANCY_FONT: React.CSSProperties = {
@@ -164,7 +165,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>(stats[0]?.name || "");
   const [searchTerm, setSearchTerm] = useState("");
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
-  const [viewMode, setViewMode] = useState<'avg'|'day'>('avg');
+  const [viewMode, setViewMode] = useState<'all' | 'weekly' | 'monthly'>('monthly');
 
   useEffect(() => {
     let mounted = true;
@@ -194,7 +195,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
   const chartData = useMemo(() => {
     if (!selectedStats) return [];
     const history = [...selectedStats.history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    if (viewMode === 'day') {
+    if (viewMode === 'all') {
       return history.map(h => ({
         date: h.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
         weight: h.weight,
@@ -202,24 +203,29 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
         volume: h.volume
       }));
     }
-    // avg: monthly averages
-    const buckets: Record<string, { ts: number; label: string; oneRmSum: number; oneRmCount: number; weightSum: number; weightCount: number } > = {};
+    const period: TimePeriod = viewMode === 'weekly' ? 'weekly' : 'monthly';
+    const buckets = new Map<string, { ts: number; label: string; oneRmSum: number; oneRmCount: number; weightSum: number; weightCount: number }>();
+
     history.forEach(h => {
       const d = new Date(h.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      const ts = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-      if (!buckets[key]) buckets[key] = { ts, label: d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }), oneRmSum: 0, oneRmCount: 0, weightSum: 0, weightCount: 0 };
-      buckets[key].oneRmSum += h.oneRepMax;
-      buckets[key].oneRmCount += 1;
-      buckets[key].weightSum += h.weight;
-      buckets[key].weightCount += 1;
+      const { key, timestamp, label } = getDateKey(d, period);
+      let b = buckets.get(key);
+      if (!b) {
+        b = { ts: timestamp, label, oneRmSum: 0, oneRmCount: 0, weightSum: 0, weightCount: 0 };
+        buckets.set(key, b);
+      }
+      b.oneRmSum += h.oneRepMax;
+      b.oneRmCount += 1;
+      b.weightSum += h.weight;
+      b.weightCount += 1;
     });
-    return Object.values(buckets)
-      .sort((a,b) => a.ts - b.ts)
+
+    return Array.from(buckets.values())
+      .sort((a, b) => a.ts - b.ts)
       .map(b => ({
         date: b.label,
-        oneRepMax: Number((b.oneRmSum / Math.max(1,b.oneRmCount)).toFixed(1)),
-        weight: Number((b.weightSum / Math.max(1,b.weightCount)).toFixed(1)),
+        oneRepMax: Number((b.oneRmSum / Math.max(1, b.oneRmCount)).toFixed(1)),
+        weight: Number((b.weightSum / Math.max(1, b.weightCount)).toFixed(1)),
       }));
   }, [selectedStats, viewMode]);
 
@@ -407,8 +413,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats }) => {
                    <span className="w-2.5 h-0.5 bg-slate-500 border-t border-dashed border-slate-500"></span> Lift Weight
                 </div>
                 <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800">
-                  <button onClick={() => setViewMode('avg')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${viewMode==='avg'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Avg</button>
-                  <button onClick={() => setViewMode('day')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${viewMode==='day'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Day</button>
+                  <button onClick={() => setViewMode('all')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${viewMode==='all'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>All</button>
+                  <button onClick={() => setViewMode('weekly')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${viewMode==='weekly'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Weekly</button>
+                  <button onClick={() => setViewMode('monthly')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${viewMode==='monthly'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Monthly</button>
                 </div>
              </div>
           </div>

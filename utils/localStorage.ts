@@ -49,10 +49,19 @@ export const clearCSVData = (): void => {
 // Chart Modes Storage
 const CHART_MODES_KEY = 'hevy_analytics_chart_modes';
 
+export type TimeFilterMode = 'all' | 'weekly' | 'monthly';
+
+const normalizeStoredMode = (value: unknown): TimeFilterMode | null => {
+  if (value === 'all' || value === 'weekly' || value === 'monthly') return value;
+  // Backward compatibility
+  if (value === 'daily') return 'all';
+  return null;
+};
+
 /**
  * Save chart modes to local storage
  */
-export const saveChartModes = (chartModes: Record<string, 'monthly' | 'daily'>): void => {
+export const saveChartModes = (chartModes: Record<string, TimeFilterMode>): void => {
   try {
     localStorage.setItem(CHART_MODES_KEY, JSON.stringify(chartModes));
   } catch (error) {
@@ -63,10 +72,17 @@ export const saveChartModes = (chartModes: Record<string, 'monthly' | 'daily'>):
 /**
  * Retrieve chart modes from local storage
  */
-export const getChartModes = (): Record<string, 'monthly' | 'daily'> | null => {
+export const getChartModes = (): Record<string, TimeFilterMode> | null => {
   try {
     const data = localStorage.getItem(CHART_MODES_KEY);
-    return data ? JSON.parse(data) : null;
+    if (!data) return null;
+    const parsed = JSON.parse(data) as Record<string, unknown>;
+    const normalized: Record<string, TimeFilterMode> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      const mode = normalizeStoredMode(v);
+      if (mode) normalized[k] = mode;
+    }
+    return normalized;
   } catch (error) {
     console.error('Failed to retrieve chart modes from local storage:', error);
     return null;

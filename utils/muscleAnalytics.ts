@@ -1,228 +1,246 @@
 import { WorkoutSet } from '../types';
-import { format, startOfDay, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
 import type { ExerciseAsset } from './exerciseAssets';
+import { getDateKey, TimePeriod, sortByTimestamp } from './dateUtils';
+import { roundTo } from './formatters';
 
-export const normalizeMuscleGroup = (m?: string): string => {
+export type NormalizedMuscleGroup = 'Chest' | 'Back' | 'Shoulders' | 'Arms' | 'Legs' | 'Core' | 'Cardio' | 'Full Body' | 'Other';
+
+const MUSCLE_GROUP_PATTERNS: ReadonlyArray<[NormalizedMuscleGroup, ReadonlyArray<string>]> = [
+  ['Chest', ['chest', 'pec']],
+  ['Back', ['lat', 'upper back', 'back', 'lower back']],
+  ['Shoulders', ['shoulder', 'delto']],
+  ['Arms', ['bicep', 'tricep', 'forearm', 'arms']],
+  ['Legs', ['quad', 'hamstring', 'glute', 'calv', 'thigh', 'hip', 'adductor', 'abductor']],
+  ['Core', ['abdom', 'core', 'waist']],
+  ['Cardio', ['cardio']],
+  ['Full Body', ['full body', 'full-body']],
+];
+
+const muscleGroupCache = new Map<string, NormalizedMuscleGroup>();
+
+export const normalizeMuscleGroup = (m?: string): NormalizedMuscleGroup => {
   if (!m) return 'Other';
-  const t = String(m).trim().toLowerCase();
-  if (t === 'none' || t === '') return 'Other';
-  if (t.includes('chest') || t.includes('pec')) return 'Chest';
-  if (t.includes('lat') || t.includes('upper back') || t === 'back' || t.includes('lower back')) return 'Back';
-  if (t.includes('shoulder') || t.includes('delto')) return 'Shoulders';
-  if (t.includes('bicep') || t.includes('tricep') || t.includes('forearm') || t === 'arms') return 'Arms';
-  if (
-    t.includes('quad') || t.includes('hamstring') || t.includes('glute') || t.includes('calv') ||
-    t.includes('thigh') || t.includes('hip') || t.includes('adductor') || t.includes('abductor')
-  ) return 'Legs';
-  if (t.includes('abdom') || t.includes('core') || t.includes('waist')) return 'Core';
-  if (t.includes('cardio')) return 'Cardio';
-  if (t.includes('full body') || t.includes('full-body')) return 'Full Body';
+  const key = String(m).trim().toLowerCase();
+  if (key === 'none' || key === '') return 'Other';
+  
+  const cached = muscleGroupCache.get(key);
+  if (cached) return cached;
+  
+  for (const [group, patterns] of MUSCLE_GROUP_PATTERNS) {
+    for (const pattern of patterns) {
+      if (key.includes(pattern) || key === pattern) {
+        muscleGroupCache.set(key, group);
+        return group;
+      }
+    }
+  }
+  
+  muscleGroupCache.set(key, 'Other');
   return 'Other';
+};
+
+const FULL_BODY_GROUPS: readonly NormalizedMuscleGroup[] = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
+
+let cachedLowerMap: Map<string, ExerciseAsset> | null = null;
+let cachedAssetsMapRef: Map<string, ExerciseAsset> | null = null;
+
+const getLowerMap = (assetsMap: Map<string, ExerciseAsset>): Map<string, ExerciseAsset> => {
+  if (cachedAssetsMapRef === assetsMap && cachedLowerMap) return cachedLowerMap;
+  
+  cachedLowerMap = new Map<string, ExerciseAsset>();
+  assetsMap.forEach((v, k) => cachedLowerMap!.set(k.toLowerCase(), v));
+  cachedAssetsMapRef = assetsMap;
+  return cachedLowerMap;
+};
+
+const lookupAsset = (
+  name: string, 
+  assetsMap: Map<string, ExerciseAsset>, 
+  lowerMap: Map<string, ExerciseAsset>
+): ExerciseAsset | undefined => {
+  return assetsMap.get(name) ?? lowerMap.get(name.toLowerCase());
+};
+
+interface MuscleContribution {
+  muscle: string;
+  sets: number;
+}
+
+const extractMuscleContributions = (
+  asset: ExerciseAsset,
+  useGroups: boolean
+): MuscleContribution[] => {
+  const contributions: MuscleContribution[] = [];
+  const primaryRaw = String(asset.primary_muscle ?? '').trim();
+  
+  if (!primaryRaw || /cardio/i.test(primaryRaw)) return contributions;
+  
+  const primary = useGroups ? normalizeMuscleGroup(primaryRaw) : primaryRaw;
+  
+  if (primary === 'Full Body' && useGroups) {
+    for (const grp of FULL_BODY_GROUPS) {
+      contributions.push({ muscle: grp, sets: 1.0 });
+    }
+    return contributions;
+  }
+  
+  if (/full\s*body/i.test(primaryRaw) && !useGroups) {
+    return contributions;
+  }
+  
+  contributions.push({ muscle: primary, sets: 1.0 });
+  
+  const secondaryRaw = String(asset.secondary_muscle ?? '').trim();
+  if (secondaryRaw && !/none/i.test(secondaryRaw)) {
+    const secondaries = secondaryRaw.split(',');
+    for (const s of secondaries) {
+      const trimmed = s.trim();
+      if (!trimmed || /cardio/i.test(trimmed) || /full\s*body/i.test(trimmed)) continue;
+      const secondary = useGroups ? normalizeMuscleGroup(trimmed) : trimmed;
+      if (secondary === 'Cardio') continue;
+      contributions.push({ muscle: secondary, sets: 0.5 });
+    }
+  }
+  
+  return contributions;
+};
+
+export interface MuscleTimeSeriesEntry {
+  timestamp: number;
+  dateFormatted: string;
+  [muscle: string]: number | string;
+}
+
+export interface MuscleTimeSeriesResult {
+  data: MuscleTimeSeriesEntry[];
+  keys: string[];
+}
+
+const buildMuscleTimeSeries = (
+  data: WorkoutSet[],
+  assetsMap: Map<string, ExerciseAsset>,
+  period: TimePeriod,
+  useGroups: boolean
+): MuscleTimeSeriesResult => {
+  const lowerMap = getLowerMap(assetsMap);
+  const grouped = new Map<string, { 
+    timestamp: number; 
+    label: string; 
+    volumes: Map<string, number> 
+  }>();
+
+  for (const set of data) {
+    if (!set.parsedDate) continue;
+    
+    const name = set.exercise_title || '';
+    const asset = lookupAsset(name, assetsMap, lowerMap);
+    if (!asset) continue;
+    
+    const contributions = extractMuscleContributions(asset, useGroups);
+    if (contributions.length === 0) continue;
+
+    const { key, timestamp, label } = getDateKey(set.parsedDate, period);
+    
+    let bucket = grouped.get(key);
+    if (!bucket) {
+      bucket = { timestamp, label, volumes: new Map() };
+      grouped.set(key, bucket);
+    }
+
+    for (const { muscle, sets } of contributions) {
+      const current = bucket.volumes.get(muscle) ?? 0;
+      bucket.volumes.set(muscle, current + sets);
+    }
+  }
+
+  const entries = sortByTimestamp(Array.from(grouped.values()));
+  const keysSet = new Set<string>();
+  for (const e of entries) {
+    for (const k of e.volumes.keys()) {
+      keysSet.add(k);
+    }
+  }
+  const keys = Array.from(keysSet);
+
+  const series: MuscleTimeSeriesEntry[] = entries.map(e => {
+    const row: MuscleTimeSeriesEntry = {
+      timestamp: e.timestamp,
+      dateFormatted: e.label,
+    };
+    for (const k of keys) {
+      row[k] = roundTo(e.volumes.get(k) ?? 0, 1);
+    }
+    return row;
+  });
+
+  return { data: series, keys };
 };
 
 export const getMuscleVolumeTimeSeries = (
   data: WorkoutSet[],
   assetsMap: Map<string, ExerciseAsset>,
   period: 'weekly' | 'monthly' | 'daily' | 'yearly' = 'weekly'
-): { data: Array<Record<string, any>>; keys: string[] } => {
-  const lowerMap = new Map<string, ExerciseAsset>();
-  assetsMap.forEach((v, k) => lowerMap.set(k.toLowerCase(), v));
-
-  const grouped: Record<string, { timestamp: number; dateFormatted: string; volumes: Record<string, number> } > = {};
-
-  const getKey = (d: Date) => {
-    if (period === 'monthly') {
-      const start = startOfMonth(d);
-      return { key: format(start, 'yyyy-MM'), ts: start.getTime(), label: format(start, 'MMM yyyy') };
-    }
-    if (period === 'yearly') {
-      const start = startOfYear(d);
-      return { key: format(start, 'yyyy'), ts: start.getTime(), label: format(start, 'yyyy') };
-    }
-    if (period === 'daily') {
-      const start = startOfDay(d);
-      return { key: format(start, 'yyyy-MM-dd'), ts: start.getTime(), label: format(start, 'MMM d') };
-    }
-    const start = startOfWeek(d, { weekStartsOn: 1 });
-    return { key: format(start, 'yyyy-ww'), ts: start.getTime(), label: `Wk of ${format(start, 'MMM d')}` };
-  };
-
-  for (const set of data) {
-    if (!set.parsedDate) continue;
-    const name = set.exercise_title || '';
-    const asset = assetsMap.get(name) || lowerMap.get(name.toLowerCase());
-    if (!asset) continue;
-    
-    // Treat cardio as ignored (hypertrophy focus)
-    const primary = normalizeMuscleGroup(asset.primary_muscle);
-    if (primary === 'Cardio') continue;
-
-    const secondaryRaw = asset.secondary_muscle as string | undefined;
-    const secondaryList = (secondaryRaw && secondaryRaw.toLowerCase() !== 'none')
-      ? secondaryRaw.split(',').map(s => normalizeMuscleGroup(s)).filter(s => s !== 'Cardio')
-      : [];
-
-    const { key, ts, label } = getKey(set.parsedDate);
-    if (!grouped[key]) grouped[key] = { timestamp: ts, dateFormatted: label, volumes: {} };
-    const g = grouped[key].volumes;
-
-    // Count sets (not weight*reps). Primary = 1 set, each secondary = 0.5 set
-    // Full Body: include 1 set to every muscle group
-    if (primary === 'Full Body') {
-      const groups = ['Chest','Back','Legs','Shoulders','Arms','Core'];
-      for (const grp of groups) {
-        g[grp] = (g[grp] || 0) + 1.0;
-      }
-      continue;
-    }
-
-    g[primary] = (g[primary] || 0) + 1.0;
-    for (const s of secondaryList) {
-      g[s] = (g[s] || 0) + 0.5;
-    }
-  }
-
-  const entries = Object.values(grouped).sort((a,b) => a.timestamp - b.timestamp);
-  const keysSet = new Set<string>();
-  entries.forEach(e => Object.keys(e.volumes).forEach(k => keysSet.add(k)));
-  const keys = Array.from(keysSet);
-
-  const series = entries.map(e => ({
-    timestamp: e.timestamp,
-    dateFormatted: e.dateFormatted,
-    ...keys.reduce((acc, k) => { const v = (e.volumes[k] || 0); acc[k] = Number(v.toFixed(1)); return acc; }, {} as Record<string, number>)
-  }));
-
-  return { data: series, keys };
+): MuscleTimeSeriesResult => {
+  return buildMuscleTimeSeries(data, assetsMap, period, true);
 };
 
-// Detailed muscle composition (latest period). Uses raw muscle names from the CSV.
+export interface MuscleCompositionEntry {
+  subject: string;
+  value: number;
+}
+
+export interface MuscleCompositionResult {
+  data: MuscleCompositionEntry[];
+  label: string;
+}
+
 export const getDetailedMuscleCompositionLatest = (
   data: WorkoutSet[],
   assetsMap: Map<string, ExerciseAsset>,
   period: 'weekly' | 'monthly' | 'yearly' = 'weekly'
-): { data: Array<{ subject: string; value: number }>; label: string } => {
-  const lowerMap = new Map<string, ExerciseAsset>();
-  assetsMap.forEach((v, k) => lowerMap.set(k.toLowerCase(), v));
-
-  const buckets: Record<string, { label: string; counts: Record<string, number> }> = {};
-
-  const getKey = (d: Date) => {
-    if (period === 'monthly') {
-      const start = startOfMonth(d);
-      return { key: format(start, 'yyyy-MM'), label: format(start, 'MMM yyyy') };
-    }
-    if (period === 'yearly') {
-      const start = startOfYear(d);
-      return { key: format(start, 'yyyy'), label: format(start, 'yyyy') };
-    }
-    const start = startOfWeek(d, { weekStartsOn: 1 });
-    return { key: format(start, 'yyyy-ww'), label: `Wk of ${format(start, 'MMM d')}` };
-  };
+): MuscleCompositionResult => {
+  const lowerMap = getLowerMap(assetsMap);
+  const buckets = new Map<string, { label: string; counts: Map<string, number> }>();
 
   for (const set of data) {
     if (!set.parsedDate) continue;
+    
     const name = set.exercise_title || '';
-    const asset = assetsMap.get(name) || lowerMap.get(name.toLowerCase());
+    const asset = lookupAsset(name, assetsMap, lowerMap);
     if (!asset) continue;
 
-    const primaryRaw = String(asset.primary_muscle || '').trim();
-    if (!primaryRaw || /cardio/i.test(primaryRaw)) continue; // ignore cardio
+    const contributions = extractMuscleContributions(asset, false);
+    if (contributions.length === 0) continue;
 
-    const { key, label } = getKey(set.parsedDate);
-    if (!buckets[key]) buckets[key] = { label, counts: {} };
-    const counts = buckets[key].counts;
-
-    // Skip Full Body for detailed muscles (group-level only as per guidance)
-    if (/full\s*body/i.test(primaryRaw)) {
-      continue;
+    const { key, label } = getDateKey(set.parsedDate, period);
+    
+    let bucket = buckets.get(key);
+    if (!bucket) {
+      bucket = { label, counts: new Map() };
+      buckets.set(key, bucket);
     }
 
-    // Primary muscle = +1 set
-    counts[primaryRaw] = (counts[primaryRaw] || 0) + 1.0;
-
-    const secondaryRaw = String(asset.secondary_muscle || '').trim();
-    if (secondaryRaw && !/none/i.test(secondaryRaw)) {
-      secondaryRaw.split(',').forEach(s => {
-        const m = s.trim();
-        if (!m || /cardio/i.test(m) || /full\s*body/i.test(m)) return;
-        counts[m] = (counts[m] || 0) + 0.5; // secondary = 0.5 set
-      });
+    for (const { muscle, sets } of contributions) {
+      const current = bucket.counts.get(muscle) ?? 0;
+      bucket.counts.set(muscle, current + sets);
     }
   }
 
-  const keys = Object.keys(buckets).sort();
-  if (!keys.length) return { data: [], label: '' };
-  const latest = buckets[keys[keys.length - 1]];
-  const arr = Object.entries(latest.counts)
-    .map(([subject, value]) => ({ subject, value: Number(value.toFixed(1)) }))
-    .sort((a,b) => b.value - a.value);
+  const keys = Array.from(buckets.keys()).sort();
+  if (keys.length === 0) return { data: [], label: '' };
+  
+  const latest = buckets.get(keys[keys.length - 1])!;
+  const arr: MuscleCompositionEntry[] = Array.from(latest.counts.entries())
+    .map(([subject, value]) => ({ subject, value: roundTo(value, 1) }))
+    .sort((a, b) => b.value - a.value);
+  
   return { data: arr, label: latest.label };
 };
 
-// Time series for individual muscles (raw names), same set-counting rules
 export const getMuscleVolumeTimeSeriesDetailed = (
   data: WorkoutSet[],
   assetsMap: Map<string, ExerciseAsset>,
   period: 'weekly' | 'monthly' | 'daily' | 'yearly' = 'weekly'
-) => {
-  const lowerMap = new Map<string, ExerciseAsset>();
-  assetsMap.forEach((v, k) => lowerMap.set(k.toLowerCase(), v));
-
-  const grouped: Record<string, { timestamp: number; dateFormatted: string; volumes: Record<string, number> } > = {};
-
-  const getKey = (d: Date) => {
-    if (period === 'monthly') {
-      const start = startOfMonth(d);
-      return { key: format(start, 'yyyy-MM'), ts: start.getTime(), label: format(start, 'MMM yyyy') };
-    }
-    if (period === 'yearly') {
-      const start = startOfYear(d);
-      return { key: format(start, 'yyyy'), ts: start.getTime(), label: format(start, 'yyyy') };
-    }
-    if (period === 'daily') {
-      const start = startOfDay(d);
-      return { key: format(start, 'yyyy-MM-dd'), ts: start.getTime(), label: format(start, 'MMM d') };
-    }
-    const start = startOfWeek(d, { weekStartsOn: 1 });
-    return { key: format(start, 'yyyy-ww'), ts: start.getTime(), label: `Wk of ${format(start, 'MMM d')}` };
-  };
-
-  for (const set of data) {
-    if (!set.parsedDate) continue;
-    const name = set.exercise_title || '';
-    const asset = assetsMap.get(name) || lowerMap.get(name.toLowerCase());
-    if (!asset) continue;
-
-    const p = String(asset.primary_muscle || '').trim();
-    if (!p || /cardio/i.test(p) || /full\s*body/i.test(p)) continue; // ignore cardio and skip full body in detailed
-
-    const { key, ts, label } = getKey(set.parsedDate);
-    if (!grouped[key]) grouped[key] = { timestamp: ts, dateFormatted: label, volumes: {} };
-    const g = grouped[key].volumes;
-
-    g[p] = (g[p] || 0) + 1.0;
-
-    const sRaw = String(asset.secondary_muscle || '').trim();
-    if (sRaw && !/none/i.test(sRaw)) {
-      sRaw.split(',').forEach(s => {
-        const m = s.trim();
-        if (!m || /cardio/i.test(m) || /full\s*body/i.test(m)) return;
-        g[m] = (g[m] || 0) + 0.5;
-      });
-    }
-  }
-
-  const entries = Object.values(grouped).sort((a,b) => a.timestamp - b.timestamp);
-  const keysSet = new Set<string>();
-  entries.forEach(e => Object.keys(e.volumes).forEach(k => keysSet.add(k)));
-  const keys = Array.from(keysSet);
-
-  const series = entries.map(e => ({
-    timestamp: e.timestamp,
-    dateFormatted: e.dateFormatted,
-    ...keys.reduce((acc, k) => { const v = (e.volumes[k] || 0); acc[k] = Number(v.toFixed(1)); return acc; }, {} as Record<string, number>)
-  }));
-
-  return { data: series, keys };
+): MuscleTimeSeriesResult => {
+  return buildMuscleTimeSeries(data, assetsMap, period, false);
 };

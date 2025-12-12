@@ -13,8 +13,17 @@ export interface WorkoutSet {
   distance_km: number;
   duration_seconds: number;
   rpe: number | null;
-  parsedDate?: Date; // Added after processing
-  isPr?: boolean; // Added for PR tracking
+  parsedDate?: Date;
+  isPr?: boolean;
+}
+
+export interface ExerciseHistoryEntry {
+  date: Date;
+  weight: number;
+  reps: number;
+  oneRepMax: number;
+  volume: number;
+  isPr: boolean;
 }
 
 export interface ExerciseStats {
@@ -23,29 +32,24 @@ export interface ExerciseStats {
   totalVolume: number;
   maxWeight: number;
   prCount: number;
-  history: {
-    date: Date;
-    weight: number;
-    reps: number;
-    oneRepMax: number;
-    volume: number;
-    isPr: boolean;
-  }[];
+  history: ExerciseHistoryEntry[];
 }
 
 export interface DailySummary {
-  date: string; // ISO Date string for grouping
+  date: string;
   timestamp: number;
   totalVolume: number;
   workoutTitle: string;
   sets: number;
-  avgReps: number; // Added for Training Goal trends
+  avgReps: number;
   durationMinutes: number;
   density: number;
 }
 
+export type WisdomType = 'efficiency' | 'hypertrophy' | 'crash' | 'promote' | 'demote' | 'neutral';
+
 export interface SetWisdom {
-  type: 'efficiency' | 'hypertrophy' | 'crash' | 'promote' | 'demote' | 'neutral';
+  type: WisdomType;
   message: string;
   tooltip?: string;
 }
@@ -57,15 +61,19 @@ export interface SessionAnalysis {
   tooltip?: string;
 }
 
+export type AnalysisStatus = 'success' | 'warning' | 'danger' | 'info';
+
+export interface AnalysisMetrics {
+  weight_change_pct: string;
+  vol_drop_pct: string;
+  actual_reps: number;
+  expected_reps: string;
+}
+
 export interface AnalysisResult {
-  transition: string;     // e.g., "Set 1 -> Set 2"
-  status: 'success' | 'warning' | 'danger' | 'info';
-  metrics: {
-    weight_change_pct: string;
-    vol_drop_pct: string;
-    actual_reps: number;
-    expected_reps: string;
-  };
-  tooltip: string;        // The "Wisdom" text
-  shortMessage: string;   // For the badge text
+  transition: string;
+  status: AnalysisStatus;
+  metrics: AnalysisMetrics;
+  tooltip: string;
+  shortMessage: string;
 }

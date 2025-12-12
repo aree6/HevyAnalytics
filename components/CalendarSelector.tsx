@@ -68,11 +68,21 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({ mode = 'both
   const weekHasData = (week: Date[]) => week.some(d => hasData(d) && !isDisabled(d));
 
   return (
-    <div className="relative z-10 bg-slate-900 border border-slate-800 rounded-xl p-3 w-[340px] text-slate-200 shadow-2xl">
-      <div className="flex items-center justify-between mb-2">
-        <button onClick={() => setViewMonth(addMonths(viewMonth, -1))} className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-sky-300">Prev</button>
-        <div className="text-sm font-semibold text-sky-300">{format(viewMonth, 'MMMM yyyy')}</div>
-        <button onClick={() => setViewMonth(addMonths(viewMonth, 1))} className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-sky-300">Next</button>
+    <div className="relative z-10 bg-slate-900 border border-slate-800 rounded-2xl p-4 w-[360px] max-w-[92vw] text-slate-200 shadow-2xl">
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={() => setViewMonth(addMonths(viewMonth, -1))}
+          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700"
+        >
+          Prev
+        </button>
+        <div className="text-sm font-bold text-white tracking-tight">{format(viewMonth, 'MMMM yyyy')}</div>
+        <button
+          onClick={() => setViewMonth(addMonths(viewMonth, 1))}
+          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700"
+        >
+          Next
+        </button>
       </div>
 
       <div className={`grid ${mode !== 'day' ? 'grid-cols-8' : 'grid-cols-7'} gap-1 text-[10px] text-slate-400 mb-1`}>
@@ -149,13 +159,33 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({ mode = 'both
         })}
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <button onClick={() => setViewMonth(new Date())} className="text-[10px] px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">Today</button>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          onClick={() => setViewMonth(new Date())}
+          className="text-[10px] px-2 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-semibold"
+        >
+          Today
+        </button>
         {onClear && (
-          <button onClick={onClear} className="text-[10px] px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">Clear</button>
+          <button
+            onClick={onClear}
+            className="text-[10px] px-2 py-2 rounded-lg bg-red-950/40 hover:bg-red-950/60 border border-red-500/30 text-red-200 font-semibold"
+          >
+            Clear &amp; Close
+          </button>
         )}
-        <button onClick={() => onSelectMonth && onSelectMonth(clampRange({ start: startOfMonth(viewMonth), end: endOfMonth(viewMonth) }))} className="text-[10px] px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">Select Month</button>
-        <button onClick={() => onSelectYear && onSelectYear(clampRange({ start: startOfYear(viewMonth), end: endOfYear(viewMonth) }))} className="text-[10px] px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">Select Year</button>
+        <button
+          onClick={() => onSelectMonth && onSelectMonth(clampRange({ start: startOfMonth(viewMonth), end: endOfMonth(viewMonth) }))}
+          className="text-[10px] px-2 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-semibold"
+        >
+          Select Month
+        </button>
+        <button
+          onClick={() => onSelectYear && onSelectYear(clampRange({ start: startOfYear(viewMonth), end: endOfYear(viewMonth) }))}
+          className="text-[10px] px-2 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-semibold"
+        >
+          Select Year
+        </button>
       </div>
 
       {multipleWeeks && onSelectWeeks && (

@@ -1,86 +1,93 @@
-import { WorkoutSet, ExerciseStats, DailySummary } from "../types";
-import { 
-  format, startOfDay, subDays, eachDayOfInterval, isSameDay, getDay, parse, differenceInMinutes, isValid 
-} from "date-fns";
+import { WorkoutSet, ExerciseStats, DailySummary } from '../types';
+import { format, startOfDay, subDays, eachDayOfInterval, getDay, parse, differenceInMinutes, isValid } from 'date-fns';
+import { getDateKey, TimePeriod, sortByTimestamp } from './dateUtils';
+import { roundTo } from './formatters';
 
-// --- CORE ANALYTICS ---
+const sortByParsedDate = (sets: WorkoutSet[], ascending: boolean): WorkoutSet[] => {
+  return [...sets].sort((a, b) => {
+    const timeA = a.parsedDate?.getTime() ?? 0;
+    const timeB = b.parsedDate?.getTime() ?? 0;
+    return ascending ? timeA - timeB : timeB - timeA;
+  });
+};
 
 export const identifyPersonalRecords = (data: WorkoutSet[]): WorkoutSet[] => {
-  const sorted = [...data].sort((a, b) => {
-    if (a.parsedDate && b.parsedDate) {
-      return a.parsedDate.getTime() - b.parsedDate.getTime();
-    }
-    return 0;
-  });
-
+  const sorted = sortByParsedDate(data, true);
   const maxWeightMap = new Map<string, number>();
 
   const dataWithPrs = sorted.map(set => {
     const exercise = set.exercise_title;
     const currentWeight = set.weight_kg || 0;
-    const previousMax = maxWeightMap.get(exercise) || 0;
+    const previousMax = maxWeightMap.get(exercise) ?? 0;
     
-    let isPr = false;
-    if (currentWeight > 0 && currentWeight > previousMax) {
-      isPr = true;
+    const isPr = currentWeight > 0 && currentWeight > previousMax;
+    if (isPr) {
       maxWeightMap.set(exercise, currentWeight);
     }
 
     return { ...set, isPr };
   });
 
-  return dataWithPrs.sort((a, b) => {
-    if (a.parsedDate && b.parsedDate) {
-      return b.parsedDate.getTime() - a.parsedDate.getTime();
-    }
+  return sortByParsedDate(dataWithPrs, false);
+};
+
+interface DailyAccumulator {
+  date: string;
+  timestamp: number;
+  totalVolume: number;
+  workoutTitle: string;
+  sets: number;
+  totalReps: number;
+  sessions: Set<string>;
+  durationMinutes: number;
+}
+
+const parseSessionDuration = (startDate: Date | undefined, endTimeStr: string): number => {
+  if (!startDate) return 0;
+  try {
+    const end = parse(endTimeStr, 'd MMM yyyy, HH:mm', new Date());
+    if (!isValid(end)) return 0;
+    const duration = differenceInMinutes(end, startDate);
+    return (duration > 0 && duration < 1440) ? duration : 0;
+  } catch {
     return 0;
-  });
+  }
 };
 
 export const getDailySummaries = (data: WorkoutSet[]): DailySummary[] => {
-  const grouped = data.reduce((acc, curr) => {
-    if (!curr.parsedDate) return acc;
-    const dateKey = format(curr.parsedDate, "yyyy-MM-dd");
+  const grouped = new Map<string, DailyAccumulator>();
+
+  for (const set of data) {
+    if (!set.parsedDate) continue;
     
-    if (!acc[dateKey]) {
-      acc[dateKey] = {
+    const dateKey = format(set.parsedDate, 'yyyy-MM-dd');
+    let acc = grouped.get(dateKey);
+    
+    if (!acc) {
+      acc = {
         date: dateKey,
-        timestamp: startOfDay(curr.parsedDate).getTime(),
+        timestamp: startOfDay(set.parsedDate).getTime(),
         totalVolume: 0,
-        workoutTitle: curr.title || 'Workout',
+        workoutTitle: set.title || 'Workout',
         sets: 0,
         totalReps: 0,
-        sessions: new Set<string>(), 
-        durationMinutes: 0
-      } as any;
+        sessions: new Set(),
+        durationMinutes: 0,
+      };
+      grouped.set(dateKey, acc);
     }
     
-    const sessionKey = curr.start_time;
-    if (!acc[dateKey].sessions.has(sessionKey)) {
-        acc[dateKey].sessions.add(sessionKey);
-        try {
-            const start = curr.parsedDate as Date | undefined;
-            const end = parse(curr.end_time, "d MMM yyyy, HH:mm", new Date());
-            if (start && isValid(start) && isValid(end)) {
-              const duration = differenceInMinutes(end, start);
-              if (duration > 0 && duration < 1440) {
-                  acc[dateKey].durationMinutes += duration;
-              }
-            }
-        } catch (e) {
-            // ignore invalid dates
-        }
+    if (!acc.sessions.has(set.start_time)) {
+      acc.sessions.add(set.start_time);
+      acc.durationMinutes += parseSessionDuration(set.parsedDate, set.end_time);
     }
 
-    const volume = (curr.weight_kg || 0) * (curr.reps || 0);
-    acc[dateKey].totalVolume += volume;
-    acc[dateKey].sets += 1;
-    acc[dateKey].totalReps += (curr.reps || 0);
-    
-    return acc;
-  }, {} as Record<string, any>);
+    acc.totalVolume += (set.weight_kg || 0) * (set.reps || 0);
+    acc.sets += 1;
+    acc.totalReps += set.reps || 0;
+  }
 
-  return Object.values(grouped).map(d => ({
+  const summaries: DailySummary[] = Array.from(grouped.values()).map(d => ({
     date: d.date,
     timestamp: d.timestamp,
     totalVolume: d.totalVolume,
@@ -88,17 +95,27 @@ export const getDailySummaries = (data: WorkoutSet[]): DailySummary[] => {
     sets: d.sets,
     avgReps: d.sets > 0 ? Math.round(d.totalReps / d.sets) : 0,
     durationMinutes: d.durationMinutes,
-    density: d.durationMinutes > 0 ? Math.round(d.totalVolume / d.durationMinutes) : 0
-  })).sort((a, b) => a.timestamp - b.timestamp);
+    density: d.durationMinutes > 0 ? Math.round(d.totalVolume / d.durationMinutes) : 0,
+  }));
+
+  return sortByTimestamp(summaries);
+};
+
+const calculateOneRepMax = (weight: number, reps: number): number => {
+  if (reps <= 0 || weight <= 0) return 0;
+  return roundTo(weight * (1 + reps / 30), 2);
 };
 
 export const getExerciseStats = (data: WorkoutSet[]): ExerciseStats[] => {
-  const grouped = data.reduce((acc, curr) => {
-    const name = curr.exercise_title;
-    if (!name || !curr.parsedDate) return acc;
+  const grouped = new Map<string, ExerciseStats>();
 
-    if (!acc[name]) {
-      acc[name] = {
+  for (const set of data) {
+    const name = set.exercise_title;
+    if (!name || !set.parsedDate) continue;
+
+    let stats = grouped.get(name);
+    if (!stats) {
+      stats = {
         name,
         totalSets: 0,
         totalVolume: 0,
@@ -106,33 +123,40 @@ export const getExerciseStats = (data: WorkoutSet[]): ExerciseStats[] => {
         prCount: 0,
         history: [],
       };
+      grouped.set(name, stats);
     }
 
-    const volume = (curr.weight_kg || 0) * (curr.reps || 0);
-    const oneRepMax = curr.reps > 0 ? (curr.weight_kg * (1 + curr.reps / 30)) : 0;
+    const volume = (set.weight_kg || 0) * (set.reps || 0);
+    const oneRepMax = calculateOneRepMax(set.weight_kg, set.reps);
 
-    acc[name].totalSets += 1;
-    acc[name].totalVolume += volume;
-    if (curr.weight_kg > acc[name].maxWeight) acc[name].maxWeight = curr.weight_kg;
-    if (curr.isPr) acc[name].prCount += 1;
+    stats.totalSets += 1;
+    stats.totalVolume += volume;
+    if (set.weight_kg > stats.maxWeight) stats.maxWeight = set.weight_kg;
+    if (set.isPr) stats.prCount += 1;
 
-    acc[name].history.push({
-      date: curr.parsedDate,
-      weight: curr.weight_kg,
-      reps: curr.reps,
+    stats.history.push({
+      date: set.parsedDate,
+      weight: set.weight_kg,
+      reps: set.reps,
       oneRepMax,
       volume,
-      isPr: curr.isPr || false
+      isPr: set.isPr ?? false,
     });
+  }
 
-    return acc;
-  }, {} as Record<string, ExerciseStats>);
-
-  return Object.values(grouped).sort((a, b) => b.totalSets - a.totalSets);
+  return Array.from(grouped.values()).sort((a, b) => b.totalSets - a.totalSets);
 };
 
-export const getHeatmapData = (dailyData: DailySummary[]) => {
+export interface HeatmapEntry {
+  date: Date;
+  count: number;
+  totalVolume: number;
+  title: string | null;
+}
+
+export const getHeatmapData = (dailyData: DailySummary[]): HeatmapEntry[] => {
   if (dailyData.length === 0) return [];
+  
   const lastDate = new Date(dailyData[dailyData.length - 1].timestamp);
   const firstDate = subDays(lastDate, 364);
   const days = eachDayOfInterval({ start: firstDate, end: lastDate });
@@ -147,142 +171,177 @@ export const getHeatmapData = (dailyData: DailySummary[]) => {
     const activity = byDayKey.get(key);
     return {
       date: day,
-      count: activity ? activity.sets : 0,
-      totalVolume: activity ? activity.totalVolume : 0,
-      title: activity ? activity.workoutTitle : null
+      count: activity?.sets ?? 0,
+      totalVolume: activity?.totalVolume ?? 0,
+      title: activity?.workoutTitle ?? null,
     };
   });
 };
 
-// --- MODERN CHART DATA GENERATORS ---
+export type TrainingStyle = 'Strength' | 'Hypertrophy' | 'Endurance';
 
-export const getIntensityEvolution = (data: WorkoutSet[], mode: 'daily' | 'monthly' = 'monthly') => {
-  const groupedData: Record<string, any> = {};
+export interface IntensityEntry {
+  dateFormatted: string;
+  timestamp: number;
+  Strength: number;
+  Hypertrophy: number;
+  Endurance: number;
+}
 
-  data.forEach(set => {
-    if (!set.parsedDate) return;
+const categorizeByReps = (reps: number): TrainingStyle => {
+  if (reps <= 5) return 'Strength';
+  if (reps <= 12) return 'Hypertrophy';
+  return 'Endurance';
+};
+
+export const getIntensityEvolution = (
+  data: WorkoutSet[], 
+  mode: 'daily' | 'weekly' | 'monthly' = 'monthly'
+): IntensityEntry[] => {
+  const period: TimePeriod = mode === 'monthly' ? 'monthly' : (mode === 'weekly' ? 'weekly' : 'daily');
+  const grouped = new Map<string, IntensityEntry>();
+
+  for (const set of data) {
+    if (!set.parsedDate) continue;
     
-    const key = mode === 'monthly' 
-      ? format(set.parsedDate, "yyyy-MM") 
-      : format(set.parsedDate, "yyyy-MM-dd");
+    const { key, timestamp, label } = getDateKey(set.parsedDate, period);
     
-    if (!groupedData[key]) {
-      groupedData[key] = {
-        dateFormatted: mode === 'monthly' ? format(set.parsedDate, 'MMM yyyy') : format(set.parsedDate, 'MMM d'),
-        timestamp: startOfDay(set.parsedDate).getTime(),
+    let entry = grouped.get(key);
+    if (!entry) {
+      entry = {
+        dateFormatted: label,
+        timestamp,
         Strength: 0,
         Hypertrophy: 0,
-        Endurance: 0
+        Endurance: 0,
       };
+      grouped.set(key, entry);
     }
 
-    // Categorize by reps, default to Hypertrophy if reps is 0 or missing
-    const reps = set.reps || 8;
-    if (reps <= 5) groupedData[key].Strength += 1;
-    else if (reps <= 12) groupedData[key].Hypertrophy += 1;
-    else groupedData[key].Endurance += 1;
-  });
+    const style = categorizeByReps(set.reps || 8);
+    entry[style] += 1;
+  }
 
-  const result = Object.values(groupedData).sort((a, b) => a.timestamp - b.timestamp);
-  return result;
+  return sortByTimestamp(Array.from(grouped.values()));
 };
 
-export const getDayOfWeekShape = (dailyData: DailySummary[]) => {
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const counts = [0, 0, 0, 0, 0, 0, 0];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
-  dailyData.forEach(day => {
+export interface DayOfWeekEntry {
+  subject: string;
+  A: number;
+  fullMark: number;
+}
+
+export const getDayOfWeekShape = (dailyData: DailySummary[]): DayOfWeekEntry[] => {
+  const counts = new Array(7).fill(0);
+
+  for (const day of dailyData) {
     const dayIndex = getDay(new Date(day.timestamp));
     counts[dayIndex]++;
-  });
+  }
 
-  const maxVal = Math.max(...counts);
+  const maxVal = Math.max(...counts, 1);
 
-  return days.map((day, index) => ({
+  return DAY_NAMES.map((day, index) => ({
     subject: day,
     A: counts[index],
-    fullMark: maxVal
+    fullMark: maxVal,
   }));
 };
 
-export const getTopExercisesRadial = (stats: ExerciseStats[]) => {
-  return [...stats].sort((a,b) => b.totalSets - a.totalSets).map(s => ({
-    name: s.name,
-    count: s.totalSets,
-  }));
+export interface ExerciseRadialEntry {
+  name: string;
+  count: number;
+}
+
+export const getTopExercisesRadial = (stats: ExerciseStats[]): ExerciseRadialEntry[] => {
+  return [...stats]
+    .sort((a, b) => b.totalSets - a.totalSets)
+    .map(s => ({ name: s.name, count: s.totalSets }));
 };
 
-export const getTopExercisesOverTime = (data: WorkoutSet[], topExerciseNames: string[], mode: 'daily' | 'monthly' = 'monthly') => {
-  // Group data by date and exercise
-  const exerciseData: Record<string, Record<string, number>> = {};
+export interface ExerciseTimeEntry {
+  date: string;
+  dateFormatted: string;
+  timestamp: number;
+  [exerciseName: string]: string | number;
+}
+
+export const getTopExercisesOverTime = (
+  data: WorkoutSet[], 
+  topExerciseNames: string[], 
+  mode: 'daily' | 'weekly' | 'monthly' = 'monthly'
+): ExerciseTimeEntry[] => {
+  const period: TimePeriod = mode === 'monthly' ? 'monthly' : (mode === 'weekly' ? 'weekly' : 'daily');
+  const topSet = new Set(topExerciseNames);
   
-  // Initialize structure for each top exercise
-  topExerciseNames.forEach(name => {
-    exerciseData[name] = {};
-  });
+  const grouped = new Map<string, { 
+    timestamp: number; 
+    label: string; 
+    counts: Map<string, number> 
+  }>();
 
-  // Process each workout set
-  data.forEach(set => {
-    if (!set.parsedDate || !topExerciseNames.includes(set.exercise_title)) return;
+  for (const set of data) {
+    if (!set.parsedDate || !topSet.has(set.exercise_title)) continue;
     
-    const key = mode === 'monthly' 
-      ? format(set.parsedDate, "yyyy-MM") 
-      : format(set.parsedDate, "yyyy-MM-dd");
-
-    if (!exerciseData[set.exercise_title][key]) {
-      exerciseData[set.exercise_title][key] = 0;
+    const { key, timestamp, label } = getDateKey(set.parsedDate, period);
+    
+    let bucket = grouped.get(key);
+    if (!bucket) {
+      bucket = { timestamp, label, counts: new Map() };
+      grouped.set(key, bucket);
     }
-    exerciseData[set.exercise_title][key] += 1; // Count sets
-  });
-
-  // Get all unique dates
-  const allDates = new Set<string>();
-  Object.values(exerciseData).forEach(exData => {
-    Object.keys(exData).forEach(date => allDates.add(date));
-  });
-
-  // Convert to array format for Recharts
-  const sortedDates = Array.from(allDates).sort();
-  
-  return sortedDates.map(dateKey => {
-    const dateObj = mode === 'monthly' 
-      ? parse(dateKey, "yyyy-MM", new Date())
-      : parse(dateKey, "yyyy-MM-dd", new Date());
     
-    const entry: Record<string, any> = {
-      date: mode === 'monthly' ? format(dateObj, 'MMM yyyy') : format(dateObj, 'MMM d'),
-      dateFormatted: mode === 'monthly' ? format(dateObj, 'MMMM yyyy') : format(dateObj, 'MMM d, yyyy'),
-      timestamp: startOfDay(dateObj).getTime(),
+    const current = bucket.counts.get(set.exercise_title) ?? 0;
+    bucket.counts.set(set.exercise_title, current + 1);
+  }
+
+  const entries = sortByTimestamp(Array.from(grouped.entries()).map(([key, val]) => ({
+    key,
+    timestamp: val.timestamp,
+    label: val.label,
+    counts: val.counts,
+  })));
+
+  return entries.map(entry => {
+    const result: ExerciseTimeEntry = {
+      date: entry.label,
+      dateFormatted: entry.label,
+      timestamp: entry.timestamp,
     };
-
-    // Add count for each exercise (0 if no data)
-    topExerciseNames.forEach(name => {
-      entry[name] = exerciseData[name][dateKey] || 0;
-    });
-
-    return entry;
+    for (const name of topExerciseNames) {
+      result[name] = entry.counts.get(name) ?? 0;
+    }
+    return result;
   });
 };
 
-export const getPrsOverTime = (data: WorkoutSet[], mode: 'daily' | 'monthly' = 'monthly') => {
-  const prsData: Record<string, { count: number, timestamp: number, dateFormatted: string }> = {};
+export interface PRTimeEntry {
+  count: number;
+  timestamp: number;
+  dateFormatted: string;
+}
 
-  data.forEach(set => {
-    if (!set.parsedDate || !set.isPr) return;
+export const getPrsOverTime = (
+  data: WorkoutSet[], 
+  mode: 'daily' | 'weekly' | 'monthly' = 'monthly'
+): PRTimeEntry[] => {
+  const period: TimePeriod = mode === 'monthly' ? 'monthly' : (mode === 'weekly' ? 'weekly' : 'daily');
+  const grouped = new Map<string, PRTimeEntry>();
+
+  for (const set of data) {
+    if (!set.parsedDate || !set.isPr) continue;
     
-    const key = mode === 'monthly' 
-      ? format(set.parsedDate, "yyyy-MM") 
-      : format(set.parsedDate, "yyyy-MM-dd");
-
-    if (!prsData[key]) {
-      prsData[key] = {
-        count: 0,
-        timestamp: startOfDay(set.parsedDate).getTime(),
-        dateFormatted: mode === 'monthly' ? format(set.parsedDate, 'MMM yyyy') : format(set.parsedDate, 'MMM d'),
-      };
+    const { key, timestamp, label } = getDateKey(set.parsedDate, period);
+    
+    let entry = grouped.get(key);
+    if (!entry) {
+      entry = { count: 0, timestamp, dateFormatted: label };
+      grouped.set(key, entry);
     }
-    prsData[key].count += 1;
-  });
+    entry.count += 1;
+  }
 
-  return Object.values(prsData).sort((a, b) => a.timestamp - b.timestamp);
+  return sortByTimestamp(Array.from(grouped.values()));
 };
