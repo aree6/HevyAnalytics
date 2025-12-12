@@ -1,46 +1,124 @@
 import { WorkoutSet } from '../types';
 import { startOfWeek, endOfWeek, format, eachWeekOfInterval, subWeeks } from 'date-fns';
 
-// Mapping from CSV muscle names to SVG muscle IDs
+// Mapping from CSV muscle names to SVG muscle IDs (granular body map)
 export const CSV_TO_SVG_MUSCLE_MAP: Record<string, string[]> = {
-  'Abdominals': ['abdominals'],
-  'Abductors': ['glutes'],
-  'Adductors': ['quads'],
-  'Biceps': ['biceps'],
-  'Calves': ['calves'],
-  'Chest': ['chest'],
-  'Forearms': ['forearms'],
-  'Glutes': ['glutes'],
-  'Hamstrings': ['hamstrings'],
+  'Abdominals': ['lower-abdominals', 'upper-abdominals'],
+  'Abductors': ['gluteus-medius'],
+  'Adductors': ['inner-thigh'],
+  'Biceps': ['long-head-bicep', 'short-head-bicep'],
+  'Calves': ['gastrocnemius', 'soleus', 'tibialis'],
+  'Chest': ['mid-lower-pectoralis', 'upper-pectoralis'],
+  'Forearms': ['wrist-extensors', 'wrist-flexors'],
+  'Glutes': ['gluteus-maximus', 'gluteus-medius'],
+  'Hamstrings': ['medial-hamstrings', 'lateral-hamstrings'],
   'Lats': ['lats'],
   'Lower Back': ['lowerback'],
-  'Neck': ['traps'],
-  'Quadriceps': ['quads'],
-  'Shoulders': ['front-shoulders', 'rear-shoulders'],
-  'Traps': ['traps', 'traps-middle'],
-  'Triceps': ['triceps'],
-  'Upper Back': ['lats', 'traps-middle', 'rear-shoulders'],
+  'Neck': ['neck'],
+  'Quadriceps': ['outer-quadricep', 'rectus-femoris', 'inner-quadricep'],
+  'Shoulders': ['anterior-deltoid', 'lateral-deltoid', 'posterior-deltoid'],
+  'Traps': ['upper-trapezius', 'lower-trapezius', 'traps-middle'],
+  'Triceps': ['medial-head-triceps', 'long-head-triceps', 'lateral-head-triceps'],
+  'Upper Back': ['lats', 'upper-trapezius', 'lower-trapezius', 'traps-middle', 'posterior-deltoid'],
   'Obliques': ['obliques'],
+};
+
+// SVG muscle groups for highlighting - maps granular SVG IDs to parent group for display
+// When user selects any part of a muscle group, we show the group name
+export const SVG_MUSCLE_GROUPS: Record<string, string> = {
+  // Shoulders group
+  'anterior-deltoid': 'Shoulders',
+  'lateral-deltoid': 'Shoulders',
+  'posterior-deltoid': 'Shoulders',
+  // Chest group
+  'mid-lower-pectoralis': 'Chest',
+  'upper-pectoralis': 'Chest',
+  // Biceps group
+  'long-head-bicep': 'Biceps',
+  'short-head-bicep': 'Biceps',
+  // Triceps group
+  'medial-head-triceps': 'Triceps',
+  'long-head-triceps': 'Triceps',
+  'lateral-head-triceps': 'Triceps',
+  // Abs group
+  'lower-abdominals': 'Abdominals',
+  'upper-abdominals': 'Abdominals',
+  // Quads group
+  'outer-quadricep': 'Quadriceps',
+  'rectus-femoris': 'Quadriceps',
+  'inner-quadricep': 'Quadriceps',
+  // Hamstrings group
+  'medial-hamstrings': 'Hamstrings',
+  'lateral-hamstrings': 'Hamstrings',
+  // Glutes group
+  'gluteus-maximus': 'Glutes',
+  'gluteus-medius': 'Glutes',
+  // Calves group
+  'gastrocnemius': 'Calves',
+  'soleus': 'Calves',
+  'tibialis': 'Calves',
+  // Traps group
+  'upper-trapezius': 'Traps',
+  'lower-trapezius': 'Traps',
+  'traps-middle': 'Traps',
+  // Forearms group
+  'wrist-extensors': 'Forearms',
+  'wrist-flexors': 'Forearms',
+  // Single muscles
+  'lats': 'Lats',
+  'lowerback': 'Lower Back',
+  'obliques': 'Obliques',
+  'neck': 'Neck',
+  'inner-thigh': 'Adductors',
 };
 
 // Reverse mapping: SVG ID to display name
 export const SVG_MUSCLE_NAMES: Record<string, string> = {
-  calves: 'Calves',
-  quads: 'Quadriceps',
-  abdominals: 'Abdominals',
-  obliques: 'Obliques',
-  chest: 'Chest',
-  biceps: 'Biceps',
-  forearms: 'Forearms',
-  'front-shoulders': 'Front Delts',
-  'rear-shoulders': 'Rear Delts',
-  traps: 'Upper Traps',
-  'traps-middle': 'Mid/Lower Traps',
-  lats: 'Lats',
-  lowerback: 'Lower Back',
-  hamstrings: 'Hamstrings',
-  glutes: 'Glutes',
-  triceps: 'Triceps',
+  // Calves
+  'gastrocnemius': 'Calves',
+  'soleus': 'Calves',
+  'tibialis': 'Calves',
+  // Quads
+  'outer-quadricep': 'Quadriceps',
+  'rectus-femoris': 'Quadriceps',
+  'inner-quadricep': 'Quadriceps',
+  // Abs
+  'lower-abdominals': 'Abdominals',
+  'upper-abdominals': 'Abdominals',
+  'obliques': 'Obliques',
+  // Chest
+  'mid-lower-pectoralis': 'Chest',
+  'upper-pectoralis': 'Chest',
+  // Biceps
+  'long-head-bicep': 'Biceps',
+  'short-head-bicep': 'Biceps',
+  // Forearms
+  'wrist-extensors': 'Forearms',
+  'wrist-flexors': 'Forearms',
+  // Shoulders
+  'anterior-deltoid': 'Shoulders',
+  'lateral-deltoid': 'Shoulders',
+  'posterior-deltoid': 'Shoulders',
+  // Traps
+  'upper-trapezius': 'Traps',
+  'lower-trapezius': 'Traps',
+  'traps-middle': 'Traps',
+  // Back
+  'lats': 'Lats',
+  'lowerback': 'Lower Back',
+  // Hamstrings
+  'medial-hamstrings': 'Hamstrings',
+  'lateral-hamstrings': 'Hamstrings',
+  // Glutes
+  'gluteus-maximus': 'Glutes',
+  'gluteus-medius': 'Glutes',
+  // Triceps
+  'medial-head-triceps': 'Triceps',
+  'long-head-triceps': 'Triceps',
+  'lateral-head-triceps': 'Triceps',
+  // Other
+  'neck': 'Neck',
+  'inner-thigh': 'Adductors',
 };
 
 // All muscle groups that can be displayed on SVG
@@ -288,7 +366,7 @@ export const getVolumeIntensity = (sets: number, maxSets: number): string => {
 
 
 export const getVolumeColor = (sets: number, maxSets: number): string => {
-  if (sets === 0) return 'hsla(0, 0%, 100%, 0.1)';
+  if (sets === 0) return 'hsla(0, 0%, 100%, 1)';
 
   const ratio = sets / Math.max(maxSets, 1);
   const lightness = 84 - ratio * 64; // 84% → 20%
@@ -311,6 +389,22 @@ export const getExerciseMuscleVolumes = (
     .split(',')
     .map(m => m.trim())
     .filter(m => m && m !== 'None');
+
+  // Skip Cardio entirely
+  if (primary === 'Cardio') {
+    return { volumes, maxVolume: 1 };
+  }
+
+  // Handle Full Body - add 1 set to every muscle group
+  if (primary === 'Full Body') {
+    for (const muscleName of FULL_BODY_MUSCLES) {
+      const svgIds = CSV_TO_SVG_MUSCLE_MAP[muscleName] || [];
+      for (const svgId of svgIds) {
+        volumes.set(svgId, 1);
+      }
+    }
+    return { volumes, maxVolume: 1 };
+  }
   
   // Primary muscle gets 1
   const primarySvgIds = CSV_TO_SVG_MUSCLE_MAP[primary] || [];
@@ -324,6 +418,39 @@ export const getExerciseMuscleVolumes = (
     for (const svgId of secondarySvgIds) {
       if (!volumes.has(svgId)) {
         volumes.set(svgId, 0.5);
+      }
+    }
+  }
+  
+  // Propagate volume across muscle groups - if any part of a group is hit, all parts should light up
+  // This ensures e.g. all 3 deltoid heads light up when any one is targeted
+  const muscleGroups: Record<string, string[]> = {
+    'Shoulders': ['anterior-deltoid', 'lateral-deltoid', 'posterior-deltoid'],
+    'Traps': ['upper-trapezius', 'lower-trapezius', 'traps-middle'],
+    'Biceps': ['long-head-bicep', 'short-head-bicep'],
+    'Triceps': ['medial-head-triceps', 'long-head-triceps', 'lateral-head-triceps'],
+    'Chest': ['mid-lower-pectoralis', 'upper-pectoralis'],
+    'Quadriceps': ['outer-quadricep', 'rectus-femoris', 'inner-quadricep'],
+    'Hamstrings': ['medial-hamstrings', 'lateral-hamstrings'],
+    'Glutes': ['gluteus-maximus', 'gluteus-medius'],
+    'Calves': ['gastrocnemius', 'soleus', 'tibialis'],
+    'Abdominals': ['lower-abdominals', 'upper-abdominals'],
+    'Forearms': ['wrist-extensors', 'wrist-flexors'],
+  };
+  
+  for (const groupParts of Object.values(muscleGroups)) {
+    // Find max volume in this group
+    let maxGroupVolume = 0;
+    for (const part of groupParts) {
+      const vol = volumes.get(part) || 0;
+      if (vol > maxGroupVolume) maxGroupVolume = vol;
+    }
+    // If any part has volume, propagate to all parts
+    if (maxGroupVolume > 0) {
+      for (const part of groupParts) {
+        if (!volumes.has(part)) {
+          volumes.set(part, maxGroupVolume);
+        }
       }
     }
   }

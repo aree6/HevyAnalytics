@@ -28,11 +28,18 @@ const App: React.FC = () => {
   const [showCSVModal, setShowCSVModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [highlightedExercise, setHighlightedExercise] = useState<string | null>(null);
+  const [initialMuscleForAnalysis, setInitialMuscleForAnalysis] = useState<{ muscleId: string; viewMode: 'muscle' | 'group' } | null>(null);
   
   // Handler for navigating to ExerciseView from MuscleAnalysis
   const handleExerciseClick = (exerciseName: string) => {
     setHighlightedExercise(exerciseName);
     setActiveTab(Tab.EXERCISES);
+  };
+
+  // Handler for navigating to MuscleAnalysis from Dashboard heatmap
+  const handleMuscleClick = (muscleId: string, viewMode: 'muscle' | 'group') => {
+    setInitialMuscleForAnalysis({ muscleId, viewMode });
+    setActiveTab(Tab.MUSCLE_ANALYSIS);
   };
   
   // Loading State
@@ -376,6 +383,16 @@ const App: React.FC = () => {
               </button>
               <button 
                 onClick={() => {
+                  setActiveTab(Tab.MUSCLE_ANALYSIS);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+              >
+                <Activity className="w-5 h-5" />
+                <span className="font-medium">Muscle Analysis</span>
+              </button>
+              <button 
+                onClick={() => {
                   setActiveTab(Tab.EXERCISES);
                   setIsMobileMenuOpen(false);
                 }}
@@ -393,16 +410,6 @@ const App: React.FC = () => {
               >
                 <History className="w-5 h-5" />
                 <span className="font-medium">History</span>
-              </button>
-              <button 
-                onClick={() => {
-                  setActiveTab(Tab.MUSCLE_ANALYSIS);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-              >
-                <Activity className="w-5 h-5" />
-                <span className="font-medium">Muscle Analysis</span>
               </button>
             </nav>
 
@@ -446,6 +453,16 @@ const App: React.FC = () => {
               </button>
               <button 
                 onClick={() => {
+                  setActiveTab(Tab.MUSCLE_ANALYSIS);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 w-full text-left ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+              >
+                <Activity className="w-5 h-5" />
+                <span className="font-medium">Muscle Analysis</span>
+              </button>
+              <button 
+                onClick={() => {
                   setActiveTab(Tab.EXERCISES);
                   setIsMobileMenuOpen(false);
                 }}
@@ -463,16 +480,6 @@ const App: React.FC = () => {
               >
                 <History className="w-5 h-5" />
                 <span className="font-medium">History</span>
-              </button>
-              <button 
-                onClick={() => {
-                  setActiveTab(Tab.MUSCLE_ANALYSIS);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 w-full text-left ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-              >
-                <Activity className="w-5 h-5" />
-                <span className="font-medium">Muscle Analysis</span>
               </button>
 
               {/* Mobile Action Buttons */}
@@ -506,11 +513,20 @@ const App: React.FC = () => {
               fullData={filteredData} 
               filtersSlot={filterControls}
               onDayClick={handleDayClick}
+              onMuscleClick={handleMuscleClick}
             />
           )}
           {activeTab === Tab.EXERCISES && <ExerciseView stats={exerciseStats} filtersSlot={filterControls} highlightedExercise={highlightedExercise} />}
           {activeTab === Tab.HISTORY && <HistoryView data={filteredData} filtersSlot={filterControls} />}
-          {activeTab === Tab.MUSCLE_ANALYSIS && <MuscleAnalysis data={filteredData} filtersSlot={filterControls} onExerciseClick={handleExerciseClick} />}
+          {activeTab === Tab.MUSCLE_ANALYSIS && (
+            <MuscleAnalysis
+              data={filteredData}
+              filtersSlot={filterControls}
+              onExerciseClick={handleExerciseClick}
+              initialMuscle={initialMuscleForAnalysis}
+              onInitialMuscleConsumed={() => setInitialMuscleForAnalysis(null)}
+            />
+          )}
         </Suspense>
       </main>
     </div>

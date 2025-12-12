@@ -6,9 +6,11 @@ import {
   loadExerciseMuscleData,
   calculateMuscleVolume,
   SVG_MUSCLE_NAMES,
+  CSV_TO_SVG_MUSCLE_MAP,
   ExerciseMuscleData,
   MuscleVolumeEntry,
   getExerciseMuscleVolumes,
+  getVolumeColor,
 } from '../utils/muscleMapping';
 import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
 import { format, startOfWeek, startOfMonth, subWeeks, subMonths, isWithinInterval } from 'date-fns';
@@ -20,17 +22,59 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { TrendingUp, Dumbbell, X, Activity } from 'lucide-react';
+import { TrendingUp, Dumbbell, X, Activity, Layers, Target } from 'lucide-react';
+import { normalizeMuscleGroup, NormalizedMuscleGroup } from '../utils/muscleAnalytics';
 
 interface MuscleAnalysisProps {
   data: WorkoutSet[];
   filtersSlot?: React.ReactNode;
   onExerciseClick?: (exerciseName: string) => void;
+  initialMuscle?: { muscleId: string; viewMode: 'muscle' | 'group' } | null;
+  onInitialMuscleConsumed?: () => void;
 }
 
 type TrendPeriod = 'all' | 'weekly' | 'monthly';
+type ViewMode = 'muscle' | 'group';
 
-export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlot, onExerciseClick }) => {
+// Muscle group definitions for aggregation
+const MUSCLE_GROUP_DISPLAY: Record<string, NormalizedMuscleGroup> = {
+  'mid-lower-pectoralis': 'Chest',
+  'upper-pectoralis': 'Chest',
+  'lats': 'Back',
+  'lowerback': 'Back',
+  'upper-trapezius': 'Back',
+  'lower-trapezius': 'Back',
+  'traps-middle': 'Back',
+  'anterior-deltoid': 'Shoulders',
+  'lateral-deltoid': 'Shoulders',
+  'posterior-deltoid': 'Shoulders',
+  'long-head-bicep': 'Arms',
+  'short-head-bicep': 'Arms',
+  'medial-head-triceps': 'Arms',
+  'long-head-triceps': 'Arms',
+  'lateral-head-triceps': 'Arms',
+  'wrist-extensors': 'Arms',
+  'wrist-flexors': 'Arms',
+  'outer-quadricep': 'Legs',
+  'rectus-femoris': 'Legs',
+  'inner-quadricep': 'Legs',
+  'medial-hamstrings': 'Legs',
+  'lateral-hamstrings': 'Legs',
+  'gluteus-maximus': 'Legs',
+  'gluteus-medius': 'Legs',
+  'gastrocnemius': 'Legs',
+  'soleus': 'Legs',
+  'tibialis': 'Legs',
+  'inner-thigh': 'Legs',
+  'lower-abdominals': 'Core',
+  'upper-abdominals': 'Core',
+  'obliques': 'Core',
+  'neck': 'Other',
+};
+
+const MUSCLE_GROUP_ORDER: NormalizedMuscleGroup[] = ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Core'];
+
+export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlot, onExerciseClick, initialMuscle, onInitialMuscleConsumed }) => {
   const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,6 +82,12 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
   const [muscleVolume, setMuscleVolume] = useState<Map<string, MuscleVolumeEntry>>(new Map());
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('monthly');
+  const [viewMode, setViewMode] = useState<ViewMode>('muscle');
+
+  const getChipTextColor = useCallback((sets: number, maxSets: number): string => {
+    const ratio = sets / Math.max(maxSets, 1);
+    return ratio >= 0.55 ? '#ffffff' : '#0f172a';
+  }, []);
 
   // Load exercise muscle data and assets on mount
   useEffect(() => {
@@ -59,6 +109,23 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     calculateMuscleVolume(data, exerciseMuscleData).then(setMuscleVolume);
   }, [data, exerciseMuscleData]);
 
+  // Apply initial muscle selection from dashboard navigation
+  useEffect(() => {
+    if (initialMuscle && !isLoading) {
+      setViewMode(initialMuscle.viewMode);
+      if (initialMuscle.viewMode === 'group') {
+        // For group mode, get the group name from the muscle ID
+        const group = MUSCLE_GROUP_DISPLAY[initialMuscle.muscleId];
+        if (group && group !== 'Other') {
+          setSelectedMuscle(group);
+        }
+      } else {
+        setSelectedMuscle(initialMuscle.muscleId);
+      }
+      onInitialMuscleConsumed?.();
+    }
+  }, [initialMuscle, isLoading, onInitialMuscleConsumed]);
+
   // Get volumes for heatmap - stable reference
   const muscleVolumes = useMemo(() => {
     const volumes = new Map<string, number>();
@@ -75,6 +142,65 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     return Math.max(max, 1);
   }, [muscleVolumes]);
 
+  // Aggregated muscle group volumes
+  const muscleGroupVolumes = useMemo(() => {
+    const groupVolumes = new Map<NormalizedMuscleGroup, number>();
+    MUSCLE_GROUP_ORDER.forEach(g => groupVolumes.set(g, 0));
+    
+    muscleVolume.forEach((entry, svgId) => {
+      const group = MUSCLE_GROUP_DISPLAY[svgId];
+      if (group && group !== 'Other') {
+        const current = groupVolumes.get(group) || 0;
+        groupVolumes.set(group, current + entry.sets);
+      }
+    });
+    
+    return groupVolumes;
+  }, [muscleVolume]);
+
+  // Max group volume for scaling
+  const maxGroupVolume = useMemo(() => {
+    let max = 0;
+    muscleGroupVolumes.forEach(v => { if (v > max) max = v; });
+    return Math.max(max, 1);
+  }, [muscleGroupVolumes]);
+
+  // Body map volumes for group view - each muscle gets its group's total volume
+  const groupedBodyMapVolumes = useMemo(() => {
+    const volumes = new Map<string, number>();
+    Object.entries(MUSCLE_GROUP_DISPLAY).forEach(([svgId, group]) => {
+      if (group !== 'Other') {
+        volumes.set(svgId, muscleGroupVolumes.get(group) || 0);
+      }
+    });
+    return volumes;
+  }, [muscleGroupVolumes]);
+
+  // Selected group data (when in group view mode)
+  const selectedGroupData = useMemo(() => {
+    if (viewMode !== 'group' || !selectedMuscle) return null;
+    const group = selectedMuscle as NormalizedMuscleGroup;
+    if (!MUSCLE_GROUP_ORDER.includes(group)) return null;
+    
+    const sets = muscleGroupVolumes.get(group) || 0;
+    // Aggregate exercises from all muscles in this group
+    const exerciseMap = new Map<string, { sets: number; primarySets: number; secondarySets: number }>();
+    
+    muscleVolume.forEach((entry, svgId) => {
+      if (MUSCLE_GROUP_DISPLAY[svgId] === group) {
+        entry.exercises.forEach((exData, exName) => {
+          const existing = exerciseMap.get(exName) || { sets: 0, primarySets: 0, secondarySets: 0 };
+          existing.sets += exData.sets;
+          existing.primarySets += exData.primarySets;
+          existing.secondarySets += exData.secondarySets;
+          exerciseMap.set(exName, existing);
+        });
+      }
+    });
+    
+    return { sets, exercises: exerciseMap };
+  }, [viewMode, selectedMuscle, muscleGroupVolumes, muscleVolume]);
+
   // Selected muscle data
   const selectedMuscleData = useMemo(() => {
     if (!selectedMuscle) return null;
@@ -87,16 +213,6 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     
     // If no muscle selected, show total sets for all muscles
     const targetMuscle = selectedMuscle;
-    
-    const CSV_TO_SVG: Record<string, string[]> = {
-      'Abdominals': ['abdominals'], 'Abductors': ['glutes'], 'Adductors': ['quads'],
-      'Biceps': ['biceps'], 'Calves': ['calves'], 'Chest': ['chest'],
-      'Forearms': ['forearms'], 'Glutes': ['glutes'], 'Hamstrings': ['hamstrings'],
-      'Lats': ['lats'], 'Lower Back': ['lowerback'], 'Neck': ['traps'],
-      'Quadriceps': ['quads'], 'Shoulders': ['front-shoulders', 'rear-shoulders'],
-      'Traps': ['traps', 'traps-middle'], 'Triceps': ['triceps'],
-      'Upper Back': ['lats', 'traps-middle', 'rear-shoulders'], 'Obliques': ['obliques'],
-    };
 
     // For 'all' mode, show each day's data
     if (trendPeriod === 'all') {
@@ -120,7 +236,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
         }
         
         const day = dayMap.get(dayKey)!;
-        const primarySvgIds = CSV_TO_SVG[primaryMuscle] || [];
+        const primarySvgIds = CSV_TO_SVG_MUSCLE_MAP[primaryMuscle] || [];
         
         // If no muscle selected, count all sets; otherwise filter by selected muscle
         if (!targetMuscle) {
@@ -131,7 +247,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
         
         const secondaryMuscles = exData.secondary_muscle.split(',').map(m => m.trim()).filter(m => m && m !== 'None');
         for (const secondary of secondaryMuscles) {
-          const secondarySvgIds = CSV_TO_SVG[secondary] || [];
+          const secondarySvgIds = CSV_TO_SVG_MUSCLE_MAP[secondary] || [];
           if (!targetMuscle) {
             day.sets += 0.5; // Count all secondary sets
           } else if (secondarySvgIds.includes(targetMuscle)) {
@@ -177,7 +293,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       }
       
       const period = periodMap.get(periodKey)!;
-      const primarySvgIds = CSV_TO_SVG[primaryMuscle] || [];
+      const primarySvgIds = CSV_TO_SVG_MUSCLE_MAP[primaryMuscle] || [];
       
       // If no muscle selected, count all sets; otherwise filter by selected muscle
       if (!targetMuscle) {
@@ -188,7 +304,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       
       const secondaryMuscles = exData.secondary_muscle.split(',').map(m => m.trim()).filter(m => m && m !== 'None');
       for (const secondary of secondaryMuscles) {
-        const secondarySvgIds = CSV_TO_SVG[secondary] || [];
+        const secondarySvgIds = CSV_TO_SVG_MUSCLE_MAP[secondary] || [];
         if (!targetMuscle) {
           period.sets += 0.5;
         } else if (secondarySvgIds.includes(targetMuscle)) {
@@ -202,15 +318,22 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       .map(d => ({ period: d.label, sets: Math.round(d.sets * 10) / 10 }));
   }, [selectedMuscle, data, exerciseMuscleData, trendPeriod]);
 
-  // Contributing exercises
+  // Contributing exercises (works for both muscle and group view)
   const contributingExercises = useMemo(() => {
+    if (viewMode === 'group' && selectedGroupData) {
+      const exercises: Array<{ name: string; sets: number; primarySets: number; secondarySets: number }> = [];
+      selectedGroupData.exercises.forEach((exData, name) => {
+        exercises.push({ name, ...exData });
+      });
+      return exercises.sort((a, b) => b.sets - a.sets).slice(0, 8);
+    }
     if (!selectedMuscleData) return [];
     const exercises: Array<{ name: string; sets: number; primarySets: number; secondarySets: number }> = [];
     selectedMuscleData.exercises.forEach((exData, name) => {
       exercises.push({ name, ...exData });
     });
     return exercises.sort((a, b) => b.sets - a.sets).slice(0, 8);
-  }, [selectedMuscleData]);
+  }, [selectedMuscleData, selectedGroupData, viewMode]);
 
   // Total sets for the period
   const totalSets = useMemo(() => {
@@ -228,38 +351,57 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
 
   // Stable callbacks
   const handleMuscleClick = useCallback((muscleId: string) => {
-    setSelectedMuscle(prev => prev === muscleId ? null : muscleId);
-  }, []);
+    if (viewMode === 'group') {
+      // In group view, clicking a muscle selects its group
+      const group = MUSCLE_GROUP_DISPLAY[muscleId] || muscleId;
+      if (group === 'Other') return;
+      setSelectedMuscle(prev => prev === group ? null : group);
+    } else {
+      setSelectedMuscle(prev => prev === muscleId ? null : muscleId);
+    }
+  }, [viewMode]);
 
   const handleMuscleHover = useCallback((muscleId: string | null) => {
     setHoveredMuscle(muscleId);
   }, []);
 
+  const selectedBodyMapIds = useMemo(() => {
+    if (!selectedMuscle) return undefined;
+    if (viewMode === 'muscle') return undefined;
+
+    const group = selectedMuscle as NormalizedMuscleGroup;
+    if (!MUSCLE_GROUP_ORDER.includes(group)) return undefined;
+
+    const ids: string[] = [];
+    for (const [svgId, g] of Object.entries(MUSCLE_GROUP_DISPLAY)) {
+      if (g === group) ids.push(svgId);
+    }
+    return ids;
+  }, [selectedMuscle, viewMode]);
+
+  const hoveredBodyMapIds = useMemo(() => {
+    if (!hoveredMuscle) return undefined;
+    if (viewMode === 'muscle') return undefined;
+
+    const group = MUSCLE_GROUP_DISPLAY[hoveredMuscle];
+    if (!group || group === 'Other') return undefined;
+
+    const ids: string[] = [];
+    for (const [svgId, g] of Object.entries(MUSCLE_GROUP_DISPLAY)) {
+      if (g === group) ids.push(svgId);
+    }
+    return ids;
+  }, [hoveredMuscle, viewMode]);
+
   const closePanel = useCallback(() => {
     setSelectedMuscle(null);
   }, []);
 
-  // Color legend component for right slot - matches HSL palette
-  const colorLegend = (
-    <div className="flex items-center gap-3 text-xs text-slate-400">
-      <div className="flex items-center gap-1">
-        <div className="w-3 h-2 rounded border border-slate-600" style={{ backgroundColor: 'hsla(0, 0%, 100%, 0.1)' }}></div>
-        <span>None</span>
-      </div>
-      <div className="flex items-center gap-1">
-        <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 75%)' }}></div>
-        <span>Low</span>
-      </div>
-      <div className="flex items-center gap-1">
-        <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 50%)' }}></div>
-        <span>Med</span>
-      </div>
-      <div className="flex items-center gap-1">
-        <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 25%)' }}></div>
-        <span>High</span>
-      </div>
-    </div>
-  );
+  // Clear selection when switching view modes
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setSelectedMuscle(null);
+    setViewMode(mode);
+  }, []);
 
   if (isLoading) {
     return (
@@ -287,29 +429,85 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
           { icon: Dumbbell, value: musclesWorked, label: 'Muscles' },
         ]}
         filtersSlot={filtersSlot}
-        rightSlot={colorLegend}
+        rightSlot={null}
       />
 
       {/* Main Content - Always Side by Side Layout */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         {/* Left: Body Map */}
         <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 relative">
-          <div className="transform scale-[0.8] origin-middle">
+          {/* View Mode Toggle - Inside the box */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
+            <div className="inline-flex bg-slate-800 rounded-lg p-0.5 shadow-lg">
+              <button
+                onClick={() => handleViewModeChange('muscle')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  viewMode === 'muscle'
+                    ? 'bg-red-600 text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Target className="w-3 h-3" />
+                Muscle
+              </button>
+              <button
+                onClick={() => handleViewModeChange('group')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  viewMode === 'group'
+                    ? 'bg-red-600 text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Layers className="w-3 h-3" />
+                Group
+              </button>
+            </div>
+          </div>
+
+          <div className="transform scale-[0.8] origin-middle mt-6">
             <BodyMap
               onPartClick={handleMuscleClick}
               selectedPart={selectedMuscle}
-              muscleVolumes={muscleVolumes}
-              maxVolume={maxVolume}
+              selectedMuscleIdsOverride={selectedBodyMapIds}
+              hoveredMuscleIdsOverride={hoveredBodyMapIds}
+              muscleVolumes={viewMode === 'group' ? groupedBodyMapVolumes : muscleVolumes}
+              maxVolume={viewMode === 'group' ? maxGroupVolume : maxVolume}
               onPartHover={handleMuscleHover}
             />
           </div>
           
+          {/* Color Legend - Bottom of body map */}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
+            <div className="flex items-center gap-3 text-xs text-slate-400 bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-2 rounded border border-slate-600" style={{ backgroundColor: 'hsla(0, 0%, 100%, 0.1)' }}></div>
+                <span>None</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 75%)' }}></div>
+                <span>Low</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 50%)' }}></div>
+                <span>Med</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 25%)' }}></div>
+                <span>High</span>
+              </div>
+            </div>
+          </div>
+
           {/* Hover Tooltip */}
           {hoveredMuscle && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 shadow-xl pointer-events-none z-20">
-              <div className="text-white font-medium text-sm">{SVG_MUSCLE_NAMES[hoveredMuscle]}</div>
+            <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 shadow-xl pointer-events-none z-20">
+              <div className="text-white font-medium text-sm">
+                {viewMode === 'group' ? MUSCLE_GROUP_DISPLAY[hoveredMuscle] : SVG_MUSCLE_NAMES[hoveredMuscle]}
+              </div>
               <div className="text-red-400 text-xs text-center">
-                {Math.round((muscleVolumes.get(hoveredMuscle) || 0) * 10) / 10} sets
+                {viewMode === 'group' 
+                  ? Math.round((muscleGroupVolumes.get(MUSCLE_GROUP_DISPLAY[hoveredMuscle]) || 0) * 10) / 10
+                  : Math.round((muscleVolumes.get(hoveredMuscle) || 0) * 10) / 10} sets
               </div>
             </div>
           )}
@@ -318,14 +516,31 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
         {/* Right: Detail Panel - Always visible */}
         <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
           {/* Panel Header */}
-          <div className="bg-slate-800/50 border-b border-slate-800 p-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">
-              {selectedMuscle ? SVG_MUSCLE_NAMES[selectedMuscle] : 'All Muscles'}
-            </h2>
+          <div className="bg-slate-800/50 border-b border-slate-800 p-3 flex items-center justify-between">
+            <div className="flex items-baseline gap-2 min-w-0">
+              <h2 className="text-lg font-bold text-white truncate">
+                {selectedMuscle 
+                  ? (viewMode === 'group' ? selectedMuscle : SVG_MUSCLE_NAMES[selectedMuscle]) 
+                  : (viewMode === 'group' ? 'All Groups' : 'All Muscles')}
+              </h2>
+              <span
+                className="text-red-400 text-sm font-semibold whitespace-nowrap"
+                title={selectedMuscle ? 'sets in current filter' : 'total sets across all muscles'}
+              >
+                {selectedMuscle
+                  ? (viewMode === 'group' && selectedGroupData
+                      ? Math.round(selectedGroupData.sets * 10) / 10
+                      : selectedMuscleData
+                        ? Math.round(selectedMuscleData.sets * 10) / 10
+                        : 0)
+                  : totalSets}{' '}
+                <span className="text-slate-400 text-xs font-normal">sets</span>
+              </span>
+            </div>
             {selectedMuscle && (
               <button
                 onClick={closePanel}
-                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-slate-400" />
               </button>
@@ -333,21 +548,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
           </div>
 
           {/* Fixed content area */}
-          <div className="p-4 space-y-4">
-            {/* Volume Summary */}
-            <div className="bg-slate-800/30 rounded-xl p-4">
-              <div className="text-center">
-                <div className="text-4xl font-bold text-red-400">
-                  {selectedMuscle && selectedMuscleData 
-                    ? Math.round(selectedMuscleData.sets * 10) / 10 
-                    : totalSets}
-                </div>
-                <div className="text-slate-400 text-sm mt-1">
-                  {selectedMuscle ? 'sets in current filter' : 'total sets across all muscles'}
-                </div>
-              </div>
-            </div>
-
+          <div className="p-3 space-y-3">
             {/* Trend Chart with Period Toggle */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -419,7 +620,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
           </div>
 
           {/* Scrollable Exercises Section */}
-          {selectedMuscle && selectedMuscleData && (
+          {selectedMuscle && (viewMode === 'group' ? selectedGroupData : selectedMuscleData) && (
             <div className="border-t border-slate-800">
               <div className="flex items-center gap-2 px-4 py-3 bg-slate-800/30">
                 <Dumbbell className="w-4 h-4 text-slate-400" />
@@ -432,13 +633,21 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                     const imgUrl = asset?.sourceType === 'video' ? asset.thumbnail : (asset?.thumbnail || asset?.source);
                     const exData = exerciseMuscleData.get(ex.name.toLowerCase());
                     const { volumes: exVolumes, maxVolume: exMaxVol } = getExerciseMuscleVolumes(exData);
-                    const pct = selectedMuscleData.sets > 0 ? Math.round((ex.sets / selectedMuscleData.sets) * 100) : 0;
+                    const totalSetsForCalc = viewMode === 'group' 
+                      ? (selectedGroupData?.sets || 1) 
+                      : (selectedMuscleData?.sets || 1);
+                    const pct = totalSetsForCalc > 0 ? Math.round((ex.sets / totalSetsForCalc) * 100) : 0;
+
+                    const isPrimary = ex.primarySets > 0;
+                    const isSecondary = ex.secondarySets > 0;
+                    const chipBg = getVolumeColor(ex.sets, totalSetsForCalc);
+                    const chipFg = getChipTextColor(ex.sets, totalSetsForCalc);
                     
                     return (
                       <div 
                         key={ex.name}
                         onClick={() => onExerciseClick?.(ex.name)}
-                        className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg hover:bg-slate-800/50 cursor-pointer transition-colors"
+                        className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg cursor-pointer"
                       >
                         {/* Rank */}
                         <span className="text-xs font-bold text-slate-500 w-4">
@@ -462,7 +671,27 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                         
                         {/* Exercise Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm text-white font-medium truncate">{ex.name}</div>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="px-2 py-0.5 rounded-md text-[11px] font-semibold border border-slate-900/10 truncate max-w-full"
+                              style={{ backgroundColor: chipBg, color: chipFg }}
+                              title={ex.name}
+                            >
+                              {ex.name}
+                            </span>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {isPrimary && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-900/50 text-slate-200 border border-slate-800">
+                                  P
+                                </span>
+                              )}
+                              {isSecondary && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-900/50 text-slate-200 border border-slate-800">
+                                  S
+                                </span>
+                              )}
+                            </div>
+                          </div>
                           <div className="text-[10px] text-slate-500 mt-0.5">
                             <span className="text-red-400 font-medium">{pct}%</span> of sets
                           </div>
@@ -495,7 +724,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
           {!selectedMuscle && (
             <div className="p-4 pt-0">
               <p className="text-xs text-slate-500 text-center py-2">
-                Click on a muscle to see its exercises
+                Click on a {viewMode === 'group' ? 'muscle group' : 'muscle'} to see its exercises
               </p>
             </div>
           )}

@@ -14,7 +14,9 @@ import { BodyMap } from './BodyMap';
 import { 
   loadExerciseMuscleData, 
   ExerciseMuscleData, 
-  getExerciseMuscleVolumes 
+  getExerciseMuscleVolumes,
+  getVolumeColor,
+  SVG_MUSCLE_NAMES
 } from '../utils/muscleMapping';
 
 // --- STYLES ---
@@ -207,6 +209,39 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     stats.find(s => s.name === selectedExerciseName), 
   [stats, selectedExerciseName]);
 
+  const selectedExerciseMuscleInfo = useMemo(() => {
+    const exData = selectedStats ? exerciseMuscleData.get(selectedStats.name.toLowerCase()) : undefined;
+    const { volumes, maxVolume } = getExerciseMuscleVolumes(exData);
+
+    // Aggregate by display name (e.g. Chest has multiple SVG ids)
+    const aggregated = new Map<string, { sets: number }>();
+    volumes.forEach((sets, svgId) => {
+      const label = SVG_MUSCLE_NAMES[svgId] || svgId;
+      const prev = aggregated.get(label);
+      if (!prev || sets > prev.sets) {
+        aggregated.set(label, { sets });
+      }
+    });
+
+    const primaryTargets: Array<{ label: string; sets: number }> = [];
+    const secondaryTargets: Array<{ label: string; sets: number }> = [];
+
+    for (const [label, { sets }] of aggregated.entries()) {
+      if (sets >= 1) primaryTargets.push({ label, sets });
+      else secondaryTargets.push({ label, sets });
+    }
+
+    primaryTargets.sort((a, b) => a.label.localeCompare(b.label));
+    secondaryTargets.sort((a, b) => a.label.localeCompare(b.label));
+
+    return { exData, volumes, maxVolume, primaryTargets, secondaryTargets };
+  }, [selectedStats, exerciseMuscleData]);
+
+  const getTargetTextColor = (sets: number, maxSets: number): string => {
+    const ratio = sets / Math.max(maxSets, 1);
+    return ratio >= 0.55 ? '#ffffff' : '#0f172a';
+  };
+
   const filteredExercises = useMemo(() => 
     stats.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())),
   [stats, searchTerm]);
@@ -375,21 +410,61 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                 })()}
                 
                 {/* Mini Body Map showing muscles this exercise targets */}
-                {(() => {
-                  const exData = exerciseMuscleData.get(selectedStats.name.toLowerCase());
-                  const { volumes, maxVolume } = getExerciseMuscleVolumes(exData);
-                  return (
-                    <div className="w-24 h-24 flex items-center justify-center pb-5">
-                      <BodyMap
-                        onPartClick={() => {}}
-                        selectedPart={null}
-                        muscleVolumes={volumes}
-                        maxVolume={maxVolume}
-                        compact
-                      />
+                <div className="flex items-start gap-3">
+                  <div className="w-24 h-24 flex items-center justify-center">
+                    <BodyMap
+                      onPartClick={() => {}}
+                      selectedPart={null}
+                      muscleVolumes={selectedExerciseMuscleInfo.volumes}
+                      maxVolume={selectedExerciseMuscleInfo.maxVolume}
+                      compact
+                    />
+                  </div>
+
+                  {(selectedExerciseMuscleInfo.primaryTargets.length > 0 || selectedExerciseMuscleInfo.secondaryTargets.length > 0) && (
+                    <div className="space-y-2 min-w-0 max-w-[220px]">
+                      {selectedExerciseMuscleInfo.primaryTargets.length > 0 && (
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-slate-500">Primary</div>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {selectedExerciseMuscleInfo.primaryTargets.map(t => (
+                              <span
+                                key={`primary-${t.label}`}
+                                className="px-2 py-0.5 rounded-md text-[10px] font-semibold border border-slate-900/10"
+                                style={{
+                                  backgroundColor: getVolumeColor(t.sets, selectedExerciseMuscleInfo.maxVolume),
+                                  color: getTargetTextColor(t.sets, selectedExerciseMuscleInfo.maxVolume),
+                                }}
+                              >
+                                {t.label}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedExerciseMuscleInfo.secondaryTargets.length > 0 && (
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-slate-500">Secondary</div>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {selectedExerciseMuscleInfo.secondaryTargets.map(t => (
+                              <span
+                                key={`secondary-${t.label}`}
+                                className="px-2 py-0.5 rounded-md text-[10px] font-semibold border border-slate-900/10"
+                                style={{
+                                  backgroundColor: getVolumeColor(t.sets, selectedExerciseMuscleInfo.maxVolume),
+                                  color: getTargetTextColor(t.sets, selectedExerciseMuscleInfo.maxVolume),
+                                }}
+                              >
+                                {t.label}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  );
-                })()}
+                  )}
+                </div>
               </div>
 
               {/* 2. Key Metrics Grid (Bottom Half - Fills Remaining Height) */}

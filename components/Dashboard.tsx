@@ -9,6 +9,8 @@ import {
   getTopExercisesOverTime
 } from '../utils/analytics';
 import { getMuscleVolumeTimeSeries, getDetailedMuscleCompositionLatest, normalizeMuscleGroup, getMuscleVolumeTimeSeriesDetailed } from '../utils/muscleAnalytics';
+import { CSV_TO_SVG_MUSCLE_MAP } from '../utils/muscleMapping';
+import { BodyMap } from './BodyMap';
 import { MUSCLE_COLORS } from '../utils/categories';
 import { saveChartModes, getChartModes, TimeFilterMode } from '../utils/localStorage';
 import { 
@@ -30,7 +32,8 @@ interface DashboardProps {
   dailyData: DailySummary[];
   exerciseStats: ExerciseStats[];
   fullData: WorkoutSet[]; // The raw set data
-  onDayClick?: (date: Date) => void; 
+  onDayClick?: (date: Date) => void;
+  onMuscleClick?: (muscleId: string, viewMode: 'muscle' | 'group') => void;
   filtersSlot?: React.ReactNode;
 }
 
@@ -96,11 +99,22 @@ const DashboardTooltip: React.FC<{ data: { rect: DOMRect, title: string, body: s
 };
 
 // 2. Chart Interpretation Footer
-const ChartDescription = ({ children, isMounted = true }: { children: React.ReactNode, isMounted?: boolean }) => (
-  <div className={`mt-4 pt-4 border-t border-slate-800 flex items-start gap-3 transition-opacity duration-700 ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
-    <Info className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0 transition-opacity duration-200 hover:opacity-80" />
-    <div className="text-xs text-slate-400 leading-relaxed space-y-2">
-      {children}
+const ChartDescription = ({
+  children,
+  isMounted = true,
+  topSlot,
+}: {
+  children: React.ReactNode;
+  isMounted?: boolean;
+  topSlot?: React.ReactNode;
+}) => (
+  <div className={`mt-4 pt-4 border-t border-slate-800 flex flex-col gap-2 transition-opacity duration-700 ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
+    {topSlot && <div className="flex justify-center">{topSlot}</div>}
+    <div className="flex items-start gap-3">
+      <Info className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0 transition-opacity duration-200 hover:opacity-80" />
+      <div className="text-xs text-slate-400 leading-relaxed space-y-2">
+        {children}
+      </div>
     </div>
   </div>
 );
@@ -281,7 +295,7 @@ const Heatmap = ({ dailyData, totalPrs, onDayClick }: { dailyData: DailySummary[
 
 // --- MAIN DASHBOARD ---
 
-export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick, filtersSlot }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick, onMuscleClick, filtersSlot }) => {
   const DEFAULT_CHART_MODES: Record<string, TimeFilterMode> = {
     volumeVsDuration: 'monthly',
     intensityEvo: 'monthly',
@@ -339,6 +353,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   const [muscleTrendView, setMuscleTrendView] = useState<'area' | 'stackedBar'>('stackedBar');
   const [muscleCompQuick, setMuscleCompQuick] = useState<'all'|'7d'|'30d'|'365d'>('all');
   const [compositionGrouping, setCompositionGrouping] = useState<'groups' | 'muscles'>('groups');
+  const [weeklySetsView, setWeeklySetsView] = useState<'radar' | 'heatmap'>('heatmap');
+  const [heatmapHoveredMuscle, setHeatmapHoveredMuscle] = useState<string | null>(null);
   
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
 
@@ -651,6 +667,152 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     arr.sort((a,b) => b.value - a.value);
     return arr.slice(0, 16);
   }, [assetsMap, fullData, muscleCompQuick, compositionGrouping]);
+
+  // Heat map muscle volumes - maps SVG muscle IDs to weekly sets values
+  const heatmapMuscleVolumes = useMemo(() => {
+    if (!assetsMap) return { volumes: new Map<string, number>(), maxVolume: 1, totalSets: 0 };
+    const now = new Date();
+    let windowStart: Date | null = null;
+    if (muscleCompQuick === '7d') windowStart = subDays(now, 7);
+    else if (muscleCompQuick === '30d') windowStart = subDays(now, 30);
+    else if (muscleCompQuick === '365d') windowStart = subDays(now, 365);
+    if (!windowStart) {
+      for (const s of fullData) {
+        const d = s.parsedDate;
+        if (!d) continue;
+        if (!windowStart || d < windowStart) windowStart = d;
+      }
+    }
+    if (!windowStart) return { volumes: new Map<string, number>(), maxVolume: 1, totalSets: 0 };
+    const lowerMap = new Map<string, ExerciseAsset>();
+    assetsMap.forEach((v, k) => lowerMap.set(k.toLowerCase(), v));
+    const counts = new Map<string, number>();
+    const addCount = (key: string, inc: number) => counts.set(key, (counts.get(key) || 0) + inc);
+    const fullBodyMuscles = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
+    
+    // Group mode: aggregate by muscle group and apply same value to all SVG IDs in that group
+    const groupCounts = new Map<string, number>();
+    const addGroupCount = (group: string, inc: number) => groupCounts.set(group, (groupCounts.get(group) || 0) + inc);
+    
+    let totalSetsRaw = 0;
+    
+    for (const s of fullData) {
+      const d = s.parsedDate;
+      if (!d) continue;
+      if (d < windowStart || d > now) continue;
+      const name = s.exercise_title || '';
+      const asset = assetsMap.get(name) || lowerMap.get(name.toLowerCase());
+      if (!asset) continue;
+      const primary = String(asset.primary_muscle || '').trim();
+      if (!primary || /cardio/i.test(primary)) continue;
+      
+      // Handle Full Body - add to all muscle groups
+      if (/full\s*body/i.test(primary)) {
+        totalSetsRaw += 1;
+        if (compositionGrouping === 'groups') {
+          for (const g of fullBodyMuscles) addGroupCount(g, 1.0);
+        } else {
+          for (const muscle of fullBodyMuscles) {
+            const svgIds = CSV_TO_SVG_MUSCLE_MAP[muscle] || [];
+            for (const svgId of svgIds) addCount(svgId, 1.0);
+          }
+        }
+        continue;
+      }
+      
+      totalSetsRaw += 1;
+      
+      if (compositionGrouping === 'groups') {
+        // Group mode: normalize to group and count
+        const primaryGroup = normalizeMuscleGroup(primary);
+        if (primaryGroup !== 'Cardio') addGroupCount(primaryGroup, 1.0);
+        
+        const secRaw = String(asset.secondary_muscle || '').trim();
+        if (secRaw && !/none/i.test(secRaw)) {
+          secRaw.split(',').forEach(s2 => {
+            const m = normalizeMuscleGroup(s2);
+            if (m === 'Cardio' || m === 'Full Body') return;
+            addGroupCount(m, 0.5);
+          });
+        }
+      } else {
+        // Muscle mode: map directly to SVG IDs
+        const primarySvgIds = CSV_TO_SVG_MUSCLE_MAP[primary] || [];
+        for (const svgId of primarySvgIds) addCount(svgId, 1.0);
+        
+        const secRaw = String(asset.secondary_muscle || '').trim();
+        if (secRaw && !/none/i.test(secRaw)) {
+          secRaw.split(',').forEach(s2 => {
+            const m = s2.trim();
+            if (!m || /cardio/i.test(m) || /full\s*body/i.test(m)) return;
+            const secondarySvgIds = CSV_TO_SVG_MUSCLE_MAP[m] || [];
+            for (const svgId of secondarySvgIds) addCount(svgId, 0.5);
+          });
+        }
+      }
+    }
+    
+    const days = Math.max(1, differenceInCalendarDays(now, windowStart) + 1);
+    const weeks = Math.max(1, days / 7);
+    const volumes = new Map<string, number>();
+    let maxVol = 0;
+    
+    if (compositionGrouping === 'groups') {
+      // Map group counts to all SVG IDs in that group
+      const groupToSvgMap: Record<string, string[]> = {
+        'Chest': ['mid-lower-pectoralis', 'upper-pectoralis'],
+        'Back': ['lats', 'lowerback', 'upper-trapezius', 'lower-trapezius', 'traps-middle'],
+        'Shoulders': ['anterior-deltoid', 'lateral-deltoid', 'posterior-deltoid'],
+        'Arms': ['long-head-bicep', 'short-head-bicep', 'medial-head-triceps', 'long-head-triceps', 'lateral-head-triceps', 'wrist-extensors', 'wrist-flexors'],
+        'Legs': ['outer-quadricep', 'rectus-femoris', 'inner-quadricep', 'medial-hamstrings', 'lateral-hamstrings', 'gluteus-maximus', 'gluteus-medius', 'gastrocnemius', 'soleus', 'tibialis', 'inner-thigh'],
+        'Core': ['lower-abdominals', 'upper-abdominals', 'obliques'],
+      };
+      groupCounts.forEach((count, group) => {
+        const weeklyVal = count / weeks;
+        if (weeklyVal > maxVol) maxVol = weeklyVal;
+        const svgIds = groupToSvgMap[group] || [];
+        for (const svgId of svgIds) {
+          volumes.set(svgId, weeklyVal);
+        }
+      });
+    } else {
+      counts.forEach((count, svgId) => {
+        const weeklyVal = count / weeks;
+        volumes.set(svgId, weeklyVal);
+        if (weeklyVal > maxVol) maxVol = weeklyVal;
+      });
+    }
+    
+    return { volumes, maxVolume: Math.max(maxVol, 1), totalSets: totalSetsRaw };
+  }, [assetsMap, fullData, muscleCompQuick, compositionGrouping]);
+
+  // Compute hovered muscle IDs for group highlighting in heatmap
+  const heatmapHoveredMuscleIds = useMemo(() => {
+    if (!heatmapHoveredMuscle) return undefined;
+    if (compositionGrouping !== 'groups') return undefined; // Only group-highlight in groups mode
+    
+    // Map from SVG muscle ID to group
+    const muscleToGroup: Record<string, string> = {
+      'mid-lower-pectoralis': 'Chest', 'upper-pectoralis': 'Chest',
+      'lats': 'Back', 'lowerback': 'Back', 'upper-trapezius': 'Back', 'lower-trapezius': 'Back', 'traps-middle': 'Back',
+      'anterior-deltoid': 'Shoulders', 'lateral-deltoid': 'Shoulders', 'posterior-deltoid': 'Shoulders',
+      'long-head-bicep': 'Arms', 'short-head-bicep': 'Arms', 'medial-head-triceps': 'Arms', 'long-head-triceps': 'Arms', 'lateral-head-triceps': 'Arms', 'wrist-extensors': 'Arms', 'wrist-flexors': 'Arms',
+      'outer-quadricep': 'Legs', 'rectus-femoris': 'Legs', 'inner-quadricep': 'Legs', 'medial-hamstrings': 'Legs', 'lateral-hamstrings': 'Legs', 'gluteus-maximus': 'Legs', 'gluteus-medius': 'Legs', 'gastrocnemius': 'Legs', 'soleus': 'Legs', 'tibialis': 'Legs', 'inner-thigh': 'Legs',
+      'lower-abdominals': 'Core', 'upper-abdominals': 'Core', 'obliques': 'Core',
+    };
+    const groupToSvgMap: Record<string, string[]> = {
+      'Chest': ['mid-lower-pectoralis', 'upper-pectoralis'],
+      'Back': ['lats', 'lowerback', 'upper-trapezius', 'lower-trapezius', 'traps-middle'],
+      'Shoulders': ['anterior-deltoid', 'lateral-deltoid', 'posterior-deltoid'],
+      'Arms': ['long-head-bicep', 'short-head-bicep', 'medial-head-triceps', 'long-head-triceps', 'lateral-head-triceps', 'wrist-extensors', 'wrist-flexors'],
+      'Legs': ['outer-quadricep', 'rectus-femoris', 'inner-quadricep', 'medial-hamstrings', 'lateral-hamstrings', 'gluteus-maximus', 'gluteus-medius', 'gastrocnemius', 'soleus', 'tibialis', 'inner-thigh'],
+      'Core': ['lower-abdominals', 'upper-abdominals', 'obliques'],
+    };
+    
+    const hoveredGroup = muscleToGroup[heatmapHoveredMuscle];
+    if (!hoveredGroup) return [heatmapHoveredMuscle];
+    return groupToSvgMap[hoveredGroup] || [heatmapHoveredMuscle];
+  }, [heatmapHoveredMuscle, compositionGrouping]);
 
   const muscleCalMeta = useMemo(() => {
     let minTs = Number.POSITIVE_INFINITY;
@@ -1096,7 +1258,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               isMounted={isMounted}
             />
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              {/* Grouping Toggle */}
+              {/* View Toggle: Radar / Heatmap */}
+              <div className="bg-slate-950 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
+                <button onClick={() => setWeeklySetsView('radar')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${weeklySetsView==='radar'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Radar</button>
+                <button onClick={() => setWeeklySetsView('heatmap')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${weeklySetsView==='heatmap'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Heatmap</button>
+              </div>
+              {/* Grouping Toggle - available for both views */}
               <div className="bg-slate-950 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
                 <button onClick={() => setCompositionGrouping('groups')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${compositionGrouping==='groups'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Groups</button>
                 <button onClick={() => setCompositionGrouping('muscles')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${compositionGrouping==='muscles'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Muscles</button>
@@ -1111,25 +1278,72 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             </div>
           </div>
           <div className={`flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} min-w-0`}>
-            {compositionQuickData.length === 0 ? (
-              <div className="flex items-center justify-center h-[300px] text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
-                Not enough data to render Muscle Composition.
-              </div>
+            {weeklySetsView === 'radar' ? (
+              compositionQuickData.length === 0 ? (
+                <div className="flex items-center justify-center h-[300px] text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
+                  Not enough data to render Muscle Composition.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={compositionQuickData}>
+                    <PolarGrid stroke="#334155" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+                    <Radar name="Weekly Sets" dataKey="value" stroke="#06b6d4" strokeWidth={3} fill="#06b6d4" fillOpacity={0.35} animationDuration={1500} />
+                    <Tooltip contentStyle={TooltipStyle} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              )
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={compositionQuickData}>
-                  <PolarGrid stroke="#334155" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
-                  <Radar name="Weekly Sets" dataKey="value" stroke="#06b6d4" strokeWidth={3} fill="#06b6d4" fillOpacity={0.35} animationDuration={1500} />
-                  <Tooltip contentStyle={TooltipStyle} />
-                </RadarChart>
-              </ResponsiveContainer>
+              <div className="flex flex-col items-center justify-center h-[300px]">
+                {heatmapMuscleVolumes.volumes.size === 0 ? (
+                  <div className="text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg p-8">
+                    Not enough data to render Heat Map.
+                  </div>
+                ) : (
+                  <>
+                    <div className="transform scale-[0.55] origin-center -mt-4">
+                      <BodyMap
+                        onPartClick={(muscleId) => onMuscleClick?.(muscleId, compositionGrouping === 'groups' ? 'group' : 'muscle')}
+                        selectedPart={null}
+                        muscleVolumes={heatmapMuscleVolumes.volumes}
+                        maxVolume={heatmapMuscleVolumes.maxVolume}
+                        hoveredMuscleIdsOverride={heatmapHoveredMuscleIds}
+                        onPartHover={setHeatmapHoveredMuscle}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
-          <ChartDescription isMounted={isMounted}>
+          <ChartDescription
+            isMounted={isMounted}
+            topSlot={
+              weeklySetsView === 'heatmap' ? (
+                <div className="flex items-center gap-3 text-xs text-slate-400 bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5 w-fit">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded border border-slate-600" style={{ backgroundColor: 'hsla(0, 0%, 100%, 0.1)' }}></div>
+                    <span>None</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 75%)' }}></div>
+                    <span>Low</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 50%)' }}></div>
+                    <span>Med</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 25%)' }}></div>
+                    <span>High</span>
+                  </div>
+                </div>
+              ) : null
+            }
+          >
             <p>
-              <span className="font-semibold text-slate-300">Quick slice.</span> Values represent weekly sets. View composition for All time, Last Week, Month, or Year. Group by {compositionGrouping === 'groups' ? 'muscle group' : 'muscle'}.
+              <span className="font-semibold text-slate-300">Quick slice.</span> Values represent weekly sets. {weeklySetsView === 'heatmap' ? 'Body heat map shows muscle activation intensity.' : ''} Group by {compositionGrouping === 'groups' ? <span className="text-cyan-400">muscle group</span> : <span className="text-cyan-400">individual muscle</span>}. View for All time, Last Week, Month, or Year.
             </p>
           </ChartDescription>
         </div>
