@@ -27,6 +27,13 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.DASHBOARD);
   const [showCSVModal, setShowCSVModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [highlightedExercise, setHighlightedExercise] = useState<string | null>(null);
+  
+  // Handler for navigating to ExerciseView from MuscleAnalysis
+  const handleExerciseClick = (exerciseName: string) => {
+    setHighlightedExercise(exerciseName);
+    setActiveTab(Tab.EXERCISES);
+  };
   
   // Loading State
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -501,9 +508,9 @@ const App: React.FC = () => {
               onDayClick={handleDayClick}
             />
           )}
-          {activeTab === Tab.EXERCISES && <ExerciseView stats={exerciseStats} filtersSlot={filterControls} />}
+          {activeTab === Tab.EXERCISES && <ExerciseView stats={exerciseStats} filtersSlot={filterControls} highlightedExercise={highlightedExercise} />}
           {activeTab === Tab.HISTORY && <HistoryView data={filteredData} filtersSlot={filterControls} />}
-          {activeTab === Tab.MUSCLE_ANALYSIS && <MuscleAnalysis data={filteredData} filtersSlot={filterControls} />}
+          {activeTab === Tab.MUSCLE_ANALYSIS && <MuscleAnalysis data={filteredData} filtersSlot={filterControls} onExerciseClick={handleExerciseClick} />}
         </Suspense>
       </main>
     </div>

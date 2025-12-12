@@ -10,6 +10,12 @@ import { ExerciseStats } from '../types';
 import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
 import { getDateKey, TimePeriod } from '../utils/dateUtils';
 import { ViewHeader } from './ViewHeader';
+import { BodyMap } from './BodyMap';
+import { 
+  loadExerciseMuscleData, 
+  ExerciseMuscleData, 
+  getExerciseMuscleVolumes 
+} from '../utils/muscleMapping';
 
 // --- STYLES ---
 const FANCY_FONT: React.CSSProperties = {
@@ -161,19 +167,30 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 interface ExerciseViewProps {
   stats: ExerciseStats[];
   filtersSlot?: React.ReactNode;
+  highlightedExercise?: string | null;
 }
 
-export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot }) => {
-  const [selectedExerciseName, setSelectedExerciseName] = useState<string>(stats[0]?.name || "");
+export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, highlightedExercise }) => {
+  const [selectedExerciseName, setSelectedExerciseName] = useState<string>(highlightedExercise || stats[0]?.name || "");
+  
+  // Update selection when highlightedExercise changes
+  useEffect(() => {
+    if (highlightedExercise && stats.some(s => s.name === highlightedExercise)) {
+      setSelectedExerciseName(highlightedExercise);
+    }
+  }, [highlightedExercise, stats]);
   const [searchTerm, setSearchTerm] = useState("");
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
   const [viewMode, setViewMode] = useState<'all' | 'weekly' | 'monthly'>('monthly');
+  const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
 
   useEffect(() => {
     let mounted = true;
     getExerciseAssets()
       .then(m => { if (mounted) setAssetsMap(m); })
       .catch(() => setAssetsMap(new Map()));
+    loadExerciseMuscleData()
+      .then(m => { if (mounted) setExerciseMuscleData(m); });
     return () => { mounted = false; };
   }, []);
 
@@ -244,6 +261,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot }
         stats={[
           { icon: Dumbbell, value: totalExercises, label: 'Exercises' },
           { icon: Trophy, value: totalPRs, label: 'PRs' },
+          ...(selectedStats ? [
+            { icon: Scale, value: selectedStats.maxWeight, label: 'PR (kg)' },
+            { icon: Activity, value: selectedStats.history.length, label: 'Sessions' },
+          ] : []),
         ]}
         filtersSlot={filtersSlot}
       />
@@ -341,23 +362,34 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot }
           {selectedStats && currentStatus ? (
             <div className="flex flex-col h-full gap-6">
               
-              {/* 1. Header & Insight (Top Half) */}
-              <div className="flex flex-col xl:flex-row gap-3 h-auto shrink-0">
-                <div className="w-full flex items-start gap-3">
-                  {assetsMap && selectedStats && (() => {
-                    const a = assetsMap.get(selectedStats.name);
-                    if (!a) return null;
-                    const imgSrc = a.sourceType === 'video' ? a.thumbnail : (a.thumbnail || a.source);
-                    return imgSrc ? (
-                      <img src={imgSrc} alt={selectedStats.name} className="w-24 h-24 rounded-lg object-cover border border-slate-800" loading="lazy" decoding="async" />
-                    ) : null;
-                  })()}
-                  <div className="grid grid-cols-3 gap-3 flex-1 h-24">
-                    <StatCard label="Personal Record" value={selectedStats.maxWeight} unit="kg" icon={Dumbbell} />
-                    <StatCard label="Total Volume" value={(selectedStats.totalVolume / 1000).toFixed(1)} unit="k" icon={Scale} />
-                    <StatCard label="Analyzing" value={selectedStats.history.length} unit={selectedStats.history.length === 1 ? 'session' : 'sessions'} icon={Activity} />
-                  </div>
-                </div>
+              {/* 1. Header with exercise image and mini heatmap */}
+              <div className="flex items-start gap-4 shrink-0">
+                {/* Exercise Image */}
+                {assetsMap && selectedStats && (() => {
+                  const a = assetsMap.get(selectedStats.name);
+                  if (!a) return null;
+                  const imgSrc = a.sourceType === 'video' ? a.thumbnail : (a.thumbnail || a.source);
+                  return imgSrc ? (
+                    <img src={imgSrc} alt={selectedStats.name} className="w-20 h-20 rounded-lg object-cover border border-slate-800" loading="lazy" decoding="async" />
+                  ) : null;
+                })()}
+                
+                {/* Mini Body Map showing muscles this exercise targets */}
+                {(() => {
+                  const exData = exerciseMuscleData.get(selectedStats.name.toLowerCase());
+                  const { volumes, maxVolume } = getExerciseMuscleVolumes(exData);
+                  return (
+                    <div className="w-24 h-24 flex items-center justify-center pb-5">
+                      <BodyMap
+                        onPartClick={() => {}}
+                        selectedPart={null}
+                        muscleVolumes={volumes}
+                        maxVolume={maxVolume}
+                        compact
+                      />
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* 2. Key Metrics Grid (Bottom Half - Fills Remaining Height) */}

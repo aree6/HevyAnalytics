@@ -8,6 +8,7 @@ import {
   SVG_MUSCLE_NAMES,
   ExerciseMuscleData,
   MuscleVolumeEntry,
+  getExerciseMuscleVolumes,
 } from '../utils/muscleMapping';
 import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
 import { format, startOfWeek, startOfMonth, subWeeks, subMonths, isWithinInterval } from 'date-fns';
@@ -24,11 +25,12 @@ import { TrendingUp, Dumbbell, X, Activity } from 'lucide-react';
 interface MuscleAnalysisProps {
   data: WorkoutSet[];
   filtersSlot?: React.ReactNode;
+  onExerciseClick?: (exerciseName: string) => void;
 }
 
 type TrendPeriod = 'all' | 'weekly' | 'monthly';
 
-export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlot }) => {
+export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlot, onExerciseClick }) => {
   const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,9 +81,12 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     return muscleVolume.get(selectedMuscle) || null;
   }, [selectedMuscle, muscleVolume]);
 
-  // Trend data based on selected period
+  // Trend data based on selected period (for specific muscle OR all muscles)
   const trendData = useMemo(() => {
-    if (!selectedMuscle || exerciseMuscleData.size === 0 || data.length === 0) return [];
+    if (exerciseMuscleData.size === 0 || data.length === 0) return [];
+    
+    // If no muscle selected, show total sets for all muscles
+    const targetMuscle = selectedMuscle;
     
     const CSV_TO_SVG: Record<string, string[]> = {
       'Abdominals': ['abdominals'], 'Abductors': ['glutes'], 'Adductors': ['quads'],
@@ -116,14 +121,20 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
         
         const day = dayMap.get(dayKey)!;
         const primarySvgIds = CSV_TO_SVG[primaryMuscle] || [];
-        if (primarySvgIds.includes(selectedMuscle)) {
+        
+        // If no muscle selected, count all sets; otherwise filter by selected muscle
+        if (!targetMuscle) {
+          day.sets += 1; // Count all sets
+        } else if (primarySvgIds.includes(targetMuscle)) {
           day.sets += 1;
         }
         
         const secondaryMuscles = exData.secondary_muscle.split(',').map(m => m.trim()).filter(m => m && m !== 'None');
         for (const secondary of secondaryMuscles) {
           const secondarySvgIds = CSV_TO_SVG[secondary] || [];
-          if (secondarySvgIds.includes(selectedMuscle)) {
+          if (!targetMuscle) {
+            day.sets += 0.5; // Count all secondary sets
+          } else if (secondarySvgIds.includes(targetMuscle)) {
             day.sets += 0.5;
           }
         }
@@ -167,14 +178,20 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       
       const period = periodMap.get(periodKey)!;
       const primarySvgIds = CSV_TO_SVG[primaryMuscle] || [];
-      if (primarySvgIds.includes(selectedMuscle)) {
+      
+      // If no muscle selected, count all sets; otherwise filter by selected muscle
+      if (!targetMuscle) {
+        period.sets += 1;
+      } else if (primarySvgIds.includes(targetMuscle)) {
         period.sets += 1;
       }
       
       const secondaryMuscles = exData.secondary_muscle.split(',').map(m => m.trim()).filter(m => m && m !== 'None');
       for (const secondary of secondaryMuscles) {
         const secondarySvgIds = CSV_TO_SVG[secondary] || [];
-        if (secondarySvgIds.includes(selectedMuscle)) {
+        if (!targetMuscle) {
+          period.sets += 0.5;
+        } else if (secondarySvgIds.includes(targetMuscle)) {
           period.sets += 0.5;
         }
       }
@@ -222,23 +239,23 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     setSelectedMuscle(null);
   }, []);
 
-  // Color legend component for right slot
+  // Color legend component for right slot - matches HSL palette
   const colorLegend = (
     <div className="flex items-center gap-3 text-xs text-slate-400">
       <div className="flex items-center gap-1">
-        <div className="w-3 h-2 rounded" style={{ backgroundColor: '#64748b' }}></div>
+        <div className="w-3 h-2 rounded border border-slate-600" style={{ backgroundColor: 'hsla(0, 0%, 100%, 0.1)' }}></div>
         <span>None</span>
       </div>
       <div className="flex items-center gap-1">
-        <div className="w-3 h-2 rounded" style={{ backgroundColor: '#f59e0b' }}></div>
+        <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 75%)' }}></div>
         <span>Low</span>
       </div>
       <div className="flex items-center gap-1">
-        <div className="w-3 h-2 rounded" style={{ backgroundColor: '#b45309' }}></div>
+        <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 50%)' }}></div>
         <span>Med</span>
       </div>
       <div className="flex items-center gap-1">
-        <div className="w-3 h-2 rounded" style={{ backgroundColor: '#78350f' }}></div>
+        <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 25%)' }}></div>
         <span>High</span>
       </div>
     </div>
@@ -273,170 +290,193 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
         rightSlot={colorLegend}
       />
 
-      {/* Main Content - Side by Side Layout */}
-      <div className={`grid gap-6 transition-all duration-300 ${selectedMuscle ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
-        {/* Body Map Section */}
-        <div className={`bg-slate-900 rounded-xl border border-slate-800 p-4 transition-all duration-300 relative ${selectedMuscle ? '' : 'max-w-4xl mx-auto w-full'}`}>
-          <BodyMap
-            onPartClick={handleMuscleClick}
-            selectedPart={selectedMuscle}
-            muscleVolumes={muscleVolumes}
-            maxVolume={maxVolume}
-            onPartHover={handleMuscleHover}
-          />
+      {/* Main Content - Always Side by Side Layout */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        {/* Left: Body Map */}
+        <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 relative">
+          <div className="transform scale-[0.8] origin-middle">
+            <BodyMap
+              onPartClick={handleMuscleClick}
+              selectedPart={selectedMuscle}
+              muscleVolumes={muscleVolumes}
+              maxVolume={maxVolume}
+              onPartHover={handleMuscleHover}
+            />
+          </div>
           
           {/* Hover Tooltip */}
           {hoveredMuscle && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 shadow-xl pointer-events-none z-20">
               <div className="text-white font-medium text-sm">{SVG_MUSCLE_NAMES[hoveredMuscle]}</div>
-              <div className="text-amber-500 text-xs text-center">
+              <div className="text-red-400 text-xs text-center">
                 {Math.round((muscleVolumes.get(hoveredMuscle) || 0) * 10) / 10} sets
               </div>
             </div>
           )}
         </div>
 
-        {/* Detail Panel */}
-        {selectedMuscle && selectedMuscleData && (
-          <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-            {/* Panel Header */}
-            <div className="bg-slate-800/50 border-b border-slate-800 p-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">
-                {SVG_MUSCLE_NAMES[selectedMuscle]}
-              </h2>
+        {/* Right: Detail Panel - Always visible */}
+        <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+          {/* Panel Header */}
+          <div className="bg-slate-800/50 border-b border-slate-800 p-4 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-white">
+              {selectedMuscle ? SVG_MUSCLE_NAMES[selectedMuscle] : 'All Muscles'}
+            </h2>
+            {selectedMuscle && (
               <button
                 onClick={closePanel}
                 className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-slate-400" />
               </button>
+            )}
+          </div>
+
+          {/* Fixed content area */}
+          <div className="p-4 space-y-4">
+            {/* Volume Summary */}
+            <div className="bg-slate-800/30 rounded-xl p-4">
+              <div className="text-center">
+                <div className="text-4xl font-bold text-red-400">
+                  {selectedMuscle && selectedMuscleData 
+                    ? Math.round(selectedMuscleData.sets * 10) / 10 
+                    : totalSets}
+                </div>
+                <div className="text-slate-400 text-sm mt-1">
+                  {selectedMuscle ? 'sets in current filter' : 'total sets across all muscles'}
+                </div>
+              </div>
             </div>
 
-            <div className="p-4 space-y-6 overflow-y-auto max-h-[calc(100vh-350px)]">
-              {/* Volume Summary */}
-              <div className="bg-slate-800/30 rounded-xl p-4">
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-amber-500">
-                    {Math.round(selectedMuscleData.sets * 10) / 10}
-                  </div>
-                  <div className="text-slate-400 text-sm mt-1">
-                    sets in current filter
-                  </div>
+            {/* Trend Chart with Period Toggle */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-slate-400" />
+                  <h3 className="text-sm font-semibold text-white">Volume Trend</h3>
+                </div>
+                {/* Period Toggle */}
+                <div className="inline-flex bg-slate-800 rounded-lg p-0.5">
+                  {(['all', 'weekly', 'monthly'] as const).map(period => (
+                    <button
+                      key={period}
+                      onClick={() => setTrendPeriod(period)}
+                      className={`px-2 py-1 rounded text-[10px] font-medium transition-all capitalize ${
+                        trendPeriod === period
+                          ? 'bg-red-600 text-white'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {period}
+                    </button>
+                  ))}
                 </div>
               </div>
-
-              {/* Trend Chart with Period Toggle */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-slate-400" />
-                    <h3 className="text-sm font-semibold text-white">Volume Trend</h3>
+              <div className="h-32 bg-slate-800/30 rounded-lg p-2">
+                {trendData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendData}>
+                      <defs>
+                        <linearGradient id="muscleColorGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(5, 75%, 50%)" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="hsl(5, 75%, 50%)" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis 
+                        dataKey="period" 
+                        tick={{ fill: '#64748b', fontSize: 9 }}
+                        tickLine={false}
+                        axisLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis hide />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                        }}
+                        labelStyle={{ color: '#f1f5f9' }}
+                        formatter={(value: number) => [`${value} sets`, '']}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="sets"
+                        stroke="hsl(5, 75%, 50%)"
+                        strokeWidth={2}
+                        fill="url(#muscleColorGradient)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+                    No data for this period
                   </div>
-                  {/* Period Toggle */}
-                  <div className="inline-flex bg-slate-800 rounded-lg p-0.5">
-                    {(['all', 'weekly', 'monthly'] as const).map(period => (
-                      <button
-                        key={period}
-                        onClick={() => setTrendPeriod(period)}
-                        className={`px-2 py-1 rounded text-[10px] font-medium transition-all capitalize ${
-                          trendPeriod === period
-                            ? 'bg-amber-600 text-white'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        {period}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="h-36 bg-slate-800/30 rounded-lg p-2">
-                  {trendData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={trendData}>
-                        <defs>
-                          <linearGradient id="muscleColorGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#d97706" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#d97706" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <XAxis 
-                          dataKey="period" 
-                          tick={{ fill: '#64748b', fontSize: 9 }}
-                          tickLine={false}
-                          axisLine={false}
-                          interval="preserveStartEnd"
-                        />
-                        <YAxis hide />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: '#1e293b',
-                            border: '1px solid #334155',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                          }}
-                          labelStyle={{ color: '#f1f5f9' }}
-                          formatter={(value: number) => [`${value} sets`, '']}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="sets"
-                          stroke="#d97706"
-                          strokeWidth={2}
-                          fill="url(#muscleColorGradient)"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-slate-500 text-sm">
-                      No data for this period
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
+            </div>
+          </div>
 
-              {/* Contributing Exercises */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Dumbbell className="w-4 h-4 text-slate-400" />
-                  <h3 className="text-sm font-semibold text-white">Top Exercises</h3>
-                </div>
-                <div className="space-y-2">
+          {/* Scrollable Exercises Section */}
+          {selectedMuscle && selectedMuscleData && (
+            <div className="border-t border-slate-800">
+              <div className="flex items-center gap-2 px-4 py-3 bg-slate-800/30">
+                <Dumbbell className="w-4 h-4 text-slate-400" />
+                <h3 className="text-sm font-semibold text-white">Top Exercises</h3>
+              </div>
+              <div className="overflow-y-auto max-h-[calc(100vh-520px)] px-4 pb-4 mt-2">
+                <div className="space-y-3">
                   {contributingExercises.map((ex, i) => {
                     const asset = assetsMap?.get(ex.name);
                     const imgUrl = asset?.sourceType === 'video' ? asset.thumbnail : (asset?.thumbnail || asset?.source);
+                    const exData = exerciseMuscleData.get(ex.name.toLowerCase());
+                    const { volumes: exVolumes, maxVolume: exMaxVol } = getExerciseMuscleVolumes(exData);
+                    const pct = selectedMuscleData.sets > 0 ? Math.round((ex.sets / selectedMuscleData.sets) * 100) : 0;
                     
                     return (
                       <div 
                         key={ex.name}
-                        className="flex items-center gap-3 py-2 px-3 bg-slate-800/30 rounded-lg"
+                        onClick={() => onExerciseClick?.(ex.name)}
+                        className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg hover:bg-slate-800/50 cursor-pointer transition-colors"
                       >
+                        {/* Rank */}
                         <span className="text-xs font-bold text-slate-500 w-4">
                           {i + 1}
                         </span>
+                        
                         {/* Exercise Image */}
                         {imgUrl ? (
                           <img 
                             src={imgUrl} 
                             alt="" 
-                            className="w-8 h-8 rounded object-cover flex-shrink-0 border border-slate-700" 
+                            className="w-10 h-10 rounded object-cover flex-shrink-0 border border-slate-700" 
                             loading="lazy" 
                             decoding="async"
                           />
                         ) : (
-                          <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-700">
+                          <div className="w-10 h-10 rounded bg-slate-800 flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-700">
                             <Dumbbell className="w-4 h-4" />
                           </div>
                         )}
+                        
+                        {/* Exercise Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm text-white truncate">{ex.name}</div>
-                          <div className="text-xs text-slate-500">
-                            {ex.primarySets > 0 && <span className="text-amber-500">{ex.primarySets} primary</span>}
-                            {ex.primarySets > 0 && ex.secondarySets > 0 && ' · '}
-                            {ex.secondarySets > 0 && <span className="text-amber-700">{ex.secondarySets} secondary</span>}
+                          <div className="text-sm text-white font-medium truncate">{ex.name}</div>
+                          <div className="text-[10px] text-slate-500 mt-0.5">
+                            <span className="text-red-400 font-medium">{pct}%</span> of sets
                           </div>
                         </div>
-                        <div className="text-lg font-bold text-amber-500">
-                          {Math.round(ex.sets * 10) / 10}
+                        
+                        {/* Mini Body Map */}
+                        <div className="w-24 h-28 flex-shrink-0">
+                          <BodyMap
+                            onPartClick={() => {}}
+                            selectedPart={null}
+                            muscleVolumes={exVolumes}
+                            maxVolume={exMaxVol}
+                            compact
+                          />
                         </div>
                       </div>
                     );
@@ -449,8 +489,17 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Hint when no muscle selected */}
+          {!selectedMuscle && (
+            <div className="p-4 pt-0">
+              <p className="text-xs text-slate-500 text-center py-2">
+                Click on a muscle to see its exercises
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

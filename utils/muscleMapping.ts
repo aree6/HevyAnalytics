@@ -296,3 +296,38 @@ export const getVolumeColor = (sets: number, maxSets: number): string => {
   return `hsl(5, 75%, ${lightness}%)`;
 };
 
+// Generate muscle volumes for a specific exercise based on its primary/secondary muscles
+export const getExerciseMuscleVolumes = (
+  exerciseData: ExerciseMuscleData | undefined
+): { volumes: Map<string, number>; maxVolume: number } => {
+  const volumes = new Map<string, number>();
+  
+  if (!exerciseData) {
+    return { volumes, maxVolume: 1 };
+  }
+  
+  const primary = exerciseData.primary_muscle;
+  const secondaries = exerciseData.secondary_muscle
+    .split(',')
+    .map(m => m.trim())
+    .filter(m => m && m !== 'None');
+  
+  // Primary muscle gets 1
+  const primarySvgIds = CSV_TO_SVG_MUSCLE_MAP[primary] || [];
+  for (const svgId of primarySvgIds) {
+    volumes.set(svgId, 1);
+  }
+  
+  // Secondary muscles get 0.5
+  for (const secondary of secondaries) {
+    const secondarySvgIds = CSV_TO_SVG_MUSCLE_MAP[secondary] || [];
+    for (const svgId of secondarySvgIds) {
+      if (!volumes.has(svgId)) {
+        volumes.set(svgId, 0.5);
+      }
+    }
+  }
+  
+  return { volumes, maxVolume: 1 };
+};
+
