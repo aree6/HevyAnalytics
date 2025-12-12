@@ -33,7 +33,8 @@
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "papaparse": "^5.4.1",
-    "lz-string": "^1.5.0"
+    "lz-string": "^1.5.0",
+    "styled-components": "^6.1.13"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

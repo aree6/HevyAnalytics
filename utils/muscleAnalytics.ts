@@ -3,6 +3,10 @@ import type { ExerciseAsset } from './exerciseAssets';
 import { getDateKey, TimePeriod, sortByTimestamp } from './dateUtils';
 import { roundTo } from './formatters';
 
+/**
+ * Normalized muscle group type for CSV-based muscle data.
+ * Used for aggregating muscle volume from exercise primary/secondary muscle data.
+ */
 export type NormalizedMuscleGroup = 'Chest' | 'Back' | 'Shoulders' | 'Arms' | 'Legs' | 'Core' | 'Cardio' | 'Full Body' | 'Other';
 
 const MUSCLE_GROUP_PATTERNS: ReadonlyArray<[NormalizedMuscleGroup, ReadonlyArray<string>]> = [

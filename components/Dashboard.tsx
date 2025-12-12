@@ -10,9 +10,15 @@ import {
 } from '../utils/analytics';
 import { getMuscleVolumeTimeSeries, getDetailedMuscleCompositionLatest, normalizeMuscleGroup, getMuscleVolumeTimeSeriesDetailed } from '../utils/muscleAnalytics';
 import { CSV_TO_SVG_MUSCLE_MAP } from '../utils/muscleMapping';
-import { BodyMap } from './BodyMap';
+import { BodyMap, BodyMapGender } from './BodyMap';
 import { MUSCLE_COLORS } from '../utils/categories';
 import { saveChartModes, getChartModes, TimeFilterMode } from '../utils/localStorage';
+import { CHART_TOOLTIP_STYLE, CHART_COLORS, ANIMATION_KEYFRAMES } from '../utils/uiConstants';
+import {
+  SVG_TO_MUSCLE_GROUP,
+  MUSCLE_GROUP_TO_SVG_IDS,
+  getGroupHighlightIds,
+} from '../utils/muscleMappingConstants';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   Legend, AreaChart, Area, 
@@ -26,7 +32,9 @@ import {
 } from 'lucide-react';
 import { format, startOfMonth, startOfWeek, subDays, differenceInCalendarDays } from 'date-fns';
 import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
- 
+import { SupportLinks } from './SupportLinks';
+import { calculateDashboardInsights, detectPlateaus, DashboardInsights, PlateauAnalysis } from '../utils/insights';
+import { InsightsPanel, PlateauAlert, RecentPRsPanel } from './InsightCards';
 
 interface DashboardProps {
   dailyData: DailySummary[];
@@ -35,6 +43,7 @@ interface DashboardProps {
   onDayClick?: (date: Date) => void;
   onMuscleClick?: (muscleId: string, viewMode: 'muscle' | 'group') => void;
   filtersSlot?: React.ReactNode;
+  bodyMapGender?: BodyMapGender;
 }
 
 type ChartKey = 'heatmap' | 'prTrend' | 'volumeVsDuration' | 'intensityEvo' | 'weekShape' | 'topExercises' | 'muscleVolume';
@@ -151,7 +160,7 @@ const ChartHeader = ({
     <div className="flex items-center gap-2 flex-wrap">
       {/* View Type Toggle (Line/Area, Area/Line, Radar/Bar) */}
       {viewType && onViewToggle && viewOptions && (
-        <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
+        <div className="bg-black/70 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
           {viewOptions.map((option) => (
             <button
               key={option.value}
@@ -171,7 +180,7 @@ const ChartHeader = ({
       
       {/* All/Weekly/Monthly Toggle */}
     {mode && onToggle && (
-      <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
+      <div className="bg-black/70 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
         <button 
           onClick={() => onToggle('all')} 
           className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-all duration-200 transform hover:scale-105 active:scale-95 ${
@@ -252,7 +261,7 @@ const Heatmap = ({ dailyData, totalPrs, onDayClick }: { dailyData: DailySummary[
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg flex flex-col md:flex-row gap-4 sm:gap-6 overflow-hidden">
+    <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg flex flex-col md:flex-row gap-4 sm:gap-6 overflow-hidden">
       <div className="flex-shrink-0 flex flex-col justify-between min-w-full md:min-w-[180px] border-b md:border-b-0 md:border-r border-slate-800/50 pb-4 md:pb-0 md:pr-6 md:mr-2">
         <div>
           <h3 className="text-base sm:text-lg font-semibold text-white flex items-center mb-1">
@@ -295,7 +304,7 @@ const Heatmap = ({ dailyData, totalPrs, onDayClick }: { dailyData: DailySummary[
 
 // --- MAIN DASHBOARD ---
 
-export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick, onMuscleClick, filtersSlot }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick, onMuscleClick, filtersSlot, bodyMapGender = 'male' }) => {
   const DEFAULT_CHART_MODES: Record<string, TimeFilterMode> = {
     volumeVsDuration: 'monthly',
     intensityEvo: 'monthly',
@@ -470,6 +479,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     }
     return sessions.size;
   }, [fullData]);
+
+  // Dashboard Insights (deltas, streaks, PR info, sparklines)
+  const dashboardInsights = useMemo(() => 
+    calculateDashboardInsights(fullData, dailyData), 
+    [fullData, dailyData]
+  );
+
+  // Plateau Detection
+  const plateauAnalysis = useMemo(() => 
+    detectPlateaus(fullData, exerciseStats), 
+    [fullData, exerciseStats]
+  );
   
   // 1. PRs Over Time Data
   const prsData = useMemo(() => {
@@ -758,19 +779,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     let maxVol = 0;
     
     if (compositionGrouping === 'groups') {
-      // Map group counts to all SVG IDs in that group
-      const groupToSvgMap: Record<string, string[]> = {
-        'Chest': ['mid-lower-pectoralis', 'upper-pectoralis'],
-        'Back': ['lats', 'lowerback', 'upper-trapezius', 'lower-trapezius', 'traps-middle'],
-        'Shoulders': ['anterior-deltoid', 'lateral-deltoid', 'posterior-deltoid'],
-        'Arms': ['long-head-bicep', 'short-head-bicep', 'medial-head-triceps', 'long-head-triceps', 'lateral-head-triceps', 'wrist-extensors', 'wrist-flexors'],
-        'Legs': ['outer-quadricep', 'rectus-femoris', 'inner-quadricep', 'medial-hamstrings', 'lateral-hamstrings', 'gluteus-maximus', 'gluteus-medius', 'gastrocnemius', 'soleus', 'tibialis', 'inner-thigh'],
-        'Core': ['lower-abdominals', 'upper-abdominals', 'obliques'],
-      };
+      // Map group counts to all SVG IDs in that group using centralized constants
       groupCounts.forEach((count, group) => {
         const weeklyVal = count / weeks;
         if (weeklyVal > maxVol) maxVol = weeklyVal;
-        const svgIds = groupToSvgMap[group] || [];
+        const svgIds = MUSCLE_GROUP_TO_SVG_IDS[group as keyof typeof MUSCLE_GROUP_TO_SVG_IDS] || [];
         for (const svgId of svgIds) {
           volumes.set(svgId, weeklyVal);
         }
@@ -789,29 +802,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   // Compute hovered muscle IDs for group highlighting in heatmap
   const heatmapHoveredMuscleIds = useMemo(() => {
     if (!heatmapHoveredMuscle) return undefined;
-    if (compositionGrouping !== 'groups') return undefined; // Only group-highlight in groups mode
-    
-    // Map from SVG muscle ID to group
-    const muscleToGroup: Record<string, string> = {
-      'mid-lower-pectoralis': 'Chest', 'upper-pectoralis': 'Chest',
-      'lats': 'Back', 'lowerback': 'Back', 'upper-trapezius': 'Back', 'lower-trapezius': 'Back', 'traps-middle': 'Back',
-      'anterior-deltoid': 'Shoulders', 'lateral-deltoid': 'Shoulders', 'posterior-deltoid': 'Shoulders',
-      'long-head-bicep': 'Arms', 'short-head-bicep': 'Arms', 'medial-head-triceps': 'Arms', 'long-head-triceps': 'Arms', 'lateral-head-triceps': 'Arms', 'wrist-extensors': 'Arms', 'wrist-flexors': 'Arms',
-      'outer-quadricep': 'Legs', 'rectus-femoris': 'Legs', 'inner-quadricep': 'Legs', 'medial-hamstrings': 'Legs', 'lateral-hamstrings': 'Legs', 'gluteus-maximus': 'Legs', 'gluteus-medius': 'Legs', 'gastrocnemius': 'Legs', 'soleus': 'Legs', 'tibialis': 'Legs', 'inner-thigh': 'Legs',
-      'lower-abdominals': 'Core', 'upper-abdominals': 'Core', 'obliques': 'Core',
-    };
-    const groupToSvgMap: Record<string, string[]> = {
-      'Chest': ['mid-lower-pectoralis', 'upper-pectoralis'],
-      'Back': ['lats', 'lowerback', 'upper-trapezius', 'lower-trapezius', 'traps-middle'],
-      'Shoulders': ['anterior-deltoid', 'lateral-deltoid', 'posterior-deltoid'],
-      'Arms': ['long-head-bicep', 'short-head-bicep', 'medial-head-triceps', 'long-head-triceps', 'lateral-head-triceps', 'wrist-extensors', 'wrist-flexors'],
-      'Legs': ['outer-quadricep', 'rectus-femoris', 'inner-quadricep', 'medial-hamstrings', 'lateral-hamstrings', 'gluteus-maximus', 'gluteus-medius', 'gastrocnemius', 'soleus', 'tibialis', 'inner-thigh'],
-      'Core': ['lower-abdominals', 'upper-abdominals', 'obliques'],
-    };
-    
-    const hoveredGroup = muscleToGroup[heatmapHoveredMuscle];
-    if (!hoveredGroup) return [heatmapHoveredMuscle];
-    return groupToSvgMap[hoveredGroup] || [heatmapHoveredMuscle];
+    if (compositionGrouping !== 'groups') return undefined;
+    return getGroupHighlightIds(heatmapHoveredMuscle);
   }, [heatmapHoveredMuscle, compositionGrouping]);
 
   const muscleCalMeta = useMemo(() => {
@@ -833,40 +825,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   }, [fullData]);
 
 
-  // Shared Recharts Styles
-  const TooltipStyle = { backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', fontSize: '12px', borderRadius: '8px' };
-  const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#ef4444'];
+  // Use shared constants for Recharts styles
+  const TooltipStyle = CHART_TOOLTIP_STYLE;
+  const PIE_COLORS = CHART_COLORS;
 
   return (
-    <div className={`space-y-4 sm:space-y-6 pb-20 transition-opacity duration-700 ease-out ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
-
-      <style>{`
-        @keyframes medalShimmer {
-          0% { transform: translateX(-140%) skewX(-12deg); opacity: 0; }
-          15% { opacity: 0.9; }
-          45% { opacity: 0.5; }
-          70% { opacity: 0.85; }
-          100% { transform: translateX(140%) skewX(-12deg); opacity: 0; }
-        }
-
-        @keyframes textShimmer {
-          0% { background-position: -200% 50%; }
-          100% { background-position: 200% 50%; }
-        }
-      `}</style>
+    <>
+      <style>{ANIMATION_KEYFRAMES}</style>
+      <div className={`space-y-6 pb-20 transition-opacity duration-700 ease-out ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
       
-      {/* HEADER & CONTROLS */}
-      <div className="bg-slate-900/50 p-3 sm:p-4 rounded-xl border border-slate-800">
+        {/* HEADER & CONTROLS */}
+        <div className="bg-black/70 p-3 sm:p-4 rounded-xl border border-slate-700/50">
         <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-3">
           <div className="hidden sm:flex items-center gap-2 justify-start">
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-2 bg-black/50 border border-slate-700/50 rounded-lg">
               <Clock className="w-4 h-4 text-slate-400" />
               <div className="text-xs">
                 <div className="text-white font-bold leading-4">{totalWorkouts}</div>
                 <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Workouts</div>
               </div>
             </div>
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-2 bg-black/50 border border-slate-700/50 rounded-lg">
               <Dumbbell className="w-4 h-4 text-slate-400" />
               <div className="text-xs">
                 <div className="text-white font-bold leading-4">{totalSets}</div>
@@ -885,18 +864,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             <div className="relative w-full sm:w-auto">
               <button 
                 onClick={() => setIsMenuOpen(!isMenuOpen)} 
-                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs sm:text-sm font-medium border border-slate-700 text-slate-200 transition-colors w-full sm:w-auto justify-center sm:justify-start"
+                className="flex items-center gap-2 px-3 py-2 bg-black/70 hover:bg-black/60 rounded-lg text-xs sm:text-sm font-medium border border-slate-700/50 text-slate-200 transition-colors w-full sm:w-auto justify-center sm:justify-start"
               >
                 <Eye className="w-4 h-4" /> Configure View <ChevronDown className={`w-4 h-4 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               {isMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 sm:w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 p-2 animate-in fade-in slide-in-from-top-2">
+                <div className="absolute right-0 top-full mt-2 w-48 sm:w-56 bg-black/90 border border-slate-700/50 rounded-xl shadow-xl z-50 p-2 animate-in fade-in slide-in-from-top-2">
                   <p className="text-[10px] uppercase font-bold text-slate-500 px-3 py-1">Visible Charts</p>
                   {Object.entries(CHART_LABELS).map(([key, label]) => (
                     <button 
                       key={key} 
                       onClick={() => toggleChart(key as ChartKey)} 
-                      className="w-full flex justify-between px-3 py-2 text-xs sm:text-sm text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
+                      className="w-full flex justify-between px-3 py-2 text-xs sm:text-sm text-slate-300 hover:bg-black/60 rounded-lg transition-colors"
                     >
                       <span>{label}</span>
                       <div className={`w-3 h-3 rounded-full border ${visibleCharts[key as ChartKey] ? 'bg-blue-500 border-blue-500' : 'bg-transparent border-slate-600'}`} />
@@ -909,6 +888,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         </div>
       </div>
 
+      {/* INSIGHTS PANEL - KPIs with Deltas & Sparklines */}
+      <InsightsPanel 
+        insights={dashboardInsights}
+        totalWorkouts={totalWorkouts}
+        totalSets={totalSets}
+        totalPRs={totalPrs}
+      />
+
+      {/* RECENT PRs TIMELINE */}
+      <RecentPRsPanel prInsights={dashboardInsights.prInsights} />
+
+      {/* PLATEAU ALERTS */}
+      {plateauAnalysis.plateauedExercises.length > 0 && (
+        <div className="bg-black/70 border border-amber-500/20 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm font-semibold text-amber-400">⚠️ Potential Plateaus Detected</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">
+              {plateauAnalysis.plateauedExercises.length} exercise{plateauAnalysis.plateauedExercises.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="overflow-x-auto -mx-2 px-2 pb-2">
+            <div className="flex gap-2" style={{ minWidth: 'min-content' }}>
+              {plateauAnalysis.plateauedExercises.slice(0, 3).map((p) => (
+                <div key={p.exerciseName} className="min-w-[280px] flex-shrink-0">
+                  <PlateauAlert 
+                    exerciseName={p.exerciseName}
+                    weeksStuck={p.weeksAtSameWeight}
+                    suggestion={p.suggestion}
+                    asset={assetsMap?.get(p.exerciseName) || assetsLowerMap?.get(p.exerciseName.toLowerCase())}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. HEATMAP (Full Width) */}
       {visibleCharts.heatmap && <Heatmap dailyData={dailyData} totalPrs={totalPrs} onDayClick={onDayClick} />}
 
@@ -916,7 +932,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         
         {/* 2. PR TRENDS (Area/Bar) */}
         {visibleCharts.prTrend && (
-          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl">
+          <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl">
             <ChartHeader 
               title="PRs Over Time" 
               icon={Trophy} 
@@ -931,14 +947,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             <div className={`flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <div key={prTrendView} className="h-full w-full">
-                  {prTrendView === 'area' ? (
-                  <AreaChart data={prsData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gPRs" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#eab308" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
+                {prTrendView === 'area' ? (
+                <AreaChart data={prsData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gPRs" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#eab308" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                   <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
@@ -960,7 +976,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                     <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                     <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
-                    <Tooltip contentStyle={TooltipStyle} />
+                    <Tooltip contentStyle={TooltipStyle} cursor={{ fill: 'rgba(0,0,0,0.35)' }} />
                     <Bar dataKey="count" name="PRs Set" fill="#eab308" radius={[8, 8, 0, 0]} animationDuration={1500} />
                   </BarChart>
                   )}
@@ -981,9 +997,314 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
           </div>
         )}
 
-        {/* 3. VOLUME DENSITY (Area/Bar) */}
+        {/* 3. WEEKLY SETS (Radar/Heatmap) */}
+        <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl min-w-0">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
+            <ChartHeader 
+              title="Weekly sets"
+              icon={Dumbbell}
+              color="text-cyan-500"
+              isMounted={isMounted}
+            />
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              {/* View Toggle: Radar / Heatmap */}
+              <div className="bg-black/70 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
+                <button onClick={() => setWeeklySetsView('radar')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${weeklySetsView==='radar'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Radar</button>
+                <button onClick={() => setWeeklySetsView('heatmap')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${weeklySetsView==='heatmap'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Heatmap</button>
+              </div>
+              {/* Grouping Toggle - available for both views */}
+              <div className="bg-black/70 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
+                <button onClick={() => setCompositionGrouping('groups')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${compositionGrouping==='groups'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Groups</button>
+                <button onClick={() => setCompositionGrouping('muscles')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${compositionGrouping==='muscles'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Muscles</button>
+              </div>
+              {/* Quick Filters */}
+              <div className="bg-black/70 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
+                <button onClick={() => setMuscleCompQuick('all')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleCompQuick==='all'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>All</button>
+                <button onClick={() => setMuscleCompQuick('7d')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleCompQuick==='7d'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Last Week</button>
+                <button onClick={() => setMuscleCompQuick('30d')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleCompQuick==='30d'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Last Month</button>
+                <button onClick={() => setMuscleCompQuick('365d')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleCompQuick==='365d'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Last Year</button>
+              </div>
+            </div>
+          </div>
+          <div className={`flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} min-w-0`}>
+            {weeklySetsView === 'radar' ? (
+              compositionQuickData.length === 0 ? (
+                <div className="flex items-center justify-center h-[300px] text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
+                  Not enough data to render Muscle Composition.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={compositionQuickData}>
+                    <PolarGrid stroke="#334155" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+                    <Radar name="Weekly Sets" dataKey="value" stroke="#06b6d4" strokeWidth={3} fill="#06b6d4" fillOpacity={0.35} animationDuration={1500} />
+                    <Tooltip contentStyle={TooltipStyle} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              )
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[300px]">
+                {heatmapMuscleVolumes.volumes.size === 0 ? (
+                  <div className="text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg p-8">
+                    Not enough data to render Heat Map.
+                  </div>
+                ) : (
+                  <>
+                    <div className="transform scale-[0.55] origin-center -mt-4">
+                      <BodyMap
+                        onPartClick={(muscleId) => onMuscleClick?.(muscleId, compositionGrouping === 'groups' ? 'group' : 'muscle')}
+                        selectedPart={null}
+                        muscleVolumes={heatmapMuscleVolumes.volumes}
+                        maxVolume={heatmapMuscleVolumes.maxVolume}
+                        hoveredMuscleIdsOverride={heatmapHoveredMuscleIds}
+                        onPartHover={setHeatmapHoveredMuscle}
+                        gender={bodyMapGender}
+                        viewMode={compositionGrouping === 'groups' ? 'group' : 'muscle'}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          <ChartDescription
+            isMounted={isMounted}
+            topSlot={
+              weeklySetsView === 'heatmap' ? (
+                <div className="flex items-center gap-3 text-xs text-slate-400 bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5 w-fit">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded border border-slate-600" style={{ backgroundColor: 'hsla(0, 0%, 100%, 0.1)' }}></div>
+                    <span>None</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 75%)' }}></div>
+                    <span>Low</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 50%)' }}></div>
+                    <span>Med</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 25%)' }}></div>
+                    <span>High</span>
+                  </div>
+                </div>
+              ) : null
+            }
+          >
+            <p>
+              <span className="font-semibold text-slate-300">Quick slice.</span> Values represent weekly sets. {weeklySetsView === 'heatmap' ? 'Body heat map shows muscle activation intensity.' : ''} Group by {compositionGrouping === 'groups' ? <span className="text-cyan-400">muscle group</span> : <span className="text-cyan-400">individual muscle</span>}. View for All time, Last Week, Month, or Year.
+            </p>
+          </ChartDescription>
+        </div>
+      </div>
+
+      {/* 4. INTENSITY EVOLUTION (Area/Stacked Bar) */}
+      {visibleCharts.intensityEvo && (
+        <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl">
+          <ChartHeader 
+            title="Training Style Evolution" 
+            icon={Layers} 
+            color="text-orange-500"
+            mode={chartModes.intensityEvo}
+            onToggle={(m) => toggleChartMode('intensityEvo', m)} 
+            viewType={intensityView}
+            onViewToggle={setIntensityView}
+            viewOptions={[{ value: 'area', label: 'Area' }, { value: 'stackedBar', label: 'Stacked' }]}
+            isMounted={isMounted}
+          />
+          {intensityData && intensityData.length > 0 ? (
+            <div className={`flex-1 w-full transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`} style={{minHeight: '250px', height: '100%'}}>
+              <ResponsiveContainer width="100%" height={250}>
+                <div key={intensityView} className="h-full w-full">
+                {intensityView === 'area' ? (
+                <AreaChart data={intensityData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gStrength" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="gHyper" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="gEndure" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                  <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={TooltipStyle} />
+                  <Legend wrapperStyle={{fontSize: '11px'}} />
+                  <Area type="monotone" dataKey="Strength" name="Strength (1-5)" stackId="1" stroke="#3b82f6" fill="url(#gStrength)" animationDuration={1500} />
+                  <Area type="monotone" dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" stroke="#10b981" fill="url(#gHyper)" animationDuration={1500} />
+                  <Area type="monotone" dataKey="Endurance" name="Endurance (13+)" stackId="1" stroke="#a855f7" fill="url(#gEndure)" animationDuration={1500} />
+                </AreaChart>
+                ) : (
+                  <BarChart data={intensityData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={TooltipStyle} cursor={{ fill: 'rgba(0,0,0,0.35)' }} />
+                    <Legend wrapperStyle={{fontSize: '11px'}} />
+                    <Bar dataKey="Strength" name="Strength (1-5)" stackId="1" fill="#3b82f6" radius={[0, 0, 0, 0]} animationDuration={1500} />
+                    <Bar dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" fill="#10b981" radius={[0, 0, 0, 0]} animationDuration={1500} />
+                    <Bar dataKey="Endurance" name="Endurance (13+)" stackId="1" fill="#a855f7" radius={[8, 8, 0, 0]} animationDuration={1500} />
+                  </BarChart>
+                )}
+                </div>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] flex items-center justify-center bg-slate-800/50 rounded-lg border border-slate-700/50">
+              <div className="text-center">
+                <Layers className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-400">No data available for Training Style Evolution</p>
+                <p className="text-xs text-slate-500 mt-1">Upload workout data or adjust your filters</p>
+              </div>
+            </div>
+          )}
+          <ChartDescription isMounted={isMounted}>
+             <p>
+               <span className="font-semibold text-slate-300">Discover your training style.</span> This chart breaks down your workouts by rep ranges, revealing what you're actually training for.
+             </p>
+             <p>
+               <span className="text-blue-400">Strength</span> (1-5 reps) builds raw power, <span className="text-emerald-400">Hypertrophy</span> (6-12 reps) builds muscle size, and <span className="text-purple-400">Endurance</span> (13+ reps) builds stamina. The balance between these tells your training story.
+             </p>
+             <p className="text-slate-500 italic">
+               💡 Switch between <span className="text-orange-400">Area</span> and <span className="text-orange-400">Stacked Bar</span> views to see layered trends or detailed composition breakdowns.
+             </p>
+          </ChartDescription>
+        </div>
+      )}
+
+      {/* MUSCLE ANALYSIS (Unified) */}
+      {visibleCharts.muscleVolume && (
+        <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl min-w-0">
+          <ChartHeader 
+            title="Muscle Analysis" 
+            icon={Dumbbell} 
+            color="text-emerald-500"
+            isMounted={isMounted}
+          />
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="bg-black/70 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
+              <button onClick={() => setMuscleGrouping('groups')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleGrouping==='groups'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Groups</button>
+              <button onClick={() => setMuscleGrouping('muscles')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleGrouping==='muscles'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Muscles</button>
+            </div>
+            <div className="bg-black/70 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
+              <button onClick={() => setMusclePeriod('weekly')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${musclePeriod==='weekly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Weekly</button>
+              <button onClick={() => setMusclePeriod('monthly')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${musclePeriod==='monthly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Monthly</button>
+              <button onClick={() => setMusclePeriod('yearly')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${musclePeriod==='yearly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Yearly</button>
+            </div>
+            <div className="bg-black/70 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
+              <button onClick={() => setMuscleTrendView('stackedBar')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleTrendView==='stackedBar'?'bg-emerald-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Stacked</button>
+              <button onClick={() => setMuscleTrendView('area')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleTrendView==='area'?'bg-emerald-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Area</button>
+            </div>
+
+          </div>
+          <div className={`flex-1 w-full min-h-[250px] sm:min-h-[320px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} min-w-0`}>
+            {trendData.length === 0 || trendKeys.length === 0 ? (
+              <div className="flex items-center justify-center h-[280px] text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
+                Not enough data to render Muscle Analysis trend.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <div key={`${muscleTrendView}-${musclePeriod}-${muscleGrouping}`} className="h-full w-full">
+                  {muscleTrendView === 'area' ? (
+                    <AreaChart data={trendData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                      <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={TooltipStyle} />
+                      <Legend wrapperStyle={{fontSize: '11px'}} />
+                      {trendKeys.map((k) => (
+                        <Area key={k} type="monotone" dataKey={k} name={k} stackId="1" stroke={MUSCLE_COLORS[(muscleGrouping==='groups'?k:normalizeMuscleGroup(k))] || '#94a3b8'} fill={MUSCLE_COLORS[(muscleGrouping==='groups'?k:normalizeMuscleGroup(k))] || '#94a3b8'} fillOpacity={0.25} animationDuration={1200} />
+                      ))}
+                    </AreaChart>
+                  ) : (
+                    <BarChart data={trendData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                      <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={TooltipStyle} cursor={{ fill: 'rgba(0,0,0,0.35)' }} />
+                      <Legend wrapperStyle={{fontSize: '11px'}} />
+                      {trendKeys.map((k, idx) => (
+                        <Bar key={k} dataKey={k} name={k} stackId="1" fill={MUSCLE_COLORS[(muscleGrouping==='groups'?k:normalizeMuscleGroup(k))] || '#94a3b8'} radius={idx===trendKeys.length-1?[6,6,0,0]:[0,0,0,0]} animationDuration={1200} />
+                      ))}
+                    </BarChart>
+                  )}
+                </div>
+              </ResponsiveContainer>
+            )}
+          </div>
+          <ChartDescription isMounted={isMounted}>
+            <p>
+              <span className="font-semibold text-slate-300">Weighted by muscle involvement.</span> <span className="text-emerald-400 font-semibold">Primary</span> = 1 set, <span className="text-cyan-400 font-semibold">Secondary</span> = 0.5 set. Cardio is ignored; Full Body adds 1 set to every group.
+            </p>
+            <p className="text-slate-500 italic">Use <span className="text-blue-400">Groups</span>/<span className="text-blue-400">Muscles</span>, choose <span className="text-purple-400">Weekly/Monthly/Yearly</span>, and switch <span className="text-emerald-400">Stacked</span>/<span className="text-emerald-400">Area</span>.</p>
+          </ChartDescription>
+        </div>
+      )}
+
+      {/* 5. Weekly Rhythm + Muscle Composition */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        
+        {/* Weekly Rhythm: Radar/Bar */}
+        {visibleCharts.weekShape && (
+          <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl">
+            <ChartHeader 
+              title="Weekly Rhythm" 
+              icon={Clock} 
+              color="text-pink-500"
+              viewType={weekShapeView}
+              onViewToggle={setWeekShapeView}
+              viewOptions={[{ value: 'radar', label: 'Radar' }, { value: 'bar', label: 'Bar' }]}
+              isMounted={isMounted}
+            />
+            <div className={`flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <div key={weekShapeView} className="h-full w-full">
+                {weekShapeView === 'radar' ? (
+                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={weekShapeData}>
+                  <PolarGrid stroke="#334155" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+                  <Radar name="Workouts" dataKey="A" stroke="#ec4899" strokeWidth={3} fill="#ec4899" fillOpacity={0.4} animationDuration={1500} />
+                  <Tooltip contentStyle={TooltipStyle} />
+                </RadarChart>
+                ) : (
+                  <BarChart data={weekShapeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis dataKey="subject" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <Tooltip contentStyle={TooltipStyle} cursor={{ fill: 'rgba(0,0,0,0.35)' }} />
+                    <Bar dataKey="A" name="Workouts" fill="#ec4899" radius={[8, 8, 0, 0]} animationDuration={1500} />
+                  </BarChart>
+                )}
+                </div>
+              </ResponsiveContainer>
+            </div>
+            <ChartDescription isMounted={isMounted}>
+              <p>
+                <span className="font-semibold text-slate-300">Find your rhythm.</span> This chart reveals your workout patterns—when you train and how consistently.
+              </p>
+              <p>
+                A balanced pattern shows consistent daily habits, while a skewed shape reveals your preferred "gym days." Are you a weekend warrior or a weekday warrior?
+              </p>
+              <p className="text-slate-500 italic">
+                💡 Switch between <span className="text-pink-400">Radar</span> and <span className="text-pink-400">Bar</span> views to see a circular pattern or traditional comparison.
+              </p>
+            </ChartDescription>
+          </div>
+        )}
+
+        {/* Volume Density (Area/Bar) */}
         {visibleCharts.volumeVsDuration && (
-          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl">
+          <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl">
             <ChartHeader 
               title="Volume Density" 
               icon={Timer} 
@@ -1027,6 +1348,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     <YAxis stroke="#8b5cf6" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}kg`} />
                     <Tooltip 
                       contentStyle={TooltipStyle} 
+                      cursor={{ fill: 'rgba(0,0,0,0.35)' }}
                       labelFormatter={(l, p) => p[0]?.payload?.tooltipLabel || l} 
                       formatter={(val: number, name) => {
                           if (name === 'Volume per Set (kg)') return [`${val} kg`, name];
@@ -1055,303 +1377,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         )}
       </div>
 
-      {/* 4. INTENSITY EVOLUTION (Area/Stacked Bar) */}
-      {visibleCharts.intensityEvo && (
-        <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl">
-          <ChartHeader 
-            title="Training Style Evolution" 
-            icon={Layers} 
-            color="text-orange-500"
-            mode={chartModes.intensityEvo}
-            onToggle={(m) => toggleChartMode('intensityEvo', m)} 
-            viewType={intensityView}
-            onViewToggle={setIntensityView}
-            viewOptions={[{ value: 'area', label: 'Area' }, { value: 'stackedBar', label: 'Stacked' }]}
-            isMounted={isMounted}
-          />
-          {intensityData && intensityData.length > 0 ? (
-            <div className={`flex-1 w-full transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`} style={{minHeight: '250px', height: '100%'}}>
-              <ResponsiveContainer width="100%" height={250}>
-                <div key={intensityView} className="h-full w-full">
-                {intensityView === 'area' ? (
-                <AreaChart data={intensityData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gStrength" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient>
-                    <linearGradient id="gHyper" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
-                    <linearGradient id="gEndure" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#a855f7" stopOpacity={0.8}/><stop offset="95%" stopColor="#a855f7" stopOpacity={0}/></linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                  <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={TooltipStyle} />
-                  <Legend wrapperStyle={{fontSize: '11px'}} />
-                  <Area type="monotone" dataKey="Strength" name="Strength (1-5)" stackId="1" stroke="#3b82f6" fill="url(#gStrength)" animationDuration={1500} />
-                  <Area type="monotone" dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" stroke="#10b981" fill="url(#gHyper)" animationDuration={1500} />
-                  <Area type="monotone" dataKey="Endurance" name="Endurance (13+)" stackId="1" stroke="#a855f7" fill="url(#gEndure)" animationDuration={1500} />
-                </AreaChart>
-                ) : (
-                  <BarChart data={intensityData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={TooltipStyle} />
-                    <Legend wrapperStyle={{fontSize: '11px'}} />
-                    <Bar dataKey="Strength" name="Strength (1-5)" stackId="1" fill="#3b82f6" radius={[0, 0, 0, 0]} animationDuration={1500} />
-                    <Bar dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" fill="#10b981" radius={[0, 0, 0, 0]} animationDuration={1500} />
-                    <Bar dataKey="Endurance" name="Endurance (13+)" stackId="1" fill="#a855f7" radius={[8, 8, 0, 0]} animationDuration={1500} />
-                  </BarChart>
-                )}
-                </div>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="flex-1 w-full min-h-[250px] sm:min-h-[300px] flex items-center justify-center bg-slate-800/50 rounded-lg border border-slate-700/50">
-              <div className="text-center">
-                <Layers className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                <p className="text-slate-400">No data available for Training Style Evolution</p>
-                <p className="text-xs text-slate-500 mt-1">Upload workout data or adjust your filters</p>
-              </div>
-            </div>
-          )}
-          <ChartDescription isMounted={isMounted}>
-             <p>
-               <span className="font-semibold text-slate-300">Discover your training style.</span> This chart breaks down your workouts by rep ranges, revealing what you're actually training for.
-             </p>
-             <p>
-               <span className="text-blue-400">Strength</span> (1-5 reps) builds raw power, <span className="text-emerald-400">Hypertrophy</span> (6-12 reps) builds muscle size, and <span className="text-purple-400">Endurance</span> (13+ reps) builds stamina. The balance between these tells your training story.
-             </p>
-             <p className="text-slate-500 italic">
-               💡 Switch between <span className="text-orange-400">Area</span> and <span className="text-orange-400">Stacked Bar</span> views to see layered trends or detailed composition breakdowns.
-             </p>
-          </ChartDescription>
-        </div>
-      )}
-
-      {/* MUSCLE ANALYSIS (Unified) */}
-      {visibleCharts.muscleVolume && (
-        <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl min-w-0">
-          <ChartHeader 
-            title="Muscle Analysis" 
-            icon={Dumbbell} 
-            color="text-emerald-500"
-            isMounted={isMounted}
-          />
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <div className="bg-slate-950 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
-              <button onClick={() => setMuscleGrouping('groups')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleGrouping==='groups'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Groups</button>
-              <button onClick={() => setMuscleGrouping('muscles')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleGrouping==='muscles'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Muscles</button>
-            </div>
-            <div className="bg-slate-950 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
-              <button onClick={() => setMusclePeriod('weekly')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${musclePeriod==='weekly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Weekly</button>
-              <button onClick={() => setMusclePeriod('monthly')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${musclePeriod==='monthly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Monthly</button>
-              <button onClick={() => setMusclePeriod('yearly')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${musclePeriod==='yearly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Yearly</button>
-            </div>
-            <div className="bg-slate-950 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
-              <button onClick={() => setMuscleTrendView('stackedBar')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleTrendView==='stackedBar'?'bg-emerald-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Stacked</button>
-              <button onClick={() => setMuscleTrendView('area')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleTrendView==='area'?'bg-emerald-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Area</button>
-            </div>
-
-          </div>
-          <div className={`flex-1 w-full min-h-[250px] sm:min-h-[320px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} min-w-0`}>
-            {trendData.length === 0 || trendKeys.length === 0 ? (
-              <div className="flex items-center justify-center h-[280px] text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
-                Not enough data to render Muscle Analysis trend.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <div key={`${muscleTrendView}-${musclePeriod}-${muscleGrouping}`} className="h-full w-full">
-                  {muscleTrendView === 'area' ? (
-                    <AreaChart data={trendData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={TooltipStyle} />
-                      <Legend wrapperStyle={{fontSize: '11px'}} />
-                      {trendKeys.map((k) => (
-                        <Area key={k} type="monotone" dataKey={k} name={k} stackId="1" stroke={MUSCLE_COLORS[(muscleGrouping==='groups'?k:normalizeMuscleGroup(k))] || '#94a3b8'} fill={MUSCLE_COLORS[(muscleGrouping==='groups'?k:normalizeMuscleGroup(k))] || '#94a3b8'} fillOpacity={0.25} animationDuration={1200} />
-                      ))}
-                    </AreaChart>
-                  ) : (
-                    <BarChart data={trendData} margin={{ left: -20, right: 10, top: 10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={TooltipStyle} />
-                      <Legend wrapperStyle={{fontSize: '11px'}} />
-                      {trendKeys.map((k, idx) => (
-                        <Bar key={k} dataKey={k} name={k} stackId="1" fill={MUSCLE_COLORS[(muscleGrouping==='groups'?k:normalizeMuscleGroup(k))] || '#94a3b8'} radius={idx===trendKeys.length-1?[6,6,0,0]:[0,0,0,0]} animationDuration={1200} />
-                      ))}
-                    </BarChart>
-                  )}
-                </div>
-              </ResponsiveContainer>
-            )}
-          </div>
-          <ChartDescription isMounted={isMounted}>
-            <p>
-              <span className="font-semibold text-slate-300">Weighted by muscle involvement.</span> <span className="text-emerald-400 font-semibold">Primary</span> = 1 set, <span className="text-cyan-400 font-semibold">Secondary</span> = 0.5 set. Cardio is ignored; Full Body adds 1 set to every group.
-            </p>
-            <p className="text-slate-500 italic">Use <span className="text-blue-400">Groups</span>/<span className="text-blue-400">Muscles</span>, choose <span className="text-purple-400">Weekly/Monthly/Yearly</span>, and switch <span className="text-emerald-400">Stacked</span>/<span className="text-emerald-400">Area</span>.</p>
-          </ChartDescription>
-        </div>
-      )}
-
-      {/* 5. Weekly Rhythm + Muscle Composition */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        
-        {/* Weekly Rhythm: Radar/Bar */}
-        {visibleCharts.weekShape && (
-          <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl">
-            <ChartHeader 
-              title="Weekly Rhythm" 
-              icon={Clock} 
-              color="text-pink-500"
-              viewType={weekShapeView}
-              onViewToggle={setWeekShapeView}
-              viewOptions={[{ value: 'radar', label: 'Radar' }, { value: 'bar', label: 'Bar' }]}
-              isMounted={isMounted}
-            />
-            <div className={`flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <ResponsiveContainer width="100%" height="100%">
-                <div key={weekShapeView} className="h-full w-full">
-                {weekShapeView === 'radar' ? (
-                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={weekShapeData}>
-                  <PolarGrid stroke="#334155" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
-                  <Radar name="Workouts" dataKey="A" stroke="#ec4899" strokeWidth={3} fill="#ec4899" fillOpacity={0.4} animationDuration={1500} />
-                  <Tooltip contentStyle={TooltipStyle} />
-                </RadarChart>
-                ) : (
-                  <BarChart data={weekShapeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="subject" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={TooltipStyle} />
-                    <Bar dataKey="A" name="Workouts" fill="#ec4899" radius={[8, 8, 0, 0]} animationDuration={1500} />
-                  </BarChart>
-                )}
-                </div>
-              </ResponsiveContainer>
-            </div>
-            <ChartDescription isMounted={isMounted}>
-              <p>
-                <span className="font-semibold text-slate-300">Find your rhythm.</span> This chart reveals your workout patterns—when you train and how consistently.
-              </p>
-              <p>
-                A balanced pattern shows consistent daily habits, while a skewed shape reveals your preferred "gym days." Are you a weekend warrior or a weekday warrior?
-              </p>
-              <p className="text-slate-500 italic">
-                💡 Switch between <span className="text-pink-400">Radar</span> and <span className="text-pink-400">Bar</span> views to see a circular pattern or traditional comparison.
-              </p>
-            </ChartDescription>
-          </div>
-        )}
-
-        {/* Muscle Composition (Radar) moved here */}
-        <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl min-w-0">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
-            <ChartHeader 
-              title="Weekly sets"
-              icon={Dumbbell}
-              color="text-cyan-500"
-              isMounted={isMounted}
-            />
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              {/* View Toggle: Radar / Heatmap */}
-              <div className="bg-slate-950 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
-                <button onClick={() => setWeeklySetsView('radar')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${weeklySetsView==='radar'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Radar</button>
-                <button onClick={() => setWeeklySetsView('heatmap')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${weeklySetsView==='heatmap'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Heatmap</button>
-              </div>
-              {/* Grouping Toggle - available for both views */}
-              <div className="bg-slate-950 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
-                <button onClick={() => setCompositionGrouping('groups')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${compositionGrouping==='groups'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Groups</button>
-                <button onClick={() => setCompositionGrouping('muscles')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${compositionGrouping==='muscles'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Muscles</button>
-              </div>
-              {/* Quick Filters */}
-              <div className="bg-slate-950 p-1 rounded-lg inline-flex gap-1 border border-slate-800">
-                <button onClick={() => setMuscleCompQuick('all')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleCompQuick==='all'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>All</button>
-                <button onClick={() => setMuscleCompQuick('7d')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleCompQuick==='7d'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Last Week</button>
-                <button onClick={() => setMuscleCompQuick('30d')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleCompQuick==='30d'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Last Month</button>
-                <button onClick={() => setMuscleCompQuick('365d')} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${muscleCompQuick==='365d'?'bg-cyan-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>Last Year</button>
-              </div>
-            </div>
-          </div>
-          <div className={`flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} min-w-0`}>
-            {weeklySetsView === 'radar' ? (
-              compositionQuickData.length === 0 ? (
-                <div className="flex items-center justify-center h-[300px] text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
-                  Not enough data to render Muscle Composition.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={compositionQuickData}>
-                    <PolarGrid stroke="#334155" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
-                    <Radar name="Weekly Sets" dataKey="value" stroke="#06b6d4" strokeWidth={3} fill="#06b6d4" fillOpacity={0.35} animationDuration={1500} />
-                    <Tooltip contentStyle={TooltipStyle} />
-                  </RadarChart>
-                </ResponsiveContainer>
-              )
-            ) : (
-              <div className="flex flex-col items-center justify-center h-[300px]">
-                {heatmapMuscleVolumes.volumes.size === 0 ? (
-                  <div className="text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg p-8">
-                    Not enough data to render Heat Map.
-                  </div>
-                ) : (
-                  <>
-                    <div className="transform scale-[0.55] origin-center -mt-4">
-                      <BodyMap
-                        onPartClick={(muscleId) => onMuscleClick?.(muscleId, compositionGrouping === 'groups' ? 'group' : 'muscle')}
-                        selectedPart={null}
-                        muscleVolumes={heatmapMuscleVolumes.volumes}
-                        maxVolume={heatmapMuscleVolumes.maxVolume}
-                        hoveredMuscleIdsOverride={heatmapHoveredMuscleIds}
-                        onPartHover={setHeatmapHoveredMuscle}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-          <ChartDescription
-            isMounted={isMounted}
-            topSlot={
-              weeklySetsView === 'heatmap' ? (
-                <div className="flex items-center gap-3 text-xs text-slate-400 bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5 w-fit">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-2 rounded border border-slate-600" style={{ backgroundColor: 'hsla(0, 0%, 100%, 0.1)' }}></div>
-                    <span>None</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 75%)' }}></div>
-                    <span>Low</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 50%)' }}></div>
-                    <span>Med</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 25%)' }}></div>
-                    <span>High</span>
-                  </div>
-                </div>
-              ) : null
-            }
-          >
-            <p>
-              <span className="font-semibold text-slate-300">Quick slice.</span> Values represent weekly sets. {weeklySetsView === 'heatmap' ? 'Body heat map shows muscle activation intensity.' : ''} Group by {compositionGrouping === 'groups' ? <span className="text-cyan-400">muscle group</span> : <span className="text-cyan-400">individual muscle</span>}. View for All time, Last Week, Month, or Year.
-            </p>
-          </ChartDescription>
-        </div>
-      </div>
-
       {/* 6. Top Exercises (Full Width, Bars/Area Views) */}
       {visibleCharts.topExercises && (
-        <div className="bg-slate-900 border border-slate-800 p-4 sm:p-6 rounded-xl shadow-lg min-h-[360px] flex flex-col transition-all duration-300 hover:shadow-xl min-w-0">
+        <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[360px] flex flex-col transition-all duration-300 hover:shadow-xl min-w-0">
           <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 sm:gap-0 transition-opacity duration-700 ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
             <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
               <Zap className="w-5 h-5 text-amber-500" />
@@ -1359,7 +1387,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             </h3>
             <div className="flex items-center gap-2 flex-wrap">
               {/* All / Monthly / Weekly Toggle */}
-              <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
+              <div className="bg-black/70 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
                 <button 
                   onClick={() => setTopExerciseMode('all')} 
                   className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-all duration-200 ${
@@ -1392,7 +1420,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                 </button>
               </div>
               {/* View: Bars / Area */}
-              <div className="bg-slate-950 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
+              <div className="bg-black/70 p-1 rounded-lg flex gap-1 border border-slate-800 transition-all duration-200 hover:border-slate-700">
                 <button 
                   onClick={() => setTopExercisesView('barh')} 
                   className={`px-2 py-1 text-[10px] font-bold uppercase rounded transition-all duration-200 ${
@@ -1415,12 +1443,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                 </button>
               </div>
               {/* Exercise Count Dropdown */}
-              <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
+              <div className="flex items-center gap-2 bg-black/70 p-1.5 rounded-lg border border-slate-700/50">
                 <span className="text-xs text-slate-400 font-medium">Show:</span>
                 <select 
                   value={topExerciseLimit} 
                   onChange={(e) => setTopExerciseLimit(parseInt(e.target.value))}
-                  className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  className="bg-black/70 border border-slate-600/50 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
                   {[3, 4, 5, 6, 7, 8].map(num => (
                     <option key={num} value={num}>{num}</option>
@@ -1737,6 +1765,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         </div>
       )}
 
-    </div>
+      <SupportLinks />
+      </div>
+    </>
   );
 };

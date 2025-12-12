@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { WorkoutSet } from '../types';
-import { BodyMap } from './BodyMap';
+import { BodyMap, BodyMapGender } from './BodyMap';
 import { ViewHeader } from './ViewHeader';
+import { SupportLinks } from './SupportLinks';
 import {
   loadExerciseMuscleData,
   calculateMuscleVolume,
@@ -22,8 +23,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { TrendingUp, Dumbbell, X, Activity, Layers, Target } from 'lucide-react';
+import { TrendingUp, TrendingDown, Dumbbell, X, Activity, Layers, Target } from 'lucide-react';
 import { normalizeMuscleGroup, NormalizedMuscleGroup } from '../utils/muscleAnalytics';
+import {
+  SVG_TO_MUSCLE_GROUP,
+  MUSCLE_GROUP_ORDER,
+  getSvgIdsForGroup,
+  getGroupForSvgId,
+} from '../utils/muscleMappingConstants';
 
 interface MuscleAnalysisProps {
   data: WorkoutSet[];
@@ -31,50 +38,16 @@ interface MuscleAnalysisProps {
   onExerciseClick?: (exerciseName: string) => void;
   initialMuscle?: { muscleId: string; viewMode: 'muscle' | 'group' } | null;
   onInitialMuscleConsumed?: () => void;
+  bodyMapGender?: BodyMapGender;
 }
 
 type TrendPeriod = 'all' | 'weekly' | 'monthly';
 type ViewMode = 'muscle' | 'group';
 
-// Muscle group definitions for aggregation
-const MUSCLE_GROUP_DISPLAY: Record<string, NormalizedMuscleGroup> = {
-  'mid-lower-pectoralis': 'Chest',
-  'upper-pectoralis': 'Chest',
-  'lats': 'Back',
-  'lowerback': 'Back',
-  'upper-trapezius': 'Back',
-  'lower-trapezius': 'Back',
-  'traps-middle': 'Back',
-  'anterior-deltoid': 'Shoulders',
-  'lateral-deltoid': 'Shoulders',
-  'posterior-deltoid': 'Shoulders',
-  'long-head-bicep': 'Arms',
-  'short-head-bicep': 'Arms',
-  'medial-head-triceps': 'Arms',
-  'long-head-triceps': 'Arms',
-  'lateral-head-triceps': 'Arms',
-  'wrist-extensors': 'Arms',
-  'wrist-flexors': 'Arms',
-  'outer-quadricep': 'Legs',
-  'rectus-femoris': 'Legs',
-  'inner-quadricep': 'Legs',
-  'medial-hamstrings': 'Legs',
-  'lateral-hamstrings': 'Legs',
-  'gluteus-maximus': 'Legs',
-  'gluteus-medius': 'Legs',
-  'gastrocnemius': 'Legs',
-  'soleus': 'Legs',
-  'tibialis': 'Legs',
-  'inner-thigh': 'Legs',
-  'lower-abdominals': 'Core',
-  'upper-abdominals': 'Core',
-  'obliques': 'Core',
-  'neck': 'Other',
-};
+/** Alias to centralized constant for backward compatibility within this file */
+const MUSCLE_GROUP_DISPLAY = SVG_TO_MUSCLE_GROUP;
 
-const MUSCLE_GROUP_ORDER: NormalizedMuscleGroup[] = ['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Core'];
-
-export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlot, onExerciseClick, initialMuscle, onInitialMuscleConsumed }) => {
+export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlot, onExerciseClick, initialMuscle, onInitialMuscleConsumed, bodyMapGender = 'male' }) => {
   const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -207,12 +180,23 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     return muscleVolume.get(selectedMuscle) || null;
   }, [selectedMuscle, muscleVolume]);
 
+  // Helper to check if SVG IDs match the target (handles both muscle and group mode)
+  const matchesTarget = useCallback((svgIds: string[], target: string | null, isGroupMode: boolean): boolean => {
+    if (!target) return true;
+    if (isGroupMode) {
+      // In group mode, check if any SVG ID belongs to the target group
+      return svgIds.some(svgId => MUSCLE_GROUP_DISPLAY[svgId] === target);
+    }
+    // In muscle mode, check if target SVG ID is in the list
+    return svgIds.includes(target);
+  }, []);
+
   // Trend data based on selected period (for specific muscle OR all muscles)
   const trendData = useMemo(() => {
     if (exerciseMuscleData.size === 0 || data.length === 0) return [];
     
-    // If no muscle selected, show total sets for all muscles
     const targetMuscle = selectedMuscle;
+    const isGroupMode = viewMode === 'group';
 
     // For 'all' mode, show each day's data
     if (trendPeriod === 'all') {
@@ -238,10 +222,10 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
         const day = dayMap.get(dayKey)!;
         const primarySvgIds = CSV_TO_SVG_MUSCLE_MAP[primaryMuscle] || [];
         
-        // If no muscle selected, count all sets; otherwise filter by selected muscle
+        // If no muscle selected, count all sets; otherwise filter by selected muscle/group
         if (!targetMuscle) {
-          day.sets += 1; // Count all sets
-        } else if (primarySvgIds.includes(targetMuscle)) {
+          day.sets += 1;
+        } else if (matchesTarget(primarySvgIds, targetMuscle, isGroupMode)) {
           day.sets += 1;
         }
         
@@ -249,8 +233,8 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
         for (const secondary of secondaryMuscles) {
           const secondarySvgIds = CSV_TO_SVG_MUSCLE_MAP[secondary] || [];
           if (!targetMuscle) {
-            day.sets += 0.5; // Count all secondary sets
-          } else if (secondarySvgIds.includes(targetMuscle)) {
+            day.sets += 0.5;
+          } else if (matchesTarget(secondarySvgIds, targetMuscle, isGroupMode)) {
             day.sets += 0.5;
           }
         }
@@ -295,10 +279,10 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       const period = periodMap.get(periodKey)!;
       const primarySvgIds = CSV_TO_SVG_MUSCLE_MAP[primaryMuscle] || [];
       
-      // If no muscle selected, count all sets; otherwise filter by selected muscle
+      // If no muscle selected, count all sets; otherwise filter by selected muscle/group
       if (!targetMuscle) {
         period.sets += 1;
-      } else if (primarySvgIds.includes(targetMuscle)) {
+      } else if (matchesTarget(primarySvgIds, targetMuscle, isGroupMode)) {
         period.sets += 1;
       }
       
@@ -307,7 +291,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
         const secondarySvgIds = CSV_TO_SVG_MUSCLE_MAP[secondary] || [];
         if (!targetMuscle) {
           period.sets += 0.5;
-        } else if (secondarySvgIds.includes(targetMuscle)) {
+        } else if (matchesTarget(secondarySvgIds, targetMuscle, isGroupMode)) {
           period.sets += 0.5;
         }
       }
@@ -316,7 +300,28 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     return Array.from(periodMap.values())
       .sort((a, b) => a.ts - b.ts)
       .map(d => ({ period: d.label, sets: Math.round(d.sets * 10) / 10 }));
-  }, [selectedMuscle, data, exerciseMuscleData, trendPeriod]);
+  }, [selectedMuscle, data, exerciseMuscleData, trendPeriod, viewMode, matchesTarget]);
+
+  // Volume delta calculation - compare current vs previous period
+  const volumeDelta = useMemo(() => {
+    if (trendData.length < 2) return null;
+    
+    const current = Number((trendData[trendData.length - 1]?.sets || 0).toFixed(1));
+    const previous = Number((trendData[trendData.length - 2]?.sets || 0).toFixed(1));
+    
+    if (previous === 0) return null;
+    
+    const delta = Number((current - previous).toFixed(1));
+    const deltaPercent = Math.round((delta / previous) * 100);
+    
+    return {
+      current,
+      previous,
+      delta,
+      deltaPercent,
+      direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'same' as 'up' | 'down' | 'same',
+    };
+  }, [trendData]);
 
   // Contributing exercises (works for both muscle and group view)
   const contributingExercises = useMemo(() => {
@@ -372,25 +377,17 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     const group = selectedMuscle as NormalizedMuscleGroup;
     if (!MUSCLE_GROUP_ORDER.includes(group)) return undefined;
 
-    const ids: string[] = [];
-    for (const [svgId, g] of Object.entries(MUSCLE_GROUP_DISPLAY)) {
-      if (g === group) ids.push(svgId);
-    }
-    return ids;
+    return [...getSvgIdsForGroup(group)];
   }, [selectedMuscle, viewMode]);
 
   const hoveredBodyMapIds = useMemo(() => {
     if (!hoveredMuscle) return undefined;
     if (viewMode === 'muscle') return undefined;
 
-    const group = MUSCLE_GROUP_DISPLAY[hoveredMuscle];
-    if (!group || group === 'Other') return undefined;
+    const group = getGroupForSvgId(hoveredMuscle);
+    if (group === 'Other') return undefined;
 
-    const ids: string[] = [];
-    for (const [svgId, g] of Object.entries(MUSCLE_GROUP_DISPLAY)) {
-      if (g === group) ids.push(svgId);
-    }
-    return ids;
+    return [...getSvgIdsForGroup(group)];
   }, [hoveredMuscle, viewMode]);
 
   const closePanel = useCallback(() => {
@@ -435,10 +432,10 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       {/* Main Content - Always Side by Side Layout */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         {/* Left: Body Map */}
-        <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 relative">
+        <div className="bg-black/70 rounded-xl border border-slate-700/50 p-4 relative">
           {/* View Mode Toggle - Inside the box */}
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
-            <div className="inline-flex bg-slate-800 rounded-lg p-0.5 shadow-lg">
+            <div className="inline-flex bg-black/70 rounded-lg p-0.5 shadow-lg border border-slate-700/50">
               <button
                 onClick={() => handleViewModeChange('muscle')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all ${
@@ -473,12 +470,14 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
               muscleVolumes={viewMode === 'group' ? groupedBodyMapVolumes : muscleVolumes}
               maxVolume={viewMode === 'group' ? maxGroupVolume : maxVolume}
               onPartHover={handleMuscleHover}
+              gender={bodyMapGender}
+              viewMode={viewMode}
             />
           </div>
           
           {/* Color Legend - Bottom of body map */}
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
-            <div className="flex items-center gap-3 text-xs text-slate-400 bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5">
+            <div className="flex items-center gap-3 text-xs text-slate-400 bg-black/70 rounded-lg px-3 py-1.5 border border-slate-700/50">
               <div className="flex items-center gap-1">
                 <div className="w-3 h-2 rounded border border-slate-600" style={{ backgroundColor: 'hsla(0, 0%, 100%, 0.1)' }}></div>
                 <span>None</span>
@@ -500,7 +499,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
 
           {/* Hover Tooltip */}
           {hoveredMuscle && (
-            <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 shadow-xl pointer-events-none z-20">
+            <div className="absolute top-14 left-1/2 -translate-x-1/2 bg-black/90 border border-slate-700/50 rounded-lg px-4 py-2 shadow-xl pointer-events-none z-20">
               <div className="text-white font-medium text-sm">
                 {viewMode === 'group' ? MUSCLE_GROUP_DISPLAY[hoveredMuscle] : SVG_MUSCLE_NAMES[hoveredMuscle]}
               </div>
@@ -514,10 +513,10 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
         </div>
 
         {/* Right: Detail Panel - Always visible */}
-        <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+        <div className="bg-black/70 rounded-xl border border-slate-700/50 overflow-hidden">
           {/* Panel Header */}
-          <div className="bg-slate-800/50 border-b border-slate-800 p-3 flex items-center justify-between">
-            <div className="flex items-baseline gap-2 min-w-0">
+          <div className="bg-black/70 border-b border-slate-700/50 p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
               <h2 className="text-lg font-bold text-white truncate">
                 {selectedMuscle 
                   ? (viewMode === 'group' ? selectedMuscle : SVG_MUSCLE_NAMES[selectedMuscle]) 
@@ -536,11 +535,22 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                   : totalSets}{' '}
                 <span className="text-slate-400 text-xs font-normal">sets</span>
               </span>
+              {/* Volume Delta Badge */}
+              {volumeDelta && volumeDelta.direction !== 'same' && (
+                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  volumeDelta.direction === 'up' 
+                    ? 'bg-emerald-500/10 text-emerald-400' 
+                    : 'bg-rose-500/10 text-rose-400'
+                }`}>
+                  {volumeDelta.direction === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                  {volumeDelta.direction === 'up' ? '+' : ''}{volumeDelta.deltaPercent}% vs prev {trendPeriod === 'weekly' ? 'wk' : trendPeriod === 'monthly' ? 'mo' : 'day'}
+                </span>
+              )}
             </div>
             {selectedMuscle && (
               <button
                 onClick={closePanel}
-                className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-black/60 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-slate-400" />
               </button>
@@ -557,7 +567,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                   <h3 className="text-sm font-semibold text-white">Volume Trend</h3>
                 </div>
                 {/* Period Toggle */}
-                <div className="inline-flex bg-slate-800 rounded-lg p-0.5">
+                <div className="inline-flex bg-black/70 rounded-lg p-0.5 border border-slate-700/50">
                   {(['all', 'weekly', 'monthly'] as const).map(period => (
                     <button
                       key={period}
@@ -573,7 +583,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                   ))}
                 </div>
               </div>
-              <div className="h-32 bg-slate-800/30 rounded-lg p-2">
+              <div className="h-32 bg-black/50 rounded-lg p-2 border border-slate-700/50">
                 {trendData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={trendData}>
@@ -622,12 +632,12 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
           {/* Scrollable Exercises Section */}
           {selectedMuscle && (viewMode === 'group' ? selectedGroupData : selectedMuscleData) && (
             <div className="border-t border-slate-800">
-              <div className="flex items-center gap-2 px-4 py-3 bg-slate-800/30">
+              <div className="flex items-center gap-2 px-4 py-3 bg-black/70 border-b border-slate-700/50">
                 <Dumbbell className="w-4 h-4 text-slate-400" />
                 <h3 className="text-sm font-semibold text-white">Top Exercises</h3>
               </div>
               <div className="overflow-y-auto max-h-[calc(100vh-520px)] px-4 pb-4 mt-2">
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {contributingExercises.map((ex, i) => {
                     const asset = assetsMap?.get(ex.name);
                     const imgUrl = asset?.sourceType === 'video' ? asset.thumbnail : (asset?.thumbnail || asset?.source);
@@ -642,72 +652,122 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                     const isSecondary = ex.secondarySets > 0;
                     const chipBg = getVolumeColor(ex.sets, totalSetsForCalc);
                     const chipFg = getChipTextColor(ex.sets, totalSetsForCalc);
+                    const setsRounded = Math.round(ex.sets * 10) / 10;
+                    const primaryRounded = Math.round(ex.primarySets * 10) / 10;
+                    const secondaryRounded = Math.round(ex.secondarySets * 10) / 10;
+                    const isTopThree = i < 3;
+                    const ribbonText = i === 0 ? 'Gold' : i === 1 ? 'Silver' : 'Bronze';
+                    const ribbonGradient = i === 0
+                      ? 'from-amber-500 via-yellow-400 to-amber-500'
+                      : i === 1
+                        ? 'from-slate-300 via-slate-100 to-slate-300'
+                        : 'from-amber-800 via-orange-600 to-amber-800';
                     
                     return (
-                      <div 
+                      <button
                         key={ex.name}
                         onClick={() => onExerciseClick?.(ex.name)}
-                        className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg cursor-pointer"
+                        type="button"
+                        className="group relative w-full text-left rounded-lg border border-slate-700/50 bg-gradient-to-b from-black/60 to-black/40 p-2 shadow-sm transition-all hover:border-slate-600/60 hover:from-black/70 hover:to-black/50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500/30"
+                        title={ex.name}
                       >
-                        {/* Rank */}
-                        <span className="text-xs font-bold text-slate-500 w-4">
-                          {i + 1}
-                        </span>
-                        
-                        {/* Exercise Image */}
-                        {imgUrl ? (
-                          <img 
-                            src={imgUrl} 
-                            alt="" 
-                            className="w-10 h-10 rounded object-cover flex-shrink-0 border border-slate-700" 
-                            loading="lazy" 
-                            decoding="async"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded bg-slate-800 flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-700">
-                            <Dumbbell className="w-4 h-4" />
-                          </div>
-                        )}
-                        
-                        {/* Exercise Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span
-                              className="px-2 py-0.5 rounded-md text-[11px] font-semibold border border-slate-900/10 truncate max-w-full"
-                              style={{ backgroundColor: chipBg, color: chipFg }}
-                              title={ex.name}
+                        {isTopThree ? (
+                          <div className="pointer-events-none absolute left-0 top-0 w-12 h-12 overflow-hidden">
+                            <div
+                              className={`absolute -left-6 top-2.5 w-24 h-4.5 -rotate-45 bg-gradient-to-r ${ribbonGradient} shadow-[0_6px_16px_rgba(0,0,0,0.35)] flex items-center justify-center`}
                             >
-                              {ex.name}
-                            </span>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              {isPrimary && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-900/50 text-slate-200 border border-slate-800">
-                                  P
-                                </span>
-                              )}
-                              {isSecondary && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-900/50 text-slate-200 border border-slate-800">
-                                  S
-                                </span>
-                              )}
+                              <span className="text-[8px] font-extrabold tracking-wider uppercase text-black/80">
+                                {ribbonText}
+                              </span>
                             </div>
                           </div>
-                          <div className="text-[10px] text-slate-500 mt-0.5">
-                            <span className="text-red-400 font-medium">{pct}%</span> of sets
+                        ) : null}
+
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_5.25rem] items-stretch gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                            {!isTopThree && (
+                              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-black/60 text-[11px] font-bold border border-slate-700/50 text-slate-300">
+                                {i + 1}
+                              </div>
+                            )}
+                            {imgUrl ? (
+                              <img
+                                src={imgUrl}
+                                alt=""
+                                className="h-10 w-10 rounded-md object-cover flex-shrink-0 border border-slate-700/70"
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            ) : (
+                              <div className="h-10 w-10 rounded-md bg-black/50 flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-700/70">
+                                <Dumbbell className="w-4 h-4" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-white truncate">
+                                {ex.name}
+                              </div>
+                            </div>
+                          </div>
+
+                            <div className="mt-1.5 border-t border-slate-800/70" />
+
+                            <div className="mt-1.5">
+                              <div className="h-1 w-full rounded-full bg-slate-800/60 overflow-hidden border border-slate-700/30">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${Math.min(Math.max(pct, 0), 100)}%`, backgroundColor: chipBg }}
+                                />
+                              </div>
+
+                              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                                  <span className="text-slate-400">
+                                    <span className="text-red-300 font-semibold">{pct}%</span> of sets
+                                  </span>
+                                  {isPrimary && (
+                                    <span
+                                      className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/60 text-slate-200 border border-slate-700/50"
+                                      title={`${primaryRounded} primary sets`}
+                                    >
+                                      Primary
+                                    </span>
+                                  )}
+                                  {isSecondary && (
+                                    <span
+                                      className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/60 text-slate-200 border border-slate-700/50"
+                                      title={`${secondaryRounded} secondary sets`}
+                                    >
+                                      Secondary
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="text-[11px] font-semibold text-slate-200">
+                                  {setsRounded}{' '}
+                                  <span className="text-slate-400 font-medium">sets</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="hidden sm:flex w-[5.25rem] justify-end">
+                            <div className="h-full w-[5.25rem] rounded-md border border-slate-700/50 bg-black/30 p-1">
+                              <div className="h-full w-full flex items-center justify-center">
+                                <BodyMap
+                                  onPartClick={() => {}}
+                                  selectedPart={null}
+                                  muscleVolumes={exVolumes}
+                                  maxVolume={exMaxVol}
+                                  compact
+                                  compactFill
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        
-                        {/* Mini Body Map */}
-                        <div className="w-24 h-28 flex-shrink-0">
-                          <BodyMap
-                            onPartClick={() => {}}
-                            selectedPart={null}
-                            muscleVolumes={exVolumes}
-                            maxVolume={exMaxVol}
-                            compact
-                          />
-                        </div>
-                      </div>
+                      </button>
                     );
                   })}
                   {contributingExercises.length === 0 && (
@@ -730,6 +790,8 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
           )}
         </div>
       </div>
+
+      <SupportLinks />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { AnalysisStatus } from '../types';
+import { TOOLTIP_THEMES, TOOLTIP_CONFIG, calculateTooltipPosition } from '../utils/uiConstants';
 
 export interface TooltipData {
   rect: DOMRect;
@@ -14,44 +15,10 @@ interface TooltipProps {
   data: TooltipData;
 }
 
-const TOOLTIP_WIDTH = 280;
-const GAP = 12;
-const FLIP_THRESHOLD = 200;
-
-const STATUS_THEMES: Readonly<Record<TooltipData['status'], string>> = {
-  success: 'border-emerald-500/50 bg-emerald-950/95 text-emerald-100 shadow-[0_0_15px_rgba(16,185,129,0.2)]',
-  warning: 'border-amber-500/50 bg-amber-950/95 text-amber-100 shadow-[0_0_15px_rgba(245,158,11,0.2)]',
-  danger: 'border-rose-500/50 bg-rose-950/95 text-rose-100 shadow-[0_0_15px_rgba(244,63,94,0.2)]',
-  info: 'border-blue-500/50 bg-slate-900/95 text-slate-200 shadow-[0_0_15px_rgba(59,130,246,0.2)]',
-  default: 'border-slate-700/50 bg-slate-950/95 text-slate-300 shadow-xl',
-};
-
-const calculatePosition = (rect: DOMRect): React.CSSProperties => {
-  const left = Math.min(
-    window.innerWidth - TOOLTIP_WIDTH - 20,
-    Math.max(20, rect.left + rect.width / 2 - TOOLTIP_WIDTH / 2)
-  );
-  
-  const shouldFlip = rect.top < FLIP_THRESHOLD;
-  
-  const style: React.CSSProperties = {
-    left: `${left}px`,
-    width: `${TOOLTIP_WIDTH}px`,
-  };
-
-  if (shouldFlip) {
-    style.top = `${rect.bottom + GAP}px`;
-  } else {
-    style.bottom = `${window.innerHeight - rect.top + GAP}px`;
-  }
-
-  return style;
-};
-
 export const Tooltip: React.FC<TooltipProps> = ({ data }) => {
   const { rect, title, body, footer, status, metrics } = data;
-  const theme = STATUS_THEMES[status];
-  const positionStyle = calculatePosition(rect);
+  const theme = TOOLTIP_THEMES[status];
+  const positionStyle = calculateTooltipPosition(rect, TOOLTIP_CONFIG.WIDTH);
 
   return (
     <div

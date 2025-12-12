@@ -1,7 +1,15 @@
 import { WorkoutSet } from '../types';
 import { startOfWeek, endOfWeek, format, eachWeekOfInterval, subWeeks } from 'date-fns';
+import {
+  INTERACTIVE_MUSCLE_IDS,
+  MUSCLE_GROUP_TO_SVG_IDS,
+  FULL_BODY_TARGET_GROUPS,
+} from './muscleMappingConstants';
 
-// Mapping from CSV muscle names to SVG muscle IDs (granular body map)
+/**
+ * Maps CSV muscle names (from exercise data) to SVG muscle element IDs.
+ * Used to highlight the correct body parts on the interactive body map.
+ */
 export const CSV_TO_SVG_MUSCLE_MAP: Record<string, string[]> = {
   'Abdominals': ['lower-abdominals', 'upper-abdominals'],
   'Abductors': ['gluteus-medius'],
@@ -23,8 +31,10 @@ export const CSV_TO_SVG_MUSCLE_MAP: Record<string, string[]> = {
   'Obliques': ['obliques'],
 };
 
-// SVG muscle groups for highlighting - maps granular SVG IDs to parent group for display
-// When user selects any part of a muscle group, we show the group name
+/**
+ * Maps granular SVG muscle IDs to their parent muscle group name for display.
+ * When a user selects any part of a muscle group, the group name is shown.
+ */
 export const SVG_MUSCLE_GROUPS: Record<string, string> = {
   // Shoulders group
   'anterior-deltoid': 'Shoulders',
@@ -72,7 +82,9 @@ export const SVG_MUSCLE_GROUPS: Record<string, string> = {
   'inner-thigh': 'Adductors',
 };
 
-// Reverse mapping: SVG ID to display name
+/**
+ * Maps SVG muscle IDs to human-readable display names.
+ */
 export const SVG_MUSCLE_NAMES: Record<string, string> = {
   // Calves
   'gastrocnemius': 'Calves',
@@ -121,10 +133,13 @@ export const SVG_MUSCLE_NAMES: Record<string, string> = {
   'inner-thigh': 'Adductors',
 };
 
-// All muscle groups that can be displayed on SVG
+/** All interactive SVG muscle IDs */
 export const ALL_SVG_MUSCLES = Object.keys(SVG_MUSCLE_NAMES);
 
-// Map SVG muscle ID back to CSV muscle names
+/**
+ * Reverse mapping: SVG muscle ID to CSV muscle names.
+ * Auto-generated from CSV_TO_SVG_MUSCLE_MAP.
+ */
 export const SVG_TO_CSV_MUSCLE_MAP: Record<string, string[]> = {};
 for (const [csvMuscle, svgMuscles] of Object.entries(CSV_TO_SVG_MUSCLE_MAP)) {
   for (const svgMuscle of svgMuscles) {
@@ -137,13 +152,8 @@ for (const [csvMuscle, svgMuscles] of Object.entries(CSV_TO_SVG_MUSCLE_MAP)) {
   }
 }
 
-// Full Body muscles - when an exercise targets "Full Body", add to all these
-export const FULL_BODY_MUSCLES = [
-  'Chest', 'Shoulders', 'Triceps', 'Biceps', 'Forearms',
-  'Lats', 'Upper Back', 'Lower Back', 'Traps',
-  'Abdominals', 'Obliques',
-  'Quadriceps', 'Hamstrings', 'Glutes', 'Calves'
-];
+/** @deprecated Use FULL_BODY_TARGET_GROUPS from muscleMappingConstants.ts */
+export const FULL_BODY_MUSCLES = FULL_BODY_TARGET_GROUPS;
 
 export interface ExerciseMuscleData {
   name: string;

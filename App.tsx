@@ -3,16 +3,18 @@ import { parseWorkoutCSV, parseWorkoutCSVAsync } from './utils/csvParser';
 import { getDailySummaries, getExerciseStats, identifyPersonalRecords } from './utils/analytics';
 import { WorkoutSet } from './types';
 import { DEFAULT_CSV_DATA } from './constants';
+import { BodyMapGender } from './components/BodyMap';
 const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
 const ExerciseView = React.lazy(() => import('./components/ExerciseView').then(m => ({ default: m.ExerciseView })));
 const HistoryView = React.lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
 const MuscleAnalysis = React.lazy(() => import('./components/MuscleAnalysis').then(m => ({ default: m.MuscleAnalysis })));
 import { CSVImportModal } from './components/CSVImportModal';
-import { saveCSVData, getCSVData, hasCSVData, clearCSVData } from './utils/localStorage';
-import { LayoutDashboard, Dumbbell, History, Upload, BarChart3, Filter, Loader2, CheckCircle2, X, Trash2, Menu, Calendar, Activity } from 'lucide-react';
+import { saveCSVData, getCSVData, clearCSVData } from './utils/localStorage';
+import { LayoutDashboard, Dumbbell, History, Upload, Filter, Loader2, CheckCircle2, X, Trash2, Menu, Calendar, Activity } from 'lucide-react';
 import { format, isSameDay, isWithinInterval } from 'date-fns';
 import { CalendarSelector } from './components/CalendarSelector';
 import { trackPageView } from './utils/ga';
+import BackgroundTexture from './components/BackgroundTexture';
 
 enum Tab {
   DASHBOARD = 'dashboard',
@@ -29,6 +31,17 @@ const App: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [highlightedExercise, setHighlightedExercise] = useState<string | null>(null);
   const [initialMuscleForAnalysis, setInitialMuscleForAnalysis] = useState<{ muscleId: string; viewMode: 'muscle' | 'group' } | null>(null);
+  
+  // Gender state with sessionStorage persistence
+  const [bodyMapGender, setBodyMapGender] = useState<BodyMapGender>(() => {
+    const stored = sessionStorage.getItem('bodyMapGender');
+    return (stored === 'male' || stored === 'female') ? stored : 'male';
+  });
+  
+  // Persist gender to sessionStorage when it changes
+  useEffect(() => {
+    sessionStorage.setItem('bodyMapGender', bodyMapGender);
+  }, [bodyMapGender]);
   
   // Handler for navigating to ExerciseView from MuscleAnalysis
   const handleExerciseClick = (exerciseName: string) => {
@@ -178,10 +191,10 @@ const App: React.FC = () => {
   const exerciseStats = useMemo(() => getExerciseStats(filteredData), [filteredData]);
 
   const filterControls = (
-    <div className={`relative flex flex-col sm:flex-row gap-2 sm:gap-3 p-2 rounded-xl shadow-sm items-start sm:items-center transition-all duration-300 ${
+    <div className={`relative flex flex-col sm:flex-row sm:flex-nowrap gap-2 sm:gap-3 p-2 rounded-xl shadow-sm items-start sm:items-center transition-all duration-300 ${
       (selectedDay || selectedWeeks.length > 0 || selectedRange)
         ? 'bg-blue-950/40 border-2 border-blue-500/50 ring-2 ring-blue-500/20'
-        : 'bg-slate-950 border border-slate-800'
+        : 'bg-black/70 border border-slate-700/50'
     }`}>
        <div className="flex items-center px-2">
           <Filter className={`w-4 h-4 mr-2 transition-colors ${(selectedDay || selectedWeeks.length > 0 || selectedRange) ? 'text-blue-400' : 'text-slate-500'}`} />
@@ -194,9 +207,9 @@ const App: React.FC = () => {
        {selectedDay && (
          <button 
            onClick={() => setSelectedDay(null)}
-           className="flex items-center gap-2 bg-blue-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+           className="flex items-center gap-2 bg-blue-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
          >
-           <span>{format(selectedDay, 'MMM d, yyyy')}</span>
+           <span className="whitespace-nowrap">{format(selectedDay, 'MMM d, yyyy')}</span>
            <X className="w-3 h-3" />
          </button>
        )}
@@ -205,10 +218,10 @@ const App: React.FC = () => {
        {selectedWeeks.length > 0 && (
          <button 
            onClick={() => setSelectedWeeks([])}
-           className="flex items-center gap-2 bg-emerald-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+           className="flex items-center gap-2 bg-emerald-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap"
            title={selectedWeeks.length === 1 ? `${format(selectedWeeks[0].start, 'MMM d')} – ${format(selectedWeeks[0].end, 'MMM d, yyyy')}` : ''}
          >
-           <span>{selectedWeeks.length === 1 ? `Week: ${format(selectedWeeks[0].start, 'MMM d')} – ${format(selectedWeeks[0].end, 'MMM d, yyyy')}` : `Weeks selected (${selectedWeeks.length})`}</span>
+           <span className="whitespace-nowrap">{selectedWeeks.length === 1 ? `Week: ${format(selectedWeeks[0].start, 'MMM d')} – ${format(selectedWeeks[0].end, 'MMM d, yyyy')}` : `Weeks selected (${selectedWeeks.length})`}</span>
            <X className="w-3 h-3" />
          </button>
        )}
@@ -217,9 +230,9 @@ const App: React.FC = () => {
        {selectedRange && (
          <button 
            onClick={() => setSelectedRange(null)}
-           className="flex items-center gap-2 bg-purple-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+           className="flex items-center gap-2 bg-purple-600 text-white text-xs sm:text-sm px-2 sm:px-3 py-2 rounded-lg hover:bg-purple-700 transition-colors whitespace-nowrap"
          >
-           <span>Range: {format(selectedRange.start, 'MMM d, yyyy')} – {format(selectedRange.end, 'MMM d, yyyy')}</span>
+           <span className="whitespace-nowrap">Range: {format(selectedRange.start, 'MMM d, yyyy')} – {format(selectedRange.end, 'MMM d, yyyy')}</span>
            <X className="w-3 h-3" />
          </button>
        )}
@@ -228,7 +241,7 @@ const App: React.FC = () => {
        <div className="relative">
          <button
            onClick={() => setCalendarOpen(!calendarOpen)}
-           className="flex items-center gap-2 px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs sm:text-sm hover:bg-slate-800"
+           className="flex items-center gap-2 px-2 py-2 rounded-lg bg-black/70 border border-slate-700/50 text-xs sm:text-sm hover:bg-black/60"
          >
            <Calendar className="w-4 h-4 text-slate-400" /> Calendar
          </button>
@@ -268,7 +281,8 @@ const App: React.FC = () => {
     }
   };
 
-  const handleModalFileSelect = (file: File) => {
+  const handleModalFileSelect = (file: File, gender: BodyMapGender) => {
+    setBodyMapGender(gender);
     processFile(file);
     setShowCSVModal(false);
   };
@@ -318,7 +332,8 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-200 font-sans">
+    <div className="flex flex-col h-screen bg-transparent text-slate-200 font-sans">
+      <BackgroundTexture />
       
       {/* CSV Import Modal */}
       {showCSVModal && (
@@ -360,7 +375,7 @@ const App: React.FC = () => {
       )}
 
       {/* Top Header Navigation */}
-      <header className="bg-slate-900 border-b border-slate-800 flex-shrink-0">
+      <header className="bg-black/70 border-b border-slate-700/50 flex-shrink-0">
         <div className="px-4 sm:px-6 py-4 flex flex-col gap-4">
           {/* Top Row: Logo and Nav Buttons */}
           <div className="flex items-center justify-between">
@@ -376,7 +391,7 @@ const App: React.FC = () => {
                   setActiveTab(Tab.DASHBOARD);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.DASHBOARD ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.DASHBOARD ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
               >
                 <LayoutDashboard className="w-5 h-5" />
                 <span className="font-medium">Dashboard</span>
@@ -386,7 +401,7 @@ const App: React.FC = () => {
                   setActiveTab(Tab.MUSCLE_ANALYSIS);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
               >
                 <Activity className="w-5 h-5" />
                 <span className="font-medium">Muscle Analysis</span>
@@ -396,7 +411,7 @@ const App: React.FC = () => {
                   setActiveTab(Tab.EXERCISES);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.EXERCISES ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.EXERCISES ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
               >
                 <Dumbbell className="w-5 h-5" />
                 <span className="font-medium">Exercises</span>
@@ -406,7 +421,7 @@ const App: React.FC = () => {
                   setActiveTab(Tab.HISTORY);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.HISTORY ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${activeTab === Tab.HISTORY ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
               >
                 <History className="w-5 h-5" />
                 <span className="font-medium">History</span>
@@ -416,14 +431,14 @@ const App: React.FC = () => {
             {/* Mobile Menu Button */}
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-white"
+              className="md:hidden p-2 rounded-lg hover:bg-black/60 transition-colors text-slate-400 hover:text-white"
             >
               <Menu className="w-6 h-6" />
             </button>
 
             {/* Action Buttons - Desktop */}
-            <div className="hidden md:flex items-center gap-2">
-              <label className="cursor-pointer group flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-600 hover:border-slate-400 hover:bg-slate-800/50 transition-all">
+            <div className="hidden md:flex items-center gap-3">
+              <label className="cursor-pointer group flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-600 hover:border-slate-400 hover:bg-black/60 transition-all">
                 <Upload className="w-4 h-4 text-slate-400 group-hover:text-white" />
                 <span className="text-sm text-slate-400 group-hover:text-white">Import</span>
                 <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
@@ -446,7 +461,7 @@ const App: React.FC = () => {
                   setActiveTab(Tab.DASHBOARD);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 w-full text-left ${activeTab === Tab.DASHBOARD ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 w-full text-left ${activeTab === Tab.DASHBOARD ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
               >
                 <LayoutDashboard className="w-5 h-5" />
                 <span className="font-medium">Dashboard</span>
@@ -456,7 +471,7 @@ const App: React.FC = () => {
                   setActiveTab(Tab.MUSCLE_ANALYSIS);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 w-full text-left ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 w-full text-left ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
               >
                 <Activity className="w-5 h-5" />
                 <span className="font-medium">Muscle Analysis</span>
@@ -466,7 +481,7 @@ const App: React.FC = () => {
                   setActiveTab(Tab.EXERCISES);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 w-full text-left ${activeTab === Tab.EXERCISES ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 w-full text-left ${activeTab === Tab.EXERCISES ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
               >
                 <Dumbbell className="w-5 h-5" />
                 <span className="font-medium">Exercises</span>
@@ -476,7 +491,7 @@ const App: React.FC = () => {
                   setActiveTab(Tab.HISTORY);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 w-full text-left ${activeTab === Tab.HISTORY ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 w-full text-left ${activeTab === Tab.HISTORY ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
               >
                 <History className="w-5 h-5" />
                 <span className="font-medium">History</span>
@@ -484,7 +499,7 @@ const App: React.FC = () => {
 
               {/* Mobile Action Buttons */}
               <div className="flex flex-col gap-2 pt-2 border-t border-slate-800 mt-2">
-                <label className="cursor-pointer group flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-600 hover:border-slate-400 hover:bg-slate-800/50 transition-all">
+                <label className="cursor-pointer group flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-600 hover:border-slate-400 hover:bg-black/60 transition-all">
                   <Upload className="w-4 h-4 text-slate-400 group-hover:text-white" />
                   <span className="text-sm text-slate-400 group-hover:text-white">Import</span>
                   <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
@@ -503,7 +518,7 @@ const App: React.FC = () => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-950 p-3 sm:p-4 md:p-6 lg:p-8">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-black/70 p-3 sm:p-4 md:p-6 lg:p-8">
 
         <Suspense fallback={<div className="text-slate-400 p-4">Loading...</div>}>
           {activeTab === Tab.DASHBOARD && (
@@ -514,6 +529,7 @@ const App: React.FC = () => {
               filtersSlot={filterControls}
               onDayClick={handleDayClick}
               onMuscleClick={handleMuscleClick}
+              bodyMapGender={bodyMapGender}
             />
           )}
           {activeTab === Tab.EXERCISES && <ExerciseView stats={exerciseStats} filtersSlot={filterControls} highlightedExercise={highlightedExercise} />}
@@ -525,6 +541,7 @@ const App: React.FC = () => {
               onExerciseClick={handleExerciseClick}
               initialMuscle={initialMuscleForAnalysis}
               onInitialMuscleConsumed={() => setInitialMuscleForAnalysis(null)}
+              bodyMapGender={bodyMapGender}
             />
           )}
         </Suspense>

@@ -1,7 +1,17 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { getVolumeColor, SVG_MUSCLE_GROUPS, CSV_TO_SVG_MUSCLE_MAP } from '../utils/muscleMapping';
-import FrontBodySvg from './FrontBodyMap';
-import BackBodySvg from './BackBodyMap';
+import { INTERACTIVE_MUSCLE_IDS } from '../utils/muscleMappingConstants';
+import MaleFrontBodyMapMuscle from './MaleFrontBodyMapMuscle';
+import MaleBackBodyMapMuscle from './MaleBackBodyMapMuscle';
+import MaleFrontBodyMapGroup from './MaleFrontBodyMapGroup';
+import MaleBackBodyMapGroup from './MaleBackBodyMapGroup';
+import FemaleFrontBodyMapMuscle from './FemaleFrontBodyMapMuscle';
+import FemaleBackBodyMapMuscle from './FemaleBackBodyMapMuscle';
+import FemaleFrontBodyMapGroup from './FemaleFrontBodyMapGroup';
+import FemaleBackBodyMapGroup from './FemaleBackBodyMapGroup';
+
+export type BodyMapGender = 'male' | 'female';
+export type BodyMapViewMode = 'muscle' | 'group';
 
 interface BodyMapProps {
   onPartClick: (muscleGroup: string) => void;
@@ -12,25 +22,16 @@ interface BodyMapProps {
   maxVolume?: number;
   onPartHover?: (muscleGroup: string | null) => void;
   compact?: boolean;
+  compactFill?: boolean;
+  gender?: BodyMapGender;
+  viewMode?: BodyMapViewMode;
 }
 
 // Hover and selection highlight colors (bright blue theme)
 const HOVER_HIGHLIGHT = 'rgba(14, 90, 182, 1)'; 
 const SELECTION_HIGHLIGHT = 'rgba(37, 99, 235, 1)'; 
 
-const INTERACTIVE_MUSCLES = [
-  'upper-trapezius', 'gastrocnemius', 'tibialis', 'soleus',
-  'outer-quadricep', 'rectus-femoris', 'inner-quadricep', 'inner-thigh',
-  'wrist-extensors', 'wrist-flexors', 'long-head-bicep', 'short-head-bicep',
-  'obliques', 'lower-abdominals', 'upper-abdominals',
-  'mid-lower-pectoralis', 'upper-pectoralis',
-  'anterior-deltoid', 'lateral-deltoid',
-  'medial-hamstrings', 'lateral-hamstrings',
-  'gluteus-maximus', 'gluteus-medius',
-  'lowerback', 'lats',
-  'medial-head-triceps', 'long-head-triceps', 'lateral-head-triceps',
-  'posterior-deltoid', 'lower-trapezius', 'traps-middle',
-];
+const INTERACTIVE_MUSCLES: readonly string[] = INTERACTIVE_MUSCLE_IDS;
 
 const getRelatedMuscleIds = (muscleGroup: string | null): string[] => {
   if (!muscleGroup) return [];
@@ -52,6 +53,9 @@ export const BodyMap: React.FC<BodyMapProps> = ({
   maxVolume = 1,
   onPartHover,
   compact = false,
+  compactFill = false,
+  gender = 'male',
+  viewMode = 'muscle',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const hoveredMuscleRef = useRef<string | null>(null);
@@ -143,12 +147,20 @@ export const BodyMap: React.FC<BodyMapProps> = ({
     };
   }, [applyColors, handleClick, handleMouseOver, handleMouseOut, compact]);
 
-  const svgClass = compact ? 'h-28 w-auto' : 'h-[60vh] md:h-[70vh] w-auto';
+  const svgClass = compact ? (compactFill ? 'h-full w-auto' : 'h-28 w-auto') : 'h-[60vh] md:h-[70vh] w-auto';
+
+  const FrontSvg = gender === 'female' 
+    ? (viewMode === 'group' ? FemaleFrontBodyMapGroup : FemaleFrontBodyMapMuscle)
+    : (viewMode === 'group' ? MaleFrontBodyMapGroup : MaleFrontBodyMapMuscle);
+  
+  const BackSvg = gender === 'female'
+    ? (viewMode === 'group' ? FemaleBackBodyMapGroup : FemaleBackBodyMapMuscle)
+    : (viewMode === 'group' ? MaleBackBodyMapGroup : MaleBackBodyMapMuscle);
 
   return (
     <div ref={containerRef} className={`flex justify-center items-center ${compact ? 'gap-0' : 'gap-4'} w-full`}>
-      <FrontBodySvg className={svgClass} />
-      <BackBodySvg className={svgClass} />
+      <FrontSvg className={svgClass} />
+      <BackSvg className={svgClass} />
     </div>
   );
 };

@@ -55,3 +55,22 @@ git clone https://github.com/aree6/HevyAnalytics.git
 cd HevyAnalytics
 npm install
 npm run dev
+
+```
+
+---
+
+## 👤 Developer
+
+- **GitHub repo**: https://github.com/aree6/HevyAnalytics
+- **GitHub profile**: https://github.com/aree6
+- **Email**: mohammadar336@gmail.com
+
+---
+
+## ❤️ Support / Donations
+
+If you find this project helpful, you can support it here:
+
+- **Buy Me a Coffee**: https://www.buymeacoffee.com/aree6
+- **Ko-fi**: https://ko-fi.com/aree6

@@ -1,3 +1,7 @@
+/**
+ * Muscle group type for exercise name-based categorization.
+ * Note: For CSV-based muscle data normalization, use NormalizedMuscleGroup from muscleAnalytics.ts
+ */
 export type MuscleGroup = 'Chest' | 'Back' | 'Legs' | 'Shoulders' | 'Arms' | 'Core' | 'Other';
 
 const MUSCLE_KEYWORDS: ReadonlyArray<[MuscleGroup, ReadonlyArray<string>]> = [
@@ -11,6 +15,10 @@ const MUSCLE_KEYWORDS: ReadonlyArray<[MuscleGroup, ReadonlyArray<string>]> = [
 
 const muscleGroupCache = new Map<string, MuscleGroup>();
 
+/**
+ * Categorizes an exercise by its title using keyword matching.
+ * For CSV muscle data normalization, use normalizeMuscleGroup from muscleAnalytics.ts
+ */
 export const getMuscleGroup = (title: string): MuscleGroup => {
   const key = title.toLowerCase();
   
