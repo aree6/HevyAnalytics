@@ -46,7 +46,7 @@ interface Session {
 
 // Session comparison delta badge
 const SessionDeltaBadge: React.FC<{ current: number; previous: number; suffix?: string; label: string; context?: string }> = ({ 
-  current, previous, suffix = '', label, context = 'vs prev'
+  current, previous, suffix = '', label, context = 'vs lst'
 }) => {
   const delta = current - previous;
   if (delta === 0 || previous === 0) return null;
@@ -88,6 +88,27 @@ const LINE_COLORS: Record<NonNullable<TooltipLine['color']>, string> = {
   yellow: 'text-orange-400',
   blue: 'text-sky-400',
   gray: 'text-slate-400',
+};
+
+const isSameCalendarDay = (a: Date, b: Date) => format(a, 'yyyy-MM-dd') === format(b, 'yyyy-MM-dd');
+
+const formatRestDuration = (ms: number) => {
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+
+  const minuteMs = 60 * 1000;
+  const hourMs = 60 * minuteMs;
+  const dayMs = 24 * hourMs;
+
+  const days = Math.floor(ms / dayMs);
+  if (days >= 1) return `${days} day${days === 1 ? '' : 's'} rest`;
+
+  const hours = Math.floor(ms / hourMs);
+  if (hours >= 1) return `${hours} hour${hours === 1 ? '' : 's'} rest`;
+
+  const mins = Math.floor(ms / minuteMs);
+  if (mins >= 1) return `${mins} min rest`;
+
+  return 'less than 1 min rest';
 };
 
 // Simple sparkline component for volume trend
@@ -410,7 +431,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
       <button 
         onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
         disabled={currentPage === 1}
-        className="p-1.5 hover:bg-black/60 rounded-lg disabled:opacity-30 transition-all"
+        className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 w-9 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200"
       >
         <ChevronLeft className="w-4 h-4 text-slate-400" />
       </button>
@@ -420,7 +441,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
       <button 
         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
         disabled={currentPage === totalPages}
-        className="p-1.5 hover:bg-black/60 rounded-lg disabled:opacity-30 transition-all"
+        className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 w-9 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200"
       >
         <ChevronRight className="w-4 h-4 text-slate-400" />
       </button>
@@ -428,7 +449,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
   );
 
   return (
-    <div className="flex flex-col gap-6 w-full text-slate-200 pb-10">
+    <div className="flex flex-col gap-2 w-full text-slate-200 pb-10">
       {/* Header - consistent with Dashboard */}
       <div className="hidden sm:block">
         <ViewHeader
@@ -443,21 +464,39 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
         Animation Wrapper: 
         Keying by currentPage forces the animation to replay when page changes.
       */}
-      <div key={currentPage} className="space-y-4 sm:space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500 fill-mode-forwards">
+      <div key={currentPage} className="space-y-2 sm:space-y-3 animate-in fade-in slide-in-from-bottom-8 duration-500 fill-mode-forwards">
         {currentSessions.map((session, index) => {
           const allSessionSets = session.exercises.flatMap(e => e.sets);
           const sessionStats = analyzeSession(allSessionSets);
+
+          const previousDisplayedSession = index > 0 ? currentSessions[index - 1] : null;
+          const restMs = previousDisplayedSession?.date && session.date
+            ? previousDisplayedSession.date.getTime() - session.date.getTime()
+            : null;
+          const restText = restMs != null ? formatRestDuration(restMs) : null;
+          const restIsDayBreak = !!(previousDisplayedSession?.date && session.date && !isSameCalendarDay(previousDisplayedSession.date, session.date));
           
           // Find previous session for comparison
           const sessionIdx = sessions.findIndex(s => s.key === session.key);
           const prevSession = sessionIdx < sessions.length - 1 ? sessions[sessionIdx + 1] : null;
 
           return (
-            <div 
-              key={session.key} 
-              className="space-y-3 sm:space-y-4"
-              style={{ animationDelay: `${index * 100}ms` }} // Staggered entrance
-            >
+            <React.Fragment key={session.key}>
+              {index > 0 && restText && (
+                <div className={`${restIsDayBreak ? 'my-20 sm:my-28' : 'my-10 sm:my-12'} w-full flex justify-center`}>
+                  <div className="flex flex-col items-center">
+                    <div className={`w-px ${restIsDayBreak ? 'h-24 sm:h-32' : 'h-14 sm:h-20'} bg-slate-800/70`} aria-hidden />
+                    <div className="my-4 px-4 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm sm:text-base font-extrabold tracking-wide shadow-[0_0_18px_rgba(16,185,129,0.15)]">
+                      {restText}
+                    </div>
+                    <div className={`w-px ${restIsDayBreak ? 'h-24 sm:h-32' : 'h-14 sm:h-20'} bg-slate-800/70`} aria-hidden />
+                  </div>
+                </div>
+              )}
+              <div 
+                className="space-y-1 sm:space-y-2"
+                style={{ animationDelay: `${index * 100}ms` }} // Staggered entrance
+              >
               
               {/* --- Session Header Card --- */}
               <div className="bg-black/70 border border-slate-700/50 rounded-2xl p-4 sm:p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-6 shadow-xl relative overflow-hidden group transition-all duration-300 hover:border-slate-600/50">
@@ -492,7 +531,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                         current={session.totalVolume} 
                         previous={prevSession.totalVolume} 
                         label="vol"
-                        context="vs prev"
+                        context="vs lst"
                       />
                     )}
                   </div>
@@ -515,7 +554,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
               </div>
 
               {/* --- Exercises Grid --- */}
-              <div className="grid grid-cols-1 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 gap-2 sm:gap-2">
                 {session.exercises.map((group, idx) => {
                   const insights = analyzeSetProgression(group.sets);
                   const macroInsight = analyzeProgression(group.sets);
@@ -555,7 +594,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                       
                       {/* Exercise Title with thumbnail */}
                       <div
-                        className="grid grid-cols-[2.5rem_1fr_auto] grid-rows-2 gap-x-3 gap-y-1 mb-4 cursor-pointer select-none sm:flex sm:items-center sm:gap-3"
+                        className="grid grid-cols-[2.5rem_1fr] grid-rows-2 gap-x-3 gap-y-1 mb-4 cursor-pointer select-none sm:flex sm:items-center sm:gap-3"
                         onClick={() => onExerciseClick?.(group.exerciseName)}
                         title="Open exercise analysis"
                       >
@@ -577,13 +616,26 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                           );
                         })()}
 
-                        <h4
-                          className="text-slate-200 text-sm sm:text-lg line-clamp-1 min-w-0 col-start-2 row-start-1"
-                          style={FANCY_FONT}
-                          title={group.exerciseName}
-                        >
-                          {group.exerciseName}
-                        </h4>
+                        <div className="flex items-center gap-2 min-w-0 col-start-2 row-start-1">
+                          <h4
+                            className="text-slate-200 text-sm sm:text-lg line-clamp-1 min-w-0 flex-1"
+                            style={FANCY_FONT}
+                            title={group.exerciseName}
+                          >
+                            {group.exerciseName}
+                          </h4>
+
+                          {/* Macro Badge (Promotion) */}
+                          {macroInsight && (
+                            <div
+                              onMouseEnter={(e) => handleMouseEnter(e, macroInsight, 'macro')}
+                              onMouseLeave={() => setTooltip(null)}
+                              className={`p-1.5 rounded-lg cursor-help flex-shrink-0 ${getWisdomColor(macroInsight.type)} animate-in zoom-in duration-300`}
+                            >
+                              <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            </div>
+                          )}
+                        </div>
 
                         {/* Stats: placed after name, slightly larger */}
                         <div className="min-w-0 col-start-2 row-start-2 sm:flex-1">
@@ -616,21 +668,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                             )}
                           </div>
                         </div>
-
-                        {/* Macro Badge (Promotion) */}
-                        {macroInsight && (
-                          <div 
-                            onMouseEnter={(e) => handleMouseEnter(e, macroInsight, 'macro')}
-                            onMouseLeave={() => setTooltip(null)}
-                            className={`p-1.5 rounded-lg cursor-help flex-shrink-0 self-center justify-self-end col-start-3 row-span-2 ${getWisdomColor(macroInsight.type)} animate-in zoom-in duration-300`}
-                          >
-                            <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </div>
-                        )}
                       </div>
 
                       {/* Main content: Sets on left, Muscle map on right */}
-                      <div className="flex gap-4 flex-1">
+                      <div className="flex gap-4 flex-1 items-stretch">
                         {/* Sets Timeline */}
                         <div className="space-y-2 relative flex-1 min-w-0">
                         {(() => {
@@ -763,18 +804,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                           if (volumes.size === 0) return null;
 
                           return (
-                            <div className="hidden sm:flex flex-col items-center gap-2 flex-shrink-0 pl-2 py-2 border-l border-slate-800/50 ">
-                              <div className="w-40 h-40 flex items-center justify-center">
+                            <div className="hidden sm:flex flex-col flex-shrink-0 pl-3 py-2 border-l border-slate-800/50 self-stretch">
+                              <div className="flex-1 w-52 md:w-60 flex items-center justify-center">
                                 <BodyMap
                                   onPartClick={() => {}}
                                   selectedPart={null}
                                   muscleVolumes={volumes}
                                   maxVolume={maxVolume}
                                   compact
+                                  compactFill
                                   gender={bodyMapGender}
                                 />
                               </div>
-                             
                             </div>
                           );
                         })()}
@@ -784,7 +825,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                 })}
               </div>
 
-            </div>
+              </div>
+            </React.Fragment>
           );
         })}
       </div>

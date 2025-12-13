@@ -75,7 +75,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 overflow-y-auto overscroll-contain">
-      <div className="min-h-full w-full px-4 sm:px-6 py-6 sm:py-10">
+      <div className="min-h-full w-full px-2 sm:px-3 py-4 sm:py-6">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-start justify-between gap-4 mb-6">
             <div className="min-w-0">

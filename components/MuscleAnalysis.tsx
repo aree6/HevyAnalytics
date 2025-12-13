@@ -14,6 +14,8 @@ import {
 } from '../utils/muscleMapping';
 import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
 import { format, startOfWeek, startOfMonth, subWeeks, subMonths, isWithinInterval } from 'date-fns';
+import { formatDayContraction, formatWeekContraction, formatMonthYearContraction } from '../utils/dateUtils';
+import { getSmartFilterMode, TimeFilterMode } from '../utils/localStorage';
 import {
   AreaChart,
   Area,
@@ -29,6 +31,10 @@ import {
   MUSCLE_GROUP_ORDER,
   getSvgIdsForGroup,
   getGroupForSvgId,
+  QuickFilterCategory,
+  QUICK_FILTER_LABELS,
+  QUICK_FILTER_GROUPS,
+  getSvgIdsForQuickFilter,
 } from '../utils/muscleMappingConstants';
 
 interface MuscleAnalysisProps {
@@ -53,8 +59,33 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
   const [hoveredMuscle, setHoveredMuscle] = useState<string | null>(null);
   const [muscleVolume, setMuscleVolume] = useState<Map<string, MuscleVolumeEntry>>(new Map());
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
-  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('monthly');
+  const [trendPeriodOverride, setTrendPeriodOverride] = useState<TrendPeriod | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('muscle');
+  const [activeQuickFilter, setActiveQuickFilter] = useState<QuickFilterCategory | null>(null);
+
+  // Calculate date range span for smart filter
+  const spanDays = useMemo(() => {
+    const dates: number[] = [];
+    for (const s of data) {
+      if (s.parsedDate) dates.push(s.parsedDate.getTime());
+    }
+    if (dates.length === 0) return 0;
+    const min = Math.min(...dates);
+    const max = Math.max(...dates);
+    return Math.max(1, Math.round((max - min) / (1000 * 60 * 60 * 24)) + 1);
+  }, [data]);
+
+  // Smart mode based on date range span
+  const smartMode = useMemo(() => getSmartFilterMode(spanDays), [spanDays]);
+
+  // Reset override when smart mode changes (new filter applied)
+  useEffect(() => {
+    setTrendPeriodOverride(null);
+  }, [smartMode]);
+
+  // Effective trend period: override if set, otherwise smart mode
+  const trendPeriod = trendPeriodOverride ?? smartMode;
+  const setTrendPeriod = setTrendPeriodOverride;
 
   const getChipTextColor = useCallback((sets: number, maxSets: number): string => {
     const ratio = sets / Math.max(maxSets, 1);
@@ -179,6 +210,30 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     return muscleVolume.get(selectedMuscle) || null;
   }, [selectedMuscle, muscleVolume]);
 
+  // Quick filter data - aggregates exercises from all muscles in the quick filter category
+  const quickFilterData = useMemo(() => {
+    if (!activeQuickFilter) return null;
+    
+    const filterSvgIds = new Set(getSvgIdsForQuickFilter(activeQuickFilter));
+    let totalSets = 0;
+    const exerciseMap = new Map<string, { sets: number; primarySets: number; secondarySets: number }>();
+    
+    muscleVolume.forEach((entry, svgId) => {
+      if (filterSvgIds.has(svgId)) {
+        totalSets += entry.sets;
+        entry.exercises.forEach((exData, exName) => {
+          const existing = exerciseMap.get(exName) || { sets: 0, primarySets: 0, secondarySets: 0 };
+          existing.sets += exData.sets;
+          existing.primarySets += exData.primarySets;
+          existing.secondarySets += exData.secondarySets;
+          exerciseMap.set(exName, existing);
+        });
+      }
+    });
+    
+    return { sets: totalSets, exercises: exerciseMap };
+  }, [activeQuickFilter, muscleVolume]);
+
   // Helper to check if SVG IDs match the target (handles both muscle and group mode)
   const matchesTarget = useCallback((svgIds: string[], target: string | null, isGroupMode: boolean): boolean => {
     if (!target) return true;
@@ -212,7 +267,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
         const dayKey = format(set.parsedDate, 'yyyy-MM-dd');
         if (!dayMap.has(dayKey)) {
           dayMap.set(dayKey, { 
-            label: format(set.parsedDate, 'MMM d'), 
+            label: formatDayContraction(set.parsedDate), 
             ts: set.parsedDate.getTime(),
             sets: 0 
           });
@@ -262,12 +317,12 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       if (trendPeriod === 'weekly') {
         const weekStart = startOfWeek(set.parsedDate, { weekStartsOn: 1 });
         periodKey = format(weekStart, 'yyyy-ww');
-        periodLabel = format(weekStart, 'MMM d');
+        periodLabel = formatWeekContraction(weekStart);
         periodTs = weekStart.getTime();
       } else {
         const monthStart = startOfMonth(set.parsedDate);
         periodKey = format(monthStart, 'yyyy-MM');
-        periodLabel = format(monthStart, 'MMM yyyy');
+        periodLabel = formatMonthYearContraction(monthStart);
         periodTs = monthStart.getTime();
       }
       
@@ -322,8 +377,16 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     };
   }, [trendData]);
 
-  // Contributing exercises (works for both muscle and group view)
+  // Contributing exercises (works for muscle, group, and quick filter views)
   const contributingExercises = useMemo(() => {
+    // Quick filter takes precedence
+    if (quickFilterData) {
+      const exercises: Array<{ name: string; sets: number; primarySets: number; secondarySets: number }> = [];
+      quickFilterData.exercises.forEach((exData, name) => {
+        exercises.push({ name, ...exData });
+      });
+      return exercises.sort((a, b) => b.sets - a.sets).slice(0, 8);
+    }
     if (viewMode === 'group' && selectedGroupData) {
       const exercises: Array<{ name: string; sets: number; primarySets: number; secondarySets: number }> = [];
       selectedGroupData.exercises.forEach((exData, name) => {
@@ -337,7 +400,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       exercises.push({ name, ...exData });
     });
     return exercises.sort((a, b) => b.sets - a.sets).slice(0, 8);
-  }, [selectedMuscleData, selectedGroupData, viewMode]);
+  }, [selectedMuscleData, selectedGroupData, viewMode, quickFilterData]);
 
   // Total sets for the period
   const totalSets = useMemo(() => {
@@ -355,6 +418,8 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
 
   // Stable callbacks
   const handleMuscleClick = useCallback((muscleId: string) => {
+    // Clear quick filter when clicking a specific muscle
+    setActiveQuickFilter(null);
     if (viewMode === 'group') {
       // In group view, clicking a muscle selects its group
       const group = MUSCLE_GROUP_DISPLAY[muscleId] || muscleId;
@@ -370,6 +435,10 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
   }, []);
 
   const selectedBodyMapIds = useMemo(() => {
+    // Quick filter takes precedence for highlighting (works in both view modes)
+    if (activeQuickFilter) {
+      return [...getSvgIdsForQuickFilter(activeQuickFilter)];
+    }
     if (!selectedMuscle) return undefined;
     if (viewMode === 'muscle') return undefined;
 
@@ -377,7 +446,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     if (!MUSCLE_GROUP_ORDER.includes(group)) return undefined;
 
     return [...getSvgIdsForGroup(group)];
-  }, [selectedMuscle, viewMode]);
+  }, [selectedMuscle, viewMode, activeQuickFilter]);
 
   const hoveredBodyMapIds = useMemo(() => {
     if (!hoveredMuscle) return undefined;
@@ -419,8 +488,29 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
   // Clear selection when switching view modes
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setSelectedMuscle(null);
+    setActiveQuickFilter(null);
     setViewMode(mode);
   }, []);
+
+  // Handle quick filter click - auto-select muscles in category
+  const handleQuickFilterClick = useCallback((category: QuickFilterCategory) => {
+    if (activeQuickFilter === category) {
+      setActiveQuickFilter(null);
+    } else {
+      // Switch to muscle view when selecting a quick filter (quick filters work on individual muscles)
+      if (viewMode === 'group') {
+        setViewMode('muscle');
+      }
+      setActiveQuickFilter(category);
+      setSelectedMuscle(null);
+    }
+  }, [activeQuickFilter, viewMode]);
+
+  // SVG IDs to highlight based on active quick filter
+  const quickFilterHighlightIds = useMemo(() => {
+    if (!activeQuickFilter) return undefined;
+    return [...getSvgIdsForQuickFilter(activeQuickFilter)];
+  }, [activeQuickFilter]);
 
   if (isLoading) {
     return (
@@ -440,7 +530,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
       {/* Header - consistent with Dashboard */}
       <div className="hidden sm:block">
         <ViewHeader
@@ -452,11 +542,35 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       </div>
 
       {/* Main Content - Always Side by Side Layout */}
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-2 grid-cols-1 lg:grid-cols-2">
         {/* Left: Body Map */}
         <div className="bg-black/70 rounded-xl border border-slate-700/50 p-4 relative">
-          {/* View Mode Toggle - Inside the box */}
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
+          {/* Top Bar: Quick Filters (left) + View Mode Toggle (right) */}
+          <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between">
+            {/* Quick Filters - Left side */}
+            <div className="flex items-center gap-1 bg-black/70 rounded-lg p-1 shadow-lg border border-slate-700/50">
+              {QUICK_FILTER_GROUPS.map((group, gi) => (
+                <div key={group.label} className="flex items-center">
+                  {gi > 0 && <div className="w-px h-4 bg-slate-700/50 mx-0.5" />}
+                  {group.filters.map(filter => (
+                    <button
+                      key={filter}
+                      onClick={() => handleQuickFilterClick(filter)}
+                      title={QUICK_FILTER_LABELS[filter]}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                        activeQuickFilter === filter
+                          ? 'bg-red-600 text-white'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                      }`}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {/* View Mode Toggle - Right side */}
             <div className="inline-flex bg-black/70 rounded-lg p-0.5 shadow-lg border border-slate-700/50">
               <button
                 onClick={() => handleViewModeChange('muscle')}
@@ -487,7 +601,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
             </div>
           </div>
 
-          <div className="transform scale-[0.8] origin-middle mt-6">
+          <div className="transform scale-[0.8] origin-middle mt-8">
             <BodyMap
               onPartClick={handleMuscleClick}
               selectedPart={selectedMuscle}
@@ -542,21 +656,25 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
           <div className="bg-black/70 border-b border-slate-700/50 p-3 flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0 flex-wrap">
               <h2 className="text-lg font-bold text-white truncate">
-                {selectedMuscle 
-                  ? (viewMode === 'group' ? selectedMuscle : SVG_MUSCLE_NAMES[selectedMuscle]) 
-                  : (viewMode === 'group' ? 'All Groups' : 'All Muscles')}
+                {activeQuickFilter
+                  ? QUICK_FILTER_LABELS[activeQuickFilter]
+                  : selectedMuscle 
+                    ? (viewMode === 'group' ? selectedMuscle : SVG_MUSCLE_NAMES[selectedMuscle]) 
+                    : (viewMode === 'group' ? 'All Groups' : 'All Muscles')}
               </h2>
               <span
                 className="text-red-400 text-sm font-semibold whitespace-nowrap"
-                title={selectedMuscle ? 'sets in current filter' : 'total sets across all muscles'}
+                title={activeQuickFilter || selectedMuscle ? 'sets in current filter' : 'total sets across all muscles'}
               >
-                {selectedMuscle
-                  ? (viewMode === 'group' && selectedGroupData
-                      ? Math.round(selectedGroupData.sets * 10) / 10
-                      : selectedMuscleData
-                        ? Math.round(selectedMuscleData.sets * 10) / 10
-                        : 0)
-                  : totalSets}{' '}
+                {activeQuickFilter
+                  ? (quickFilterData ? Math.round(quickFilterData.sets * 10) / 10 : 0)
+                  : selectedMuscle
+                    ? (viewMode === 'group' && selectedGroupData
+                        ? Math.round(selectedGroupData.sets * 10) / 10
+                        : selectedMuscleData
+                          ? Math.round(selectedMuscleData.sets * 10) / 10
+                          : 0)
+                    : totalSets}{' '}
                 <span className="text-slate-400 text-xs font-normal">sets</span>
               </span>
               {/* Volume Delta Badge */}
@@ -567,13 +685,13 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                     : 'bg-rose-500/10 text-rose-400'
                 }`}>
                   {volumeDelta.direction === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {volumeDelta.direction === 'up' ? '+' : ''}{volumeDelta.deltaPercent}% vs prev {trendPeriod === 'weekly' ? 'wk' : trendPeriod === 'monthly' ? 'mo' : 'day'}
+                  {volumeDelta.direction === 'up' ? '+' : ''}{volumeDelta.deltaPercent}% vs lst {trendPeriod === 'weekly' ? 'wk' : trendPeriod === 'monthly' ? 'mo' : 'day'}
                 </span>
               )}
             </div>
-            {selectedMuscle && (
+            {(selectedMuscle || activeQuickFilter) && (
               <button
-                onClick={closePanel}
+                onClick={() => { setSelectedMuscle(null); setActiveQuickFilter(null); }}
                 className="p-1.5 hover:bg-black/60 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-slate-400" />
@@ -602,7 +720,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      {period}
+                      {period === 'all' ? 'all' : period === 'weekly' ? 'wk' : 'mo'}
                     </button>
                   ))}
                 </div>
@@ -654,7 +772,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
           </div>
 
           {/* Scrollable Exercises Section */}
-          {selectedMuscle && (viewMode === 'group' ? selectedGroupData : selectedMuscleData) && (
+          {(quickFilterData || (selectedMuscle && (viewMode === 'group' ? selectedGroupData : selectedMuscleData))) && (
             <div className="border-t border-slate-800">
               <div className="flex items-center gap-2 px-4 py-3 bg-black/70 border-b border-slate-700/50">
                 <Dumbbell className="w-4 h-4 text-slate-400" />
@@ -667,9 +785,11 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                     const imgUrl = asset?.sourceType === 'video' ? asset.thumbnail : (asset?.thumbnail || asset?.source);
                     const exData = exerciseMuscleData.get(ex.name.toLowerCase());
                     const { volumes: exVolumes, maxVolume: exMaxVol } = getExerciseMuscleVolumes(exData);
-                    const totalSetsForCalc = viewMode === 'group' 
-                      ? (selectedGroupData?.sets || 1) 
-                      : (selectedMuscleData?.sets || 1);
+                    const totalSetsForCalc = quickFilterData
+                      ? (quickFilterData.sets || 1)
+                      : viewMode === 'group' 
+                        ? (selectedGroupData?.sets || 1) 
+                        : (selectedMuscleData?.sets || 1);
                     const pct = totalSetsForCalc > 0 ? Math.round((ex.sets / totalSetsForCalc) * 100) : 0;
 
                     const isPrimary = ex.primarySets > 0;
@@ -680,7 +800,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                     const primaryRounded = Math.round(ex.primarySets * 10) / 10;
                     const secondaryRounded = Math.round(ex.secondarySets * 10) / 10;
                     const isTopThree = i < 3;
-                    const ribbonText = i === 0 ? 'Gold' : i === 1 ? 'Silver' : 'Bronze';
+                    const ribbonText = i === 0 ? 'Top' : i === 1 ? '2nd' : '3rd';
                     const ribbonGradient = i === 0
                       ? 'from-amber-500 via-yellow-400 to-amber-500'
                       : i === 1

@@ -33,6 +33,60 @@ const App: React.FC = () => {
   const [showCSVModal, setShowCSVModal] = useState(false);
   const [highlightedExercise, setHighlightedExercise] = useState<string | null>(null);
   const [initialMuscleForAnalysis, setInitialMuscleForAnalysis] = useState<{ muscleId: string; viewMode: 'muscle' | 'group' } | null>(null);
+
+  const mainRef = useRef<HTMLElement | null>(null);
+  const activeTabRef = useRef<Tab>(activeTab);
+  const tabScrollPositionsRef = useRef<Record<string, number>>({});
+  const pendingNavRef = useRef<{ tab: Tab; kind: 'top' | 'deep' } | null>(null);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+
+    const onScroll = () => {
+      tabScrollPositionsRef.current[activeTabRef.current] = el.scrollTop;
+    };
+
+    el.addEventListener('scroll', onScroll, { passive: true } as any);
+    return () => el.removeEventListener('scroll', onScroll as any);
+  }, []);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+
+    const pending = pendingNavRef.current;
+    if (!pending || pending.tab !== activeTab) return;
+
+    if (pending.kind === 'top') {
+      const targetTop = tabScrollPositionsRef.current[activeTab] ?? 0;
+      requestAnimationFrame(() => {
+        if (!mainRef.current) return;
+        mainRef.current.scrollTop = targetTop;
+      });
+    } else {
+      tabScrollPositionsRef.current[activeTab] = 0;
+      requestAnimationFrame(() => {
+        if (!mainRef.current) return;
+        mainRef.current.scrollTop = 0;
+      });
+    }
+
+    pendingNavRef.current = null;
+  }, [activeTab]);
+
+  const navigateToTab = useCallback((tab: Tab, kind: 'top' | 'deep') => {
+    const el = mainRef.current;
+    if (el) {
+      tabScrollPositionsRef.current[activeTabRef.current] = el.scrollTop;
+    }
+    pendingNavRef.current = { tab, kind };
+    setActiveTab(tab);
+  }, []);
   
   // Gender state with localStorage persistence
   const [bodyMapGender, setBodyMapGender] = useState<BodyMapGender>(() => getBodyMapGender());
@@ -53,13 +107,13 @@ const App: React.FC = () => {
   // Handler for navigating to ExerciseView from MuscleAnalysis
   const handleExerciseClick = (exerciseName: string) => {
     setHighlightedExercise(exerciseName);
-    setActiveTab(Tab.EXERCISES);
+    navigateToTab(Tab.EXERCISES, 'deep');
   };
 
   // Handler for navigating to MuscleAnalysis from Dashboard heatmap
   const handleMuscleClick = (muscleId: string, viewMode: 'muscle' | 'group') => {
     setInitialMuscleForAnalysis({ muscleId, viewMode });
-    setActiveTab(Tab.MUSCLE_ANALYSIS);
+    navigateToTab(Tab.MUSCLE_ANALYSIS, 'deep');
   };
   
   // Loading State
@@ -307,7 +361,7 @@ const App: React.FC = () => {
   const handleDayClick = (date: Date) => {
     setSelectedDay(date);
     setSelectedRange(null);
-    setActiveTab(Tab.HISTORY);
+    navigateToTab(Tab.HISTORY, 'deep');
   };
 
   const handleModalFileSelect = (file: File, gender: BodyMapGender, unit: WeightUnit) => {
@@ -422,7 +476,7 @@ const App: React.FC = () => {
 
       {/* Top Header Navigation */}
       <header className="bg-black/70 border-b border-slate-700/50 flex-shrink-0">
-        <div className="px-4 sm:px-6 py-4 flex flex-col gap-4">
+        <div className="px-2 sm:px-3 py-3 flex flex-col gap-3">
           {/* Top Row: Logo and Nav Buttons */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -437,7 +491,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 min-w-0">
+            <div className="flex items-center justify-end gap-2  min-w-0">
               {/* Desktop: right-aligned support buttons, Update pinned as rightmost */}
               <div className="hidden md:block">
                 <SupportLinks
@@ -461,7 +515,7 @@ const App: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleOpenUpdateFlow}
-                  className="inline-flex items-center gap-2 h-9 px-3 rounded-md text-xs font-semibold bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all"
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200 gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />
                   <span className="hidden sm:inline">Update CSV</span>
@@ -474,29 +528,45 @@ const App: React.FC = () => {
           {/* Second Row: Navigation */}
           <nav className="grid grid-cols-5 gap-1 pt-1 sm:grid sm:grid-cols-4 sm:gap-2">
             <button 
-              onClick={() => setActiveTab(Tab.DASHBOARD)}
-              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg transition-all duration-200 whitespace-nowrap ${activeTab === Tab.DASHBOARD ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
+              onClick={() => {
+                setHighlightedExercise(null);
+                setInitialMuscleForAnalysis(null);
+                navigateToTab(Tab.DASHBOARD, 'top');
+              }}
+              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.DASHBOARD ? 'bg-blue-600 border-blue-500/50 text-white shadow-lg shadow-blue-900/50' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
             >
               <LayoutDashboard className="w-5 h-5" />
               <span className="hidden sm:inline font-medium">Dashboard</span>
             </button>
             <button 
-              onClick={() => setActiveTab(Tab.MUSCLE_ANALYSIS)}
-              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg transition-all duration-200 whitespace-nowrap ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
+              onClick={() => {
+                setHighlightedExercise(null);
+                setInitialMuscleForAnalysis(null);
+                navigateToTab(Tab.MUSCLE_ANALYSIS, 'top');
+              }}
+              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-blue-600 border-blue-500/50 text-white shadow-lg shadow-blue-900/50' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
             >
               <BicepsFlexed className="w-5 h-5" />
               <span className="hidden sm:inline font-medium">Muscle</span>
             </button>
             <button 
-              onClick={() => setActiveTab(Tab.EXERCISES)}
-              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg transition-all duration-200 whitespace-nowrap ${activeTab === Tab.EXERCISES ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
+              onClick={() => {
+                setHighlightedExercise(null);
+                setInitialMuscleForAnalysis(null);
+                navigateToTab(Tab.EXERCISES, 'top');
+              }}
+              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.EXERCISES ? 'bg-blue-600 border-blue-500/50 text-white shadow-lg shadow-blue-900/50' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
             >
               <Dumbbell className="w-5 h-5" />
               <span className="hidden sm:inline font-medium">Exercises</span>
             </button>
             <button 
-              onClick={() => setActiveTab(Tab.HISTORY)}
-              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg transition-all duration-200 whitespace-nowrap ${activeTab === Tab.HISTORY ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-black/60 hover:text-white'}`}
+              onClick={() => {
+                setHighlightedExercise(null);
+                setInitialMuscleForAnalysis(null);
+                navigateToTab(Tab.HISTORY, 'top');
+              }}
+              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.HISTORY ? 'bg-blue-600 border-blue-500/50 text-white shadow-lg shadow-blue-900/50' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
             >
               <History className="w-5 h-5" />
               <span className="hidden sm:inline font-medium">History</span>
@@ -552,13 +622,23 @@ const App: React.FC = () => {
             onSelectWeek={(r) => { setSelectedWeeks([r]); setSelectedDay(null); setSelectedRange(null); setCalendarOpen(false); }}
             onSelectMonth={(r) => { setSelectedRange(r); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
             onSelectYear={(r) => { setSelectedRange(r); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
-            onClear={() => { setSelectedRange(null); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
+            onClear={() => { setSelectedRange(null); setSelectedDay(null); setSelectedWeeks([]); }}
+            onClose={() => setCalendarOpen(false)}
+            onApply={({ range }) => {
+              // Single consecutive range
+              if (range) {
+                setSelectedRange(range);
+                setSelectedDay(null);
+                setSelectedWeeks([]);
+              }
+              setCalendarOpen(false);
+            }}
           />
         </div>
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-black/70 p-3 sm:p-4 md:p-6 lg:p-8">
+      <main ref={mainRef} className="flex-1 overflow-x-hidden overflow-y-auto bg-black/70 p-1 sm:p-2 md:p-3 lg:p-4">
 
         <Suspense fallback={<div className="text-slate-400 p-4">Loading...</div>}>
           {activeTab === Tab.DASHBOARD && (
@@ -569,11 +649,21 @@ const App: React.FC = () => {
               filtersSlot={desktopFilterControls}
               onDayClick={handleDayClick}
               onMuscleClick={handleMuscleClick}
+              onExerciseClick={handleExerciseClick}
               bodyMapGender={bodyMapGender}
               weightUnit={weightUnit}
             />
           )}
-          {activeTab === Tab.EXERCISES && <ExerciseView stats={exerciseStats} filtersSlot={desktopFilterControls} highlightedExercise={highlightedExercise} weightUnit={weightUnit} bodyMapGender={bodyMapGender} />}
+          {activeTab === Tab.EXERCISES && (
+            <ExerciseView
+              stats={exerciseStats}
+              filtersSlot={desktopFilterControls}
+              highlightedExercise={highlightedExercise}
+              onHighlightApplied={() => setHighlightedExercise(null)}
+              weightUnit={weightUnit}
+              bodyMapGender={bodyMapGender}
+            />
+          )}
           {activeTab === Tab.HISTORY && (
             <HistoryView
               data={filteredData}

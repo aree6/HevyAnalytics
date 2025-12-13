@@ -8,8 +8,9 @@ const BackgroundTexture: React.FC = () => {
         <span className="ripple-overlay" />
         <svg className="texture-filter">
           <filter id="advanced-texture">
+            // #00009000
             <feTurbulence type="fractalNoise" baseFrequency="0.009" numOctaves={8} result="noise" />
-            <feSpecularLighting in="noise" surfaceScale={300} specularConstant={2000} specularExponent={20} lightingColor="#00009000" result="specular">
+            <feSpecularLighting in="noise" surfaceScale={300} specularConstant={2000} specularExponent={20} lightingColor="rgba(0, 0, 90, 1)" result="specular">
               <fePointLight x={50} y={50} z={600} />
             </feSpecularLighting>
             <feComposite in="specular" in2="SourceGraphic" operator="in" result="litNoise" />

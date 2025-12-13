@@ -72,8 +72,7 @@ export interface WeeklyComparison {
   prs: DeltaResult;
 }
 
-export const getWeekOverWeekComparison = (data: WorkoutSet[]): WeeklyComparison => {
-  const now = new Date();
+export const getWeekOverWeekComparison = (data: WorkoutSet[], now: Date = new Date()): WeeklyComparison => {
   const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
   const lastWeekStart = subWeeks(thisWeekStart, 1);
   const lastWeekEnd = subDays(thisWeekStart, 1);
@@ -105,7 +104,7 @@ export interface StreakInfo {
   consistencyScore: number;   // 0-100 score
 }
 
-export const calculateStreakInfo = (data: WorkoutSet[]): StreakInfo => {
+export const calculateStreakInfo = (data: WorkoutSet[], now: Date = new Date()): StreakInfo => {
   if (data.length === 0) {
     return {
       currentStreak: 0,
@@ -149,7 +148,6 @@ export const calculateStreakInfo = (data: WorkoutSet[]): StreakInfo => {
 
   const firstDate = new Date(sortedDates[0]);
   const lastDate = new Date(sortedDates[sortedDates.length - 1]);
-  const now = new Date();
   const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
 
   // Count workouts this week
@@ -254,7 +252,7 @@ export interface PRInsights {
   totalPRs: number;
 }
 
-export const calculatePRInsights = (data: WorkoutSet[]): PRInsights => {
+export const calculatePRInsights = (data: WorkoutSet[], now: Date = new Date()): PRInsights => {
   const prs = data.filter(s => s.isPr && s.parsedDate).sort((a, b) => 
     (b.parsedDate?.getTime() || 0) - (a.parsedDate?.getTime() || 0)
   );
@@ -271,7 +269,6 @@ export const calculatePRInsights = (data: WorkoutSet[]): PRInsights => {
     };
   }
 
-  const now = new Date();
   const lastPR = prs[0];
   const daysSinceLastPR = differenceInDays(now, lastPR.parsedDate!);
   
@@ -345,8 +342,7 @@ export interface PlateauAnalysis {
   overallTrend: 'improving' | 'maintaining' | 'declining';
 }
 
-export const detectPlateaus = (data: WorkoutSet[], exerciseStats: ExerciseStats[]): PlateauAnalysis => {
-  const now = new Date();
+export const detectPlateaus = (data: WorkoutSet[], exerciseStats: ExerciseStats[], now: Date = new Date()): PlateauAnalysis => {
   const fourWeeksAgo = subWeeks(now, 4);
   const eightWeeksAgo = subWeeks(now, 8);
 
@@ -445,8 +441,7 @@ export const getVolumeSparkline = (dailyData: DailySummary[], points: number = 7
   }));
 };
 
-export const getWorkoutSparkline = (data: WorkoutSet[], weeks: number = 8): SparklinePoint[] => {
-  const now = new Date();
+export const getWorkoutSparkline = (data: WorkoutSet[], weeks: number = 8, now: Date = new Date()): SparklinePoint[] => {
   const result: SparklinePoint[] = [];
   
   for (let i = weeks - 1; i >= 0; i--) {
@@ -470,8 +465,7 @@ export const getWorkoutSparkline = (data: WorkoutSet[], weeks: number = 8): Spar
   return result;
 };
 
-export const getPRSparkline = (data: WorkoutSet[], weeks: number = 8): SparklinePoint[] => {
-  const now = new Date();
+export const getPRSparkline = (data: WorkoutSet[], weeks: number = 8, now: Date = new Date()): SparklinePoint[] => {
   const result: SparklinePoint[] = [];
   
   for (let i = weeks - 1; i >= 0; i--) {
@@ -493,8 +487,7 @@ export const getPRSparkline = (data: WorkoutSet[], weeks: number = 8): Sparkline
   return result;
 };
 
-export const getSetsSparkline = (data: WorkoutSet[], weeks: number = 8): SparklinePoint[] => {
-  const now = new Date();
+export const getSetsSparkline = (data: WorkoutSet[], weeks: number = 8, now: Date = new Date()): SparklinePoint[] => {
   const result: SparklinePoint[] = [];
   
   for (let i = weeks - 1; i >= 0; i--) {
@@ -515,8 +508,7 @@ export const getSetsSparkline = (data: WorkoutSet[], weeks: number = 8): Sparkli
   return result;
 };
 
-export const getConsistencySparkline = (data: WorkoutSet[], weeks: number = 8): SparklinePoint[] => {
-  const now = new Date();
+export const getConsistencySparkline = (data: WorkoutSet[], weeks: number = 8, now: Date = new Date()): SparklinePoint[] => {
   const result: SparklinePoint[] = [];
   
   for (let i = weeks - 1; i >= 0; i--) {
@@ -557,16 +549,17 @@ export interface DashboardInsights {
 
 export const calculateDashboardInsights = (
   data: WorkoutSet[], 
-  dailyData: DailySummary[]
+  dailyData: DailySummary[],
+  now: Date = new Date()
 ): DashboardInsights => {
   return {
-    weekComparison: getWeekOverWeekComparison(data),
-    streakInfo: calculateStreakInfo(data),
-    prInsights: calculatePRInsights(data),
+    weekComparison: getWeekOverWeekComparison(data, now),
+    streakInfo: calculateStreakInfo(data, now),
+    prInsights: calculatePRInsights(data, now),
     volumeSparkline: getVolumeSparkline(dailyData),
-    workoutSparkline: getWorkoutSparkline(data),
-    prSparkline: getPRSparkline(data),
-    setsSparkline: getSetsSparkline(data),
-    consistencySparkline: getConsistencySparkline(data),
+    workoutSparkline: getWorkoutSparkline(data, 8, now),
+    prSparkline: getPRSparkline(data, 8, now),
+    setsSparkline: getSetsSparkline(data, 8, now),
+    consistencySparkline: getConsistencySparkline(data, 8, now),
   };
 };

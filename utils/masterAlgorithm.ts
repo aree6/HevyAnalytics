@@ -98,9 +98,9 @@ const analyzeSameWeight = (
     return createAnalysisResult(
       transition, 'success', 0, repDropPct, currReps, `${prevReps}`,
       'Second Wind',
-      `+${repDiff} reps vs previous`,
+      `+${repDiff} reps vs lst`,
       buildStructured(`+${repDiff}`, 'up', [
-        line('Had reserves in previous set', 'gray'),
+        line('Had reserves in lst set', 'gray'),
         line('Or took longer rest this time', 'gray'),
       ])
     );
@@ -139,7 +139,7 @@ const analyzeSameWeight = (
   if (dropPctAbs <= DROP_THRESHOLD_MODERATE) {
     const why: TooltipLine[] = isFirstWorkingSet 
       ? [line('First set pushed close to failure', 'yellow')]
-      : [line('Previous set was near failure', 'yellow'), line('Or rest was shorter than usual', 'gray')];
+      : [line('Lst set was near failure', 'yellow'), line('Or rest was shorter than usual', 'gray')];
     
     return createAnalysisResult(
       transition, 'warning', 0, repDropPct, currReps, `${prevReps}`,
@@ -155,7 +155,7 @@ const analyzeSameWeight = (
   // SEVERE DROP (>25%)
   const why: TooltipLine[] = isFirstWorkingSet
     ? [line('First set was to failure', 'red'), line('Limits performance on remaining sets', 'gray')]
-    : [line('Accumulated fatigue from previous sets', 'red'), line('Or rest time too short', 'gray')];
+    : [line('Accumulated fatigue from lst sets', 'red'), line('Or rest time too short', 'gray')];
   
   return createAnalysisResult(
     transition, 'danger', 0, repDropPct, currReps, `${prevReps}`,
@@ -238,7 +238,7 @@ const analyzeWeightIncrease = (
       line(`Only ${currReps} reps (expected ~${expectedRepsInt})`, 'red'),
       line('Weight increase too aggressive', 'gray'),
     ], [
-      line('Build more reps at previous weight first', 'blue'),
+      line('Build more reps at lst weight first', 'blue'),
       line('Try smaller 2.5-5% jumps', 'gray'),
     ])
   );

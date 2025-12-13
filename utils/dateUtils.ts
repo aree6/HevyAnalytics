@@ -8,6 +8,33 @@ export interface DateKeyResult {
   label: string;
 }
 
+const MONTH_ABBR = ['ja', 'f', 'mr', 'ap', 'my', 'ju', 'jl', 'au', 'sp', 'oc', 'nv', 'dc'] as const;
+
+export const formatYearContraction = (d: Date): string => {
+  const yy = String(d.getFullYear() % 100).padStart(2, '0');
+  return `'${yy}`;
+};
+
+export const formatMonthContraction = (d: Date): string => {
+  return MONTH_ABBR[d.getMonth()] ?? 'm';
+};
+
+export const formatDayContraction = (d: Date): string => {
+  return `${formatMonthContraction(d)}${d.getDate()}`;
+};
+
+export const formatDayYearContraction = (d: Date): string => {
+  return `${formatDayContraction(d)}${formatYearContraction(d)}`;
+};
+
+export const formatMonthYearContraction = (d: Date): string => {
+  return `${formatMonthContraction(d)}${formatYearContraction(d)}`;
+};
+
+export const formatWeekContraction = (weekStart: Date): string => {
+  return `wk ${formatDayContraction(weekStart)}`;
+};
+
 const DATE_KEY_CONFIGS: Record<TimePeriod, {
   getStart: (d: Date) => Date;
   keyFormat: string;
@@ -40,10 +67,15 @@ const DATE_KEY_CONFIGS: Record<TimePeriod, {
 export const getDateKey = (date: Date, period: TimePeriod): DateKeyResult => {
   const config = DATE_KEY_CONFIGS[period];
   const start = config.getStart(date);
-  
-  const labelFormatted = period === 'weekly' 
-    ? `Wk of ${format(start, config.labelFormat)}`
-    : format(start, config.labelFormat);
+
+  const labelFormatted =
+    period === 'daily'
+      ? formatDayContraction(start)
+      : period === 'weekly'
+        ? formatWeekContraction(start)
+        : period === 'monthly'
+          ? formatMonthYearContraction(start)
+          : formatYearContraction(start);
 
   return {
     key: format(start, config.keyFormat),

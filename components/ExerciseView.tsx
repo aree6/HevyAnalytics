@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
@@ -19,8 +19,9 @@ import {
   getVolumeColor,
   SVG_MUSCLE_NAMES
 } from '../utils/muscleMapping';
-import { WeightUnit } from '../utils/localStorage';
+import { WeightUnit, getSmartFilterMode, TimeFilterMode } from '../utils/localStorage';
 import { convertWeight } from '../utils/units';
+import { formatDayContraction, formatDayYearContraction } from '../utils/dateUtils';
 
 // --- TYPES & LOGIC ---
 type ExerciseStatus = 'overload' | 'stagnant' | 'regression' | 'neutral' | 'new';
@@ -271,23 +272,88 @@ interface ExerciseViewProps {
   stats: ExerciseStats[];
   filtersSlot?: React.ReactNode;
   highlightedExercise?: string | null;
+  onHighlightApplied?: () => void;
   weightUnit?: WeightUnit;
   bodyMapGender?: BodyMapGender;
 }
 
-export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, highlightedExercise, weightUnit = 'kg', bodyMapGender = 'male' }) => {
+export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, highlightedExercise, onHighlightApplied, weightUnit = 'kg', bodyMapGender = 'male' }) => {
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>(highlightedExercise || stats[0]?.name || "");
+
+  const exerciseButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  const getSelectedHighlightClasses = (status: ExerciseStatus) => {
+    switch (status) {
+      case 'overload':
+        return {
+          button: 'bg-emerald-500/10 border-emerald-400/70 ring-2 ring-emerald-500/25 shadow-[0_0_0_1px_rgba(52,211,153,0.25),0_0_18px_rgba(16,185,129,0.12)]',
+          thumbBorder: 'border-emerald-400/70',
+        };
+      case 'regression':
+        return {
+          button: 'bg-rose-500/10 border-rose-400/70 ring-2 ring-rose-500/25 shadow-[0_0_0_1px_rgba(251,113,133,0.25),0_0_18px_rgba(244,63,94,0.12)]',
+          thumbBorder: 'border-rose-400/70',
+        };
+      case 'stagnant':
+        return {
+          button: 'bg-amber-500/10 border-amber-400/70 ring-2 ring-amber-500/25 shadow-[0_0_0_1px_rgba(251,191,36,0.22),0_0_18px_rgba(245,158,11,0.10)]',
+          thumbBorder: 'border-amber-400/70',
+        };
+      case 'neutral':
+        return {
+          button: 'bg-indigo-500/10 border-indigo-400/70 ring-2 ring-indigo-500/25 shadow-[0_0_0_1px_rgba(129,140,248,0.22),0_0_18px_rgba(99,102,241,0.10)]',
+          thumbBorder: 'border-indigo-400/70',
+        };
+      case 'new':
+      default:
+        return {
+          button: 'bg-blue-600/15 border-blue-400/70 ring-2 ring-blue-500/25 shadow-[0_0_0_1px_rgba(59,130,246,0.35),0_0_18px_rgba(59,130,246,0.12)]',
+          thumbBorder: 'border-blue-400/70',
+        };
+    }
+  };
   
   // Update selection when highlightedExercise changes
   useEffect(() => {
     if (highlightedExercise && stats.some(s => s.name === highlightedExercise)) {
       setSelectedExerciseName(highlightedExercise);
+      requestAnimationFrame(() => {
+        const el = exerciseButtonRefs.current[highlightedExercise];
+        el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+      onHighlightApplied?.();
     }
-  }, [highlightedExercise, stats]);
+  }, [highlightedExercise, onHighlightApplied, stats]);
   const [searchTerm, setSearchTerm] = useState("");
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
-  const [viewMode, setViewMode] = useState<'all' | 'weekly' | 'monthly'>('monthly');
+  const [viewModeOverride, setViewModeOverride] = useState<TimeFilterMode | null>(null);
   const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
+
+  // Selected exercise stats
+  const selectedStats = useMemo(() => 
+    stats.find(s => s.name === selectedExerciseName), 
+  [stats, selectedExerciseName]);
+
+  // Calculate date range span for selected exercise
+  const exerciseSpanDays = useMemo(() => {
+    if (!selectedStats || selectedStats.history.length === 0) return 0;
+    const dates = selectedStats.history.map(h => new Date(h.date).getTime());
+    const min = Math.min(...dates);
+    const max = Math.max(...dates);
+    return Math.max(1, Math.round((max - min) / (1000 * 60 * 60 * 24)) + 1);
+  }, [selectedStats]);
+
+  // Smart mode based on date range span
+  const smartMode = useMemo(() => getSmartFilterMode(exerciseSpanDays), [exerciseSpanDays]);
+
+  // Reset override when exercise or smart mode changes
+  useEffect(() => {
+    setViewModeOverride(null);
+  }, [smartMode, selectedExerciseName]);
+
+  // Effective view mode: override if set, otherwise smart mode
+  const viewMode = viewModeOverride ?? smartMode;
+  const setViewMode = setViewModeOverride;
 
   useEffect(() => {
     let mounted = true;
@@ -307,10 +373,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     });
     return map;
   }, [stats]);
-
-  const selectedStats = useMemo(() => 
-    stats.find(s => s.name === selectedExerciseName), 
-  [stats, selectedExerciseName]);
 
   const selectedExerciseMuscleInfo = useMemo(() => {
     const exData = selectedStats ? exerciseMuscleData.get(selectedStats.name.toLowerCase()) : undefined;
@@ -354,7 +416,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     const history = [...selectedStats.history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     if (viewMode === 'all') {
       return history.map(h => ({
-        date: h.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        date: formatDayContraction(new Date(h.date)),
         weight: convertWeight(h.weight, weightUnit),
         oneRepMax: convertWeight(h.oneRepMax, weightUnit),
         volume: h.volume
@@ -400,7 +462,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
   const sessionsCount = selectedStats ? selectedStats.history.length : 0;
 
   return (
-    <div className="flex flex-col gap-6 w-full text-slate-200 pb-10">
+    <div className="flex flex-col gap-2 w-full text-slate-200 pb-10">
       {/* Header - consistent with Dashboard */}
       <div className="hidden sm:block">
         <ViewHeader
@@ -439,7 +501,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                         ) : null}
                       </span>
                     ),
-                    label: 'Last Session',
+                    label: 'lst session',
                   },
                 ]
               : []),
@@ -453,7 +515,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
           We use lg:h-[380px] to enforce equal height for Sidebar and Metrics on Desktop.
           On mobile, it falls back to auto (stacked).
       */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 ">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 ">
         
         {/* --- LEFT: SIDEBAR --- */}
     {/* UPDATED: Changed max-h-[400px] to h-[25vh] to limit to 1/4 screen height */}
@@ -479,6 +541,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
             const status = statusMap[ex.name];
             const isSelected = selectedExerciseName === ex.name;
             const asset = assetsMap?.get(ex.name);
+
+            const selectedHighlight = getSelectedHighlightClasses(status.status);
             
             let IndicatorIcon = Activity;
             let indicatorColor = "text-slate-500";
@@ -489,11 +553,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
             return (
               <button
                 key={ex.name}
+                ref={(el) => {
+                  exerciseButtonRefs.current[ex.name] = el;
+                }}
                 onClick={() => setSelectedExerciseName(ex.name)}
-                className={`w-full text-left px-2 py-1.5 rounded-md transition-all duration-200 flex items-center justify-between group border border-transparent ${
-                  isSelected 
-                    ? 'bg-blue-600/10 border-blue-500/30' 
-                    : 'hover:bg-black/60 hover:border-slate-600/50'
+                className={`w-full text-left px-2 py-1.5 rounded-md transition-all duration-200 flex items-center justify-between group border ${
+                  isSelected
+                    ? selectedHighlight.button
+                    : 'border-transparent hover:bg-black/60 hover:border-slate-600/50'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -505,7 +572,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                     );
                     const imgUrl = asset.sourceType === 'video' ? asset.thumbnail : (asset.thumbnail || asset.source);
                     return imgUrl ? (
-                      <img src={imgUrl} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0 border border-slate-800" loading="lazy" decoding="async" />
+                      <img src={imgUrl} alt="" className={`w-6 h-6 rounded object-cover flex-shrink-0 border ${isSelected ? selectedHighlight.thumbBorder : 'border-slate-800'}`} loading="lazy" decoding="async" />
                     ) : (
                       <div className="w-6 h-6 rounded bg-black/50 flex items-center justify-center text-slate-500 flex-shrink-0">
                         <Dumbbell className="w-3.5 h-3.5" />
@@ -517,7 +584,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                       {ex.name}
                     </span>
                     <span className="text-[10px] text-slate-500 truncate">
-                      Last: {new Date(ex.history[0].date).toLocaleDateString()}
+                      lst: {formatDayYearContraction(new Date(ex.history[0].date))}
                     </span>
                   </div>
                 </div>
@@ -537,9 +604,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     </div>
 
         {/* --- RIGHT: HEADER & METRICS --- */}
-        <div className="lg:col-span-2 flex flex-col gap-6 h-full min-h-0">
+        <div className="lg:col-span-2 flex flex-col gap-2 h-full min-h-0">
           {selectedStats && currentStatus ? (
-            <div className="flex flex-col h-full gap-6">
+            <div className="flex flex-col h-full gap-2">
               
               {/* 1. Header with exercise image and mini heatmap */}
               <div className="inline-flex items-start gap-4 shrink-0 bg-white rounded-xl p-3 self-start w-fit max-w-full">
@@ -679,9 +746,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                    <span className="w-2.5 h-0.5 bg-slate-500 border-t border-dashed border-slate-500"></span> Lift Weight
                 </div>
                 <div className="bg-black/70 p-1 rounded-lg flex gap-1 border border-slate-700/50">
-                  <button onClick={() => setViewMode('all')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${viewMode==='all'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}>All</button>
-                  <button onClick={() => setViewMode('weekly')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${viewMode==='weekly'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}>Weekly</button>
-                  <button onClick={() => setViewMode('monthly')} className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${viewMode==='monthly'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}>Monthly</button>
+                  <button onClick={() => setViewMode('all')} className={`px-2 py-1 rounded text-[10px] font-bold ${viewMode==='all'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}>all</button>
+                  <button onClick={() => setViewMode('weekly')} className={`px-2 py-1 rounded text-[10px] font-bold ${viewMode==='weekly'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}>wk</button>
+                  <button onClick={() => setViewMode('monthly')} className={`px-2 py-1 rounded text-[10px] font-bold ${viewMode==='monthly'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}>mo</button>
                 </div>
              </div>
           </div>

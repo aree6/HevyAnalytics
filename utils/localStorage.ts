@@ -46,47 +46,19 @@ export const clearCSVData = (): void => {
   }
 };
 
-// Chart Modes Storage
-const CHART_MODES_KEY = 'hevy_analytics_chart_modes';
-
 export type TimeFilterMode = 'all' | 'weekly' | 'monthly';
 
-const normalizeStoredMode = (value: unknown): TimeFilterMode | null => {
-  if (value === 'all' || value === 'weekly' || value === 'monthly') return value;
-  // Backward compatibility
-  if (value === 'daily') return 'all';
-  return null;
-};
-
 /**
- * Save chart modes to local storage
+ * Determine the appropriate filter mode based on date range span (in days).
+ * Rules based on how many aggregated data points would be meaningful:
+ * - Less than 5 weeks (35 days) → 'all' (weekly view would have <5 points)
+ * - 5 weeks to 5 months (35-150 days) → 'weekly' 
+ * - More than 5 months (150+ days) → 'monthly'
  */
-export const saveChartModes = (chartModes: Record<string, TimeFilterMode>): void => {
-  try {
-    localStorage.setItem(CHART_MODES_KEY, JSON.stringify(chartModes));
-  } catch (error) {
-    console.error('Failed to save chart modes to local storage:', error);
-  }
-};
-
-/**
- * Retrieve chart modes from local storage
- */
-export const getChartModes = (): Record<string, TimeFilterMode> | null => {
-  try {
-    const data = localStorage.getItem(CHART_MODES_KEY);
-    if (!data) return null;
-    const parsed = JSON.parse(data) as Record<string, unknown>;
-    const normalized: Record<string, TimeFilterMode> = {};
-    for (const [k, v] of Object.entries(parsed)) {
-      const mode = normalizeStoredMode(v);
-      if (mode) normalized[k] = mode;
-    }
-    return normalized;
-  } catch (error) {
-    console.error('Failed to retrieve chart modes from local storage:', error);
-    return null;
-  }
+export const getSmartFilterMode = (spanDays: number): TimeFilterMode => {
+  if (spanDays < 35) return 'all';      // <5 weeks → show all
+  if (spanDays < 150) return 'weekly';  // 5 weeks to ~5 months → weekly
+  return 'monthly';                      // 5+ months → monthly
 };
 
 // Weight Unit Preference Storage

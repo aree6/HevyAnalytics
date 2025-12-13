@@ -30,8 +30,8 @@ export const ViewHeader: React.FC<ViewHeaderProps> = ({
   const leftItems = leftStats ?? stats;
 
   return (
-    <div className="bg-black/70 p-3 sm:p-4 rounded-xl">
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr),auto,minmax(0,1fr)] items-center gap-3">
+    <div className="bg-black/70 p-2 sm:p-3 rounded-xl">
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr),auto,minmax(0,1fr)] items-center gap-2">
         {/* Left: Stats */}
         <div className="hidden sm:flex items-center gap-2 justify-start min-w-0">
           {leftItems.map((stat, i) => (
@@ -71,7 +71,7 @@ export const ViewHeader: React.FC<ViewHeaderProps> = ({
               <div className="relative w-full sm:w-auto">
                 <button 
                   onClick={() => setIsMenuOpen(!isMenuOpen)} 
-                  className="flex items-center gap-2 px-3 py-2 bg-black/70 hover:bg-black/60 rounded-lg text-xs sm:text-sm font-medium border border-slate-700/50 text-slate-200 transition-colors w-full sm:w-auto justify-center sm:justify-start"
+                  className="inline-flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-start whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200"
                 >
                   <Eye className="w-4 h-4" /> Configure View <ChevronDown className={`w-4 h-4 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
                 </button>

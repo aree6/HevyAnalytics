@@ -12,7 +12,7 @@ import { getMuscleVolumeTimeSeries, getDetailedMuscleCompositionLatest, normaliz
 import { CSV_TO_SVG_MUSCLE_MAP, SVG_MUSCLE_NAMES, getVolumeColor } from '../utils/muscleMapping';
 import { BodyMap, BodyMapGender } from './BodyMap';
 import { MUSCLE_COLORS } from '../utils/categories';
-import { saveChartModes, getChartModes, TimeFilterMode, WeightUnit } from '../utils/localStorage';
+import { getSmartFilterMode, TimeFilterMode, WeightUnit } from '../utils/localStorage';
 import { convertVolume } from '../utils/units';
 import { CHART_TOOLTIP_STYLE, CHART_COLORS, ANIMATION_KEYFRAMES } from '../utils/uiConstants';
 import {
@@ -35,6 +35,7 @@ import {
   Grid3X3, Scan, Square, ChartBarStacked, ChartColumnStacked, BicepsFlexed
 } from 'lucide-react';
 import { format, startOfMonth, startOfWeek, subDays, differenceInCalendarDays } from 'date-fns';
+import { formatDayContraction, formatDayYearContraction, formatWeekContraction, formatMonthYearContraction } from '../utils/dateUtils';
 import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
 import { ViewHeader } from './ViewHeader';
 import { calculateDashboardInsights, detectPlateaus, calculateDelta, DashboardInsights, PlateauAnalysis } from '../utils/insights';
@@ -156,6 +157,7 @@ interface DashboardProps {
   fullData: WorkoutSet[]; // The raw set data
   onDayClick?: (date: Date) => void;
   onMuscleClick?: (muscleId: string, viewMode: 'muscle' | 'group') => void;
+  onExerciseClick?: (exerciseName: string) => void;
   filtersSlot?: React.ReactNode;
   bodyMapGender?: BodyMapGender;
   weightUnit?: WeightUnit;
@@ -268,7 +270,7 @@ const ChartHeader = ({
   viewOptions,
   isMounted = true
 }: ChartHeaderProps) => (
-  <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3 sm:gap-0 transition-opacity duration-700 ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
+  <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-3 sm:gap-0 transition-opacity duration-700 ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
     <h3 className="text-lg font-semibold text-white flex items-center gap-2 transition-opacity duration-200 hover:opacity-90">
       <Icon className={`w-5 h-5 ${color} transition-opacity duration-200 hover:opacity-80`} />
       <span className="flex items-center gap-2">
@@ -351,7 +353,7 @@ const ChartHeader = ({
 );
 
 // 4. Heatmap Component - Memoized to prevent unnecessary re-renders
-const Heatmap = memo(({ dailyData, totalPrs, onDayClick }: { dailyData: DailySummary[], totalPrs: number, onDayClick?: (date: Date) => void }) => {
+const Heatmap = memo(({ dailyData, totalPrs, onDayClick, effectiveNow }: { dailyData: DailySummary[], totalPrs: number, onDayClick?: (date: Date) => void, effectiveNow: Date }) => {
   // Cache heatmap data across tab switches
   const heatmapData = useMemo(() => {
     return computationCache.getOrCompute(
@@ -361,6 +363,32 @@ const Heatmap = memo(({ dailyData, totalPrs, onDayClick }: { dailyData: DailySum
       { ttl: 10 * 60 * 1000 }
     );
   }, [dailyData]);
+
+  const monthLabels = useMemo(() => {
+    const columns = Math.ceil(heatmapData.length / 7);
+    const cells = new Array(columns).fill('');
+    if (heatmapData.length === 0) return { columns, cells };
+
+    let lastMonth = -1;
+    let lastCol = -1;
+    for (let i = 0; i < heatmapData.length; i++) {
+      const d = heatmapData[i].date;
+      const m = d.getMonth();
+      if (i === 0 || m !== lastMonth) {
+        const col = Math.floor(i / 7);
+        const label = format(d, 'MMM');
+        if (col === lastCol) {
+          cells[col] = label;
+        } else {
+          cells[col] = label;
+          lastCol = col;
+        }
+        lastMonth = m;
+      }
+    }
+    return { columns, cells };
+  }, [heatmapData]);
+
   const [tooltip, setTooltip] = useState<any | null>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -394,7 +422,7 @@ const Heatmap = memo(({ dailyData, totalPrs, onDayClick }: { dailyData: DailySum
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltip({
       rect,
-      title: day.date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
+      title: formatDayYearContraction(day.date),
       body: `${day.count} Sets${day.title ? `\n${day.title}` : ''}`,
       footer: 'Click to view details',
       status: day.count > 30 ? 'success' : 'info'
@@ -409,7 +437,7 @@ const Heatmap = memo(({ dailyData, totalPrs, onDayClick }: { dailyData: DailySum
             <Calendar className="w-5 h-5 mr-2 text-blue-500" />
             Consistency
           </h3>
-          <p className="text-xs sm:text-sm text-slate-500">Last 365 Days</p>
+          <p className="text-xs sm:text-sm text-slate-500">365d ending {format(effectiveNow, 'MMM d, yyyy')}</p>
         </div>
         <div className="mt-4">
            <div className="flex items-center gap-3">
@@ -422,20 +450,30 @@ const Heatmap = memo(({ dailyData, totalPrs, onDayClick }: { dailyData: DailySum
               </div>
            </div>
         </div>
+
       </div>
       <div className="flex-1 w-full overflow-x-auto pb-2 custom-scrollbar" ref={scrollContainerRef}>
-         <div className="grid grid-flow-col grid-rows-7 gap-1 min-w-max">
-            {heatmapData.map((day) => (
-              <div 
-                key={day.date.toISOString()}
-                className={`w-3 h-3 rounded-sm ${getColor(day.count)} transition-all duration-300 ${day.count > 0 ? 'cursor-pointer hover:z-10 ring-0 hover:ring-2 ring-white/20' : 'cursor-default'}`}
-                onClick={() => day.count > 0 && onDayClick?.(day.date)}
-                onMouseEnter={(e) => handleMouseEnter(e, day)}
-                onMouseLeave={() => setTooltip(null)}
-              >
+        <div className="min-w-max">
+          <div className="grid grid-flow-col auto-cols-[12px] gap-1 text-[10px] text-slate-500 mb-2">
+            {monthLabels.cells.map((label, idx) => (
+              <div key={idx} className="w-3 h-3 flex items-end justify-start">
+                {label}
               </div>
             ))}
-         </div>
+          </div>
+          <div className="grid grid-flow-col grid-rows-7 gap-1">
+              {heatmapData.map((day) => (
+                <div 
+                  key={day.date.toISOString()}
+                  className={`w-3 h-3 rounded-sm ${getColor(day.count)} transition-all duration-300 ${day.count > 0 ? 'cursor-pointer hover:z-10 ring-0 hover:ring-2 ring-white/20' : 'cursor-default'}`}
+                  onClick={() => day.count > 0 && onDayClick?.(day.date)}
+                  onMouseEnter={(e) => handleMouseEnter(e, day)}
+                  onMouseLeave={() => setTooltip(null)}
+                >
+                </div>
+              ))}
+          </div>
+        </div>
       </div>
       {tooltip && <DashboardTooltip data={tooltip} />}
     </div>
@@ -445,36 +483,80 @@ const Heatmap = memo(({ dailyData, totalPrs, onDayClick }: { dailyData: DailySum
 
 // --- MAIN DASHBOARD ---
 
-export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick, onMuscleClick, filtersSlot, bodyMapGender = 'male', weightUnit = 'kg' }) => {
-  const DEFAULT_CHART_MODES: Record<string, TimeFilterMode> = {
-    volumeVsDuration: 'monthly',
-    intensityEvo: 'monthly',
-    prTrend: 'monthly',
-  };
-
+export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick, onMuscleClick, onExerciseClick, filtersSlot, bodyMapGender = 'male', weightUnit = 'kg' }) => {
   // State to control animation retriggering on mount
   const [isMounted, setIsMounted] = useState(false);
 
-  // FIXED: Initialize state lazily from local storage to prevent double-render
-  const [chartModes, setChartModes] = useState<Record<string, TimeFilterMode>>(() => {
-    return getChartModes() || DEFAULT_CHART_MODES;
+  const effectiveNow = useMemo(() => {
+    let maxTs = 0;
+    for (const s of fullData) {
+      const ts = s.parsedDate?.getTime?.() ?? 0;
+      if (ts > maxTs) maxTs = ts;
+    }
+    const today = new Date();
+    const maxInData = maxTs > 0 ? new Date(maxTs) : null;
+    return maxInData ? (maxInData > today ? today : maxInData) : today;
+  }, [fullData]);
+
+  // Calculate date range span for smart filter
+  const spanDays = useMemo(() => {
+    const dates: number[] = [];
+    for (const s of fullData) {
+      if (s.parsedDate) dates.push(s.parsedDate.getTime());
+    }
+    if (dates.length === 0) return 0;
+    const min = Math.min(...dates);
+    const max = Math.max(...dates);
+    return Math.max(1, Math.round((max - min) / (1000 * 60 * 60 * 24)) + 1);
+  }, [fullData]);
+
+  // Smart filter mode based on date range span
+  const smartMode = useMemo(() => getSmartFilterMode(spanDays), [spanDays]);
+
+  // Count total workouts (for display purposes)
+  const totalWorkouts = useMemo(() => {
+    const sessions = new Set<string>();
+    for (const s of fullData) {
+      if (!s.start_time) continue;
+      sessions.add(s.start_time);
+    }
+    return sessions.size;
+  }, [fullData]);
+
+  // Track user overrides only (null = use smart mode)
+  const [chartOverrides, setChartOverrides] = useState<Record<string, TimeFilterMode | null>>({
+    volumeVsDuration: null,
+    intensityEvo: null,
+    prTrend: null,
   });
 
-  // FIXED: Simple effect to trigger animation after mount
+  // Reset overrides when smart mode changes (new filter applied)
   useEffect(() => {
-    // A small timeout ensures the DOM nodes exist and layout is calculated
-    // before we toggle opacity, preventing the "start-stop" glitch.
+    setChartOverrides({
+      volumeVsDuration: null,
+      intensityEvo: null,
+      prTrend: null,
+    });
+  }, [smartMode]);
+
+  // Effective chart modes: use override if set, otherwise smart mode
+  const chartModes = useMemo(() => ({
+    volumeVsDuration: chartOverrides.volumeVsDuration ?? smartMode,
+    intensityEvo: chartOverrides.intensityEvo ?? smartMode,
+    prTrend: chartOverrides.prTrend ?? smartMode,
+  }), [chartOverrides, smartMode]);
+
+  // Simple effect to trigger animation after mount
+  useEffect(() => {
     const timer = setTimeout(() => {
       setIsMounted(true);
     }, 50);
     return () => clearTimeout(timer);
   }, []);
 
-  // Save chart modes to localStorage whenever they change
+  // Toggle chart mode (user override)
   const toggleChartMode = (chart: string, mode: TimeFilterMode) => {
-    const newModes = { ...chartModes, [chart]: mode };
-    setChartModes(newModes);
-    saveChartModes(newModes);
+    setChartOverrides(prev => ({ ...prev, [chart]: mode }));
   };
 
   const [topExerciseMode, setTopExerciseMode] = useState<'all' | 'weekly' | 'monthly'>('all');
@@ -509,121 +591,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     return () => { mounted = false; };
   }, []);
 
-  // Determine span of currently filtered data
-  const spanDays = useMemo(() => {
-    const dates: number[] = [];
-    for (const s of fullData) {
-      if (s.parsedDate) dates.push(s.parsedDate.getTime());
-    }
-    // Fallback to daily summaries if needed
-    if (dates.length === 0 && dailyData?.length) {
-      for (const d of dailyData) {
-        if (d?.timestamp) dates.push(new Date(d.timestamp).getTime());
-      }
-    }
-    if (dates.length === 0) return 0;
-    const min = Math.min(...dates);
-    const max = Math.max(...dates);
-    return Math.max(1, Math.round((max - min) / (1000 * 60 * 60 * 24)) + 1);
-  }, [fullData, dailyData]);
-
-  // Detect rough granularity by counting unique periods in the filtered data
-  const granularity = useMemo(() => {
-    const days = new Set<string>();
-    const weeks = new Set<string>();
-    const months = new Set<string>();
-    const years = new Set<string>();
-    for (const s of fullData) {
-      const d = s.parsedDate;
-      if (!d) continue;
-      days.add(format(d, 'yyyy-MM-dd'));
-      weeks.add(format(d, 'yyyy-ww'));
-      months.add(format(d, 'yyyy-MM'));
-      years.add(format(d, 'yyyy'));
-    }
-    return { days: days.size, weeks: weeks.size, months: months.size, years: years.size };
-  }, [fullData]);
-
-  // Auto-adjust periods/modes based on selected range span
-  useEffect(() => {
-    if (spanDays === 0) return;
-    // Rule of thumb:
-    // - If < 30 days or a single week/month selected -> show daily where it makes sense
-    // - If a few weeks -> weekly; if a few months -> monthly; if multiple years -> yearly
-    if (granularity.years >= 2) {
-      // Multi-year
-      const next = { ...chartModes, prTrend: 'monthly', intensityEvo: 'monthly', volumeVsDuration: 'monthly' as const };
-      setChartModes(next); saveChartModes(next);
-      return;
-    }
-    if (granularity.months >= 2) {
-      // Multi-month
-      const next = { ...chartModes, prTrend: 'monthly', intensityEvo: 'monthly', volumeVsDuration: 'monthly' as const };
-      setChartModes(next); saveChartModes(next);
-      return;
-    }
-    if (granularity.weeks >= 2) {
-      // Multi-week
-      const next = { ...chartModes, prTrend: 'daily', intensityEvo: 'daily', volumeVsDuration: 'daily' as const };
-      setChartModes(next); saveChartModes(next);
-      return;
-    }
-    if (spanDays < 30) {
-      if (chartModes.prTrend !== 'daily' || chartModes.intensityEvo !== 'daily' || chartModes.volumeVsDuration !== 'daily') {
-        const next = { ...chartModes, prTrend: 'daily', intensityEvo: 'daily', volumeVsDuration: 'daily' as const };
-        setChartModes(next); saveChartModes(next);
-      }
-    } else if (spanDays <= 60) {
-      if (chartModes.prTrend !== 'daily' || chartModes.intensityEvo !== 'daily' || chartModes.volumeVsDuration !== 'daily') {
-        const next = { ...chartModes, prTrend: 'daily', intensityEvo: 'daily', volumeVsDuration: 'daily' as const };
-        setChartModes(next); saveChartModes(next);
-      }
-    } else if (spanDays <= 400) {
-      if (chartModes.prTrend !== 'monthly' || chartModes.intensityEvo !== 'monthly' || chartModes.volumeVsDuration !== 'monthly') {
-        const next = { ...chartModes, prTrend: 'monthly', intensityEvo: 'monthly', volumeVsDuration: 'monthly' as const };
-        setChartModes(next); saveChartModes(next);
-      }
-    } else {
-      if (chartModes.prTrend !== 'monthly' || chartModes.intensityEvo !== 'monthly' || chartModes.volumeVsDuration !== 'monthly') {
-        const next = { ...chartModes, prTrend: 'monthly', intensityEvo: 'monthly', volumeVsDuration: 'monthly' as const };
-        setChartModes(next); saveChartModes(next);
-      }
-    }
-  }, [spanDays, granularity]);
-
   // --- MEMOIZED DATA LOGIC ---
 
   const totalPrs = useMemo(() => exerciseStats.reduce((acc, curr) => acc + curr.prCount, 0), [exerciseStats]);
 
   const totalSets = useMemo(() => fullData.length, [fullData]);
-  const totalWorkouts = useMemo(() => {
-    const sessions = new Set<string>();
-    for (const s of fullData) {
-      if (!s.start_time) continue;
-      sessions.add(s.start_time);
-    }
-    return sessions.size;
-  }, [fullData]);
 
   // Dashboard Insights (deltas, streaks, PR info, sparklines) - cached across tab switches
   const dashboardInsights = useMemo(() => {
     return computationCache.getOrCompute(
       'dashboardInsights',
       fullData,
-      () => calculateDashboardInsights(fullData, dailyData),
+      () => calculateDashboardInsights(fullData, dailyData, effectiveNow),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, dailyData]);
+  }, [fullData, dailyData, effectiveNow]);
 
   // Plateau Detection - cached across tab switches
   const plateauAnalysis = useMemo(() => {
     return computationCache.getOrCompute(
       'plateauAnalysis',
       fullData,
-      () => detectPlateaus(fullData, exerciseStats),
+      () => detectPlateaus(fullData, exerciseStats, effectiveNow),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, exerciseStats]);
+  }, [fullData, exerciseStats, effectiveNow]);
   
   // 1. PRs Over Time Data
   const prsData = useMemo(() => {
@@ -707,7 +699,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     if (mode === 'all') {
       return dailyData.map(d => ({
         ...d,
-        dateFormatted: format(new Date(d.timestamp), 'MMM d'),
+        dateFormatted: formatDayContraction(new Date(d.timestamp)),
         tooltipLabel: format(new Date(d.timestamp), 'MMM d, yyyy'),
         volumePerSet: d.sets > 0 ? convertVolume(Math.round(d.totalVolume / d.sets), weightUnit) : 0
       }));
@@ -729,8 +721,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         const avgVol = Math.round(w.volSum / w.count);
         const avgSets = Math.round(w.setSum / w.count);
         return {
-          dateFormatted: `Wk of ${format(new Date(w.timestamp), 'MMM d')}`,
-          tooltipLabel: `Week of ${format(new Date(w.timestamp), 'MMM d, yyyy')}`,
+          dateFormatted: formatWeekContraction(new Date(w.timestamp)),
+          tooltipLabel: `wk of ${format(new Date(w.timestamp), 'MMM d, yyyy')}`,
           totalVolume: convertVolume(avgVol, weightUnit),
           sets: avgSets,
           volumePerSet: avgSets > 0 ? convertVolume(Math.round(avgVol / avgSets), weightUnit) : 0
@@ -754,7 +746,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         const avgVol = Math.round(m.volSum / m.count);
         const avgSets = Math.round(m.setSum / m.count);
         return {
-          dateFormatted: format(new Date(m.timestamp), 'MMM yyyy'),
+          dateFormatted: formatMonthYearContraction(new Date(m.timestamp)),
           tooltipLabel: format(new Date(m.timestamp), 'MMMM yyyy'),
           totalVolume: convertVolume(avgVol, weightUnit),
           sets: avgSets,
@@ -810,7 +802,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   
   // Data for horizontal bars (simple) with time filters: All, Monthly (30d), Weekly (7d)
   const topExercisesBarData = useMemo(() => {
-    const now = new Date();
+    const now = effectiveNow;
     let start: Date | null = null;
     if (topExerciseMode === 'monthly') start = subDays(now, 30);
     else if (topExerciseMode === 'weekly') start = subDays(now, 7);
@@ -827,10 +819,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     const arr = Array.from(counts.entries()).map(([name, count]) => ({ name, count }));
     arr.sort((a,b) => b.count - a.count);
     return arr.slice(0, 4);
-  }, [fullData, topExerciseMode]);
+  }, [fullData, topExerciseMode, effectiveNow]);
 
   const topExercisesInsight = useMemo(() => {
-    const now = new Date();
+    const now = effectiveNow;
     const getSetCountBetween = (start: Date | null, end: Date) => {
       let count = 0;
       for (const s of fullData) {
@@ -862,7 +854,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     const windowLabel = topExerciseMode === 'weekly' ? '7d' : '30d';
     const delta = calculateDelta(currentSets, prevSets);
     return { windowLabel, delta, top, topShare };
-  }, [fullData, topExerciseMode, topExercisesBarData]);
+  }, [fullData, topExerciseMode, topExercisesBarData, effectiveNow]);
 
   // Time series for area view of Top Exercises
   const topExercisesOverTimeData = useMemo(() => {
@@ -928,7 +920,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
   const compositionQuickData = useMemo(() => {
     if (!assetsMap) return [] as { subject: string; value: number }[];
-    const now = new Date();
+    const now = effectiveNow;
     let windowStart: Date | null = null;
     if (muscleCompQuick === '7d') windowStart = subDays(now, 7);
     else if (muscleCompQuick === '30d') windowStart = subDays(now, 30);
@@ -988,7 +980,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     const arr = Array.from(counts.entries()).map(([subject, value]) => ({ subject, value: Number((value / weeks).toFixed(1)) }));
     arr.sort((a,b) => b.value - a.value);
     return arr.slice(0, 16);
-  }, [assetsMap, fullData, muscleCompQuick, compositionGrouping]);
+  }, [assetsMap, fullData, muscleCompQuick, compositionGrouping, effectiveNow]);
 
   const weeklySetsInsight = useMemo(() => {
     if (!compositionQuickData || compositionQuickData.length === 0) return null;
@@ -1011,7 +1003,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     if (!assetsMap) return { volumes: new Map<string, number>(), maxVolume: 1, totalSets: 0 };
     const cacheKey = `heatmapMuscleVolumes:${muscleCompQuick}:${compositionGrouping}`;
     return computationCache.getOrCompute(cacheKey, fullData, () => {
-    const now = new Date();
+    const now = effectiveNow;
     let windowStart: Date | null = null;
     if (muscleCompQuick === '7d') windowStart = subDays(now, 7);
     else if (muscleCompQuick === '30d') windowStart = subDays(now, 30);
@@ -1117,7 +1109,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     
     return { volumes, maxVolume: Math.max(maxVol, 1), totalSets: totalSetsRaw };
     }, { ttl: 10 * 60 * 1000 });
-  }, [assetsMap, fullData, muscleCompQuick, compositionGrouping]);
+  }, [assetsMap, fullData, muscleCompQuick, compositionGrouping, effectiveNow]);
 
   // Compute hovered muscle IDs for group highlighting in heatmap
   const heatmapHoveredMuscleIds = useMemo(() => {
@@ -1166,7 +1158,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   return (
     <>
       <style>{ANIMATION_KEYFRAMES}</style>
-      <div className={`space-y-6 pb-20 transition-opacity duration-700 ease-out ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`space-y-2 pb-12 transition-opacity duration-700 ease-out ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
       
         <div className="hidden sm:block">
           <ViewHeader
@@ -1216,9 +1208,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
       )}
 
       {/* 1. HEATMAP (Full Width) */}
-      <Heatmap dailyData={dailyData} totalPrs={totalPrs} onDayClick={onDayClick} />
+      <Heatmap dailyData={dailyData} totalPrs={totalPrs} onDayClick={onDayClick} effectiveNow={effectiveNow} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-2">
         
         {/* 2. PR TRENDS (Area/Bar) */}
         <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl">
@@ -1769,7 +1761,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         </div>
 
       {/* 5. Weekly Rhythm + Muscle Composition */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-2">
         
         {/* Weekly Rhythm: Radar/Bar */}
         <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl">
@@ -2138,7 +2130,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                               const countReservePx = 88;
 
                               return (
-                                <div key={exercise.name} className="w-full min-w-0">
+                                <button
+                                  key={exercise.name}
+                                  type="button"
+                                  onClick={() => onExerciseClick?.(exercise.name)}
+                                  className="w-full min-w-0 text-left"
+                                  title={`View ${exercise.name}`}
+                                >
                                   {/* Mobile layout: stack count below so it never pushes off-screen */}
                                   <div className="flex flex-col gap-1 sm:hidden min-w-0">
                                     <div
@@ -2289,7 +2287,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                                       )}
                                     </div>
                                   </div>
-                                </div>
+                                </button>
                               );
                                 })}
                               </div>
