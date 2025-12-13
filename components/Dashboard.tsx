@@ -109,12 +109,12 @@ const getTrendBadgeTone = (
   return deltaPercent < 0 ? 'good' : 'bad';
 };
 
-const TrendBadge = ({
-  label,
-  tone,
-}: {
+const TrendBadge: React.FC<{
   label: React.ReactNode;
   tone: 'good' | 'bad' | 'neutral' | 'info';
+}> = ({
+  label,
+  tone,
 }) => {
   const cls =
     tone === 'good'
@@ -618,9 +618,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   }, [fullData, exerciseStats, effectiveNow]);
   
   // 1. PRs Over Time Data
-  const prsData = useMemo(() => {
+  type PrsOverTimePoint = {
+    count: number;
+    dateFormatted: string;
+    tooltipLabel?: string;
+    timestamp?: number;
+  };
+
+  const prsData = useMemo<PrsOverTimePoint[]>(() => {
     const mode = chartModes.prTrend === 'all' ? 'daily' : chartModes.prTrend;
-    return getPrsOverTime(fullData, mode as any);
+    return getPrsOverTime(fullData, mode as any) as PrsOverTimePoint[];
   }, [fullData, chartModes.prTrend]);
 
   const prTrendDelta = useMemo(() => {
@@ -633,7 +640,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   const prTrendDelta4 = useMemo(() => {
     if (prsData.length < 5) return null;
     const last = prsData[prsData.length - 1];
-    const prev4Sum = sumLastN(prsData.slice(0, -1), 4, (d) => d.count);
+    const prev4Sum = sumLastN<PrsOverTimePoint>(prsData.slice(0, -1), 4, (d) => d.count);
     if (prev4Sum == null) return null;
     return calculateDelta(last.count, prev4Sum / 4);
   }, [prsData]);

@@ -10,9 +10,10 @@ const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({
 const ExerciseView = React.lazy(() => import('./components/ExerciseView').then(m => ({ default: m.ExerciseView })));
 const HistoryView = React.lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
 const MuscleAnalysis = React.lazy(() => import('./components/MuscleAnalysis').then(m => ({ default: m.MuscleAnalysis })));
+const FlexView = React.lazy(() => import('./components/FlexView').then(m => ({ default: m.FlexView })));
 import { CSVImportModal } from './components/CSVImportModal';
 import { saveCSVData, getCSVData, clearCSVData, saveWeightUnit, getWeightUnit, WeightUnit, getBodyMapGender, saveBodyMapGender } from './utils/localStorage';
-import { LayoutDashboard, Dumbbell, History, Loader2, CheckCircle2, X, Calendar, BicepsFlexed, Pencil, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Dumbbell, History, Loader2, CheckCircle2, X, Calendar, BicepsFlexed, Pencil, RefreshCw, Sparkles } from 'lucide-react';
 import { format, isSameDay, isWithinInterval } from 'date-fns';
 import { CalendarSelector } from './components/CalendarSelector';
 import { trackPageView } from './utils/ga';
@@ -23,7 +24,8 @@ enum Tab {
   DASHBOARD = 'dashboard',
   EXERCISES = 'exercises',
   HISTORY = 'history',
-  MUSCLE_ANALYSIS = 'muscle-analysis'
+  MUSCLE_ANALYSIS = 'muscle-analysis',
+  FLEX = 'flex'
 }
 
 const App: React.FC = () => {
@@ -199,6 +201,7 @@ const App: React.FC = () => {
       import('./components/ExerciseView');
       import('./components/HistoryView');
       import('./components/MuscleAnalysis');
+      import('./components/FlexView');
       // Preload exercise assets (cached globally)
       getExerciseAssets().catch(() => {});
     });
@@ -526,7 +529,7 @@ const App: React.FC = () => {
           </div>
 
           {/* Second Row: Navigation */}
-          <nav className="grid grid-cols-5 gap-1 pt-1 sm:grid sm:grid-cols-4 sm:gap-2">
+          <nav className="grid grid-cols-6 gap-1 pt-1 sm:grid sm:grid-cols-5 sm:gap-2">
             <button 
               onClick={() => {
                 setHighlightedExercise(null);
@@ -571,8 +574,19 @@ const App: React.FC = () => {
               <History className="w-5 h-5" />
               <span className="hidden sm:inline font-medium">History</span>
             </button>
+            <button 
+              onClick={() => {
+                setHighlightedExercise(null);
+                setInitialMuscleForAnalysis(null);
+                navigateToTab(Tab.FLEX, 'top');
+              }}
+              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.FLEX ? 'bg-blue-600 border-blue-500/50 text-white shadow-lg shadow-blue-900/50' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+            >
+              <Sparkles className="w-5 h-5" />
+              <span className="hidden sm:inline font-medium">Flex</span>
+            </button>
 
-            {/* Mobile-only Calendar entry (5th item) */}
+            {/* Mobile-only Calendar entry (6th item) */}
             <button
               onClick={() => setCalendarOpen((v) => !v)}
               className={`sm:hidden w-full h-full relative flex flex-col items-center justify-center px-2 py-2 rounded-lg transition-all duration-200 ${
@@ -681,6 +695,13 @@ const App: React.FC = () => {
               initialMuscle={initialMuscleForAnalysis}
               onInitialMuscleConsumed={() => setInitialMuscleForAnalysis(null)}
               bodyMapGender={bodyMapGender}
+            />
+          )}
+          {activeTab === Tab.FLEX && (
+            <FlexView
+              data={filteredData}
+              filtersSlot={desktopFilterControls}
+              weightUnit={weightUnit}
             />
           )}
         </Suspense>
