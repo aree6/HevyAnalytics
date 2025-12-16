@@ -1,5 +1,5 @@
-import { WorkoutSet, SessionAnalysis, AnalysisResult, SetWisdom, AnalysisStatus, StructuredTooltip, TooltipLine } from '../types';
-import { roundTo } from './formatters';
+import { WorkoutSet, SessionAnalysis, AnalysisResult, SetWisdom, AnalysisStatus, StructuredTooltip, TooltipLine } from '../../types';
+import { roundTo } from '../format/formatters';
 
 // === CONSTANTS ===
 const EPLEY_FACTOR = 30;

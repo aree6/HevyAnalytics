@@ -11,12 +11,12 @@ import {
   PRInsights,
   DeltaResult,
   RecentPR 
-} from '../utils/insights';
-import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
-import { WeightUnit } from '../utils/localStorage';
-import { convertWeight } from '../utils/units';
-import { formatHumanReadableDate } from '../utils/dateUtils';
-import { formatNumber } from '../utils/formatters';
+} from '../utils/analysis/insights';
+import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
+import { WeightUnit } from '../utils/storage/localStorage';
+import { convertWeight } from '../utils/format/units';
+import { formatHumanReadableDate } from '../utils/date/dateUtils';
+import { formatNumber } from '../utils/format/formatters';
 
 // Mini Sparkline Component
 export const Sparkline: React.FC<{ data: SparklinePoint[]; color?: string; height?: number }> = ({ 

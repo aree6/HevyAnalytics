@@ -1,4 +1,4 @@
-import { WeightUnit } from './localStorage';
+import { WeightUnit } from '../storage/localStorage';
 
 const KG_TO_LBS = 2.20462;
 

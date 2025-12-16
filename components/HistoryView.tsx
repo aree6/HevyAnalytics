@@ -4,8 +4,8 @@ import {
   ChevronLeft, ChevronRight, Trophy, Target, Hash, HelpCircle,
   AlertTriangle, Info, TrendingUp, TrendingDown, Calendar, Clock, Dumbbell
 } from 'lucide-react';
-import { analyzeSetProgression, analyzeSession, getStatusColor, analyzeProgression, getWisdomColor, isWarmupSet } from '../utils/masterAlgorithm';
-import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
+import { analyzeSetProgression, analyzeSession, getStatusColor, analyzeProgression, getWisdomColor, isWarmupSet } from '../utils/analysis/masterAlgorithm';
+import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
 import { BodyMap, BodyMapGender } from './BodyMap';
 import { 
   loadExerciseMuscleData, 
@@ -14,14 +14,14 @@ import {
   FULL_BODY_MUSCLES,
   getExerciseMuscleVolumes,
   SVG_MUSCLE_NAMES
-} from '../utils/muscleMapping';
+} from '../utils/muscle/muscleMapping';
 import { ViewHeader } from './ViewHeader';
-import { FANCY_FONT, TOOLTIP_THEMES, calculateCenteredTooltipPosition } from '../utils/uiConstants';
+import { FANCY_FONT, TOOLTIP_THEMES, calculateCenteredTooltipPosition } from '../utils/ui/uiConstants';
 import { format } from 'date-fns';
-import { WeightUnit } from '../utils/localStorage';
-import { convertWeight, convertVolume } from '../utils/units';
-import { formatSignedNumber } from '../utils/formatters';
-import { formatRelativeWithDate, getEffectiveNowFromWorkoutData } from '../utils/dateUtils';
+import { WeightUnit } from '../utils/storage/localStorage';
+import { convertWeight, convertVolume } from '../utils/format/units';
+import { formatSignedNumber } from '../utils/format/formatters';
+import { formatRelativeWithDate, getEffectiveNowFromWorkoutData } from '../utils/date/dateUtils';
 import { LazyRender } from './LazyRender';
 
 interface HistoryViewProps {

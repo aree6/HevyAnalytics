@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnalysisStatus } from '../types';
-import { TOOLTIP_THEMES, TOOLTIP_CONFIG, calculateCenteredTooltipPosition } from '../utils/uiConstants';
+import { TOOLTIP_THEMES, TOOLTIP_CONFIG, calculateCenteredTooltipPosition } from '../utils/ui/uiConstants';
 
 export interface TooltipData {
   rect: DOMRect;

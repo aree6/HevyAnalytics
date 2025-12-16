@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { initGA } from './utils/ga';
+import { initGA } from './utils/integrations/ga';
 import { ThemeProvider } from './components/ThemeProvider';
 import './tailwind.css';
 

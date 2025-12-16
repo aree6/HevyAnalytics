@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { getThemeMode, saveThemeMode, ThemeMode } from '../utils/localStorage';
+import { getThemeMode, saveThemeMode, ThemeMode } from '../utils/storage/localStorage';
 
 interface ThemeContextValue {
   mode: ThemeMode;

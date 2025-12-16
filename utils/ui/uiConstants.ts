@@ -1,5 +1,5 @@
 import React from 'react';
-import type { AnalysisStatus } from '../types';
+import type { AnalysisStatus } from '../../types';
 
 /**
  * Shared UI constants for consistent styling across components.

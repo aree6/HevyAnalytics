@@ -11,11 +11,11 @@ import {
   MuscleVolumeEntry,
   getExerciseMuscleVolumes,
   getVolumeColor,
-} from '../utils/muscleMapping';
-import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
+} from '../utils/muscle/muscleMapping';
+import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
 import { format, startOfWeek, startOfMonth, subWeeks, subMonths, isWithinInterval } from 'date-fns';
-import { formatDayContraction, formatWeekContraction, formatMonthYearContraction } from '../utils/dateUtils';
-import { getSmartFilterMode, TimeFilterMode } from '../utils/localStorage';
+import { formatDayContraction, formatWeekContraction, formatMonthYearContraction } from '../utils/date/dateUtils';
+import { getSmartFilterMode, TimeFilterMode } from '../utils/storage/localStorage';
 import {
   AreaChart,
   Area,
@@ -25,11 +25,11 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Dumbbell, X, Activity, Layers, PersonStanding, BicepsFlexed } from 'lucide-react';
-import { normalizeMuscleGroup, NormalizedMuscleGroup } from '../utils/muscleAnalytics';
+import { normalizeMuscleGroup, NormalizedMuscleGroup } from '../utils/muscle/muscleAnalytics';
 import { LazyRender } from './LazyRender';
 import { ChartSkeleton } from './ChartSkeleton';
 import { Tooltip as HoverTooltip, TooltipData } from './Tooltip';
-import { CHART_TOOLTIP_STYLE } from '../utils/uiConstants';
+import { CHART_TOOLTIP_STYLE } from '../utils/ui/uiConstants';
 import {
   SVG_TO_MUSCLE_GROUP,
   MUSCLE_GROUP_ORDER,
@@ -39,7 +39,7 @@ import {
   QUICK_FILTER_LABELS,
   QUICK_FILTER_GROUPS,
   getSvgIdsForQuickFilter,
-} from '../utils/muscleMappingConstants';
+} from '../utils/muscle/muscleMappingConstants';
 
 interface MuscleAnalysisProps {
   data: WorkoutSet[];

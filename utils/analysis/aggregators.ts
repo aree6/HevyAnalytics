@@ -1,5 +1,5 @@
-import { getDateKey, TimePeriod, sortByTimestamp } from './dateUtils';
-import { roundTo } from './formatters';
+import { getDateKey, TimePeriod, sortByTimestamp } from '../date/dateUtils';
+import { roundTo } from '../format/formatters';
 
 export interface AggregatedBucket<T> {
   key: string;

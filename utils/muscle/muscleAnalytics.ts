@@ -21,9 +21,9 @@
  * - This prevents artificially low averages from vacation/injury periods
  */
 
-import { WorkoutSet } from '../types';
-import type { ExerciseAsset } from './exerciseAssets';
-import { buildTimeSeries } from './aggregators';
+import { WorkoutSet } from '../../types';
+import type { ExerciseAsset } from '../data/exerciseAssets';
+import { buildTimeSeries } from '../analysis/aggregators';
 import {
   getMuscleVolumeTimeSeriesRolling,
   getLatestRollingWeeklyVolume,
@@ -32,8 +32,8 @@ import {
   RollingWeeklyVolume,
   VolumePeriod,
 } from './rollingVolumeCalculator';
-import { roundTo } from './formatters';
-import { formatDayContraction, TimePeriod } from './dateUtils';
+import { roundTo } from '../format/formatters';
+import { formatDayContraction, TimePeriod } from '../date/dateUtils';
 
 // ============================================================================
 // Re-exports from Rolling Volume Calculator

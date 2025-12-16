@@ -1,4 +1,4 @@
-import { WorkoutSet, ExerciseStats, DailySummary } from '../types';
+import { WorkoutSet, ExerciseStats, DailySummary } from '../../types';
 import { format, differenceInDays, differenceInCalendarWeeks, startOfDay, endOfDay, startOfWeek, subDays, subWeeks, isWithinInterval, isSameDay } from 'date-fns';
 import { analyzeExerciseTrendCore, summarizeExerciseHistory } from './exerciseTrend';
 

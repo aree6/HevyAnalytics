@@ -18,10 +18,10 @@
  * - Full Body: Adds 1 set to each major muscle group
  */
 
-import { WorkoutSet } from '../types';
-import type { ExerciseAsset } from './exerciseAssets';
+import { WorkoutSet } from '../../types';
+import type { ExerciseAsset } from '../data/exerciseAssets';
 import { startOfDay, differenceInDays, startOfMonth, startOfYear, format } from 'date-fns';
-import { roundTo } from './formatters';
+import { roundTo } from '../format/formatters';
 
 // ============================================================================
 // Constants

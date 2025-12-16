@@ -1,7 +1,7 @@
-import { WorkoutSet, ExerciseStats, DailySummary } from '../types';
+import { WorkoutSet, ExerciseStats, DailySummary } from '../../types';
 import { format, startOfDay, subDays, eachDayOfInterval, getDay, parse, differenceInMinutes, isValid } from 'date-fns';
-import { getDateKey, TimePeriod, sortByTimestamp } from './dateUtils';
-import { roundTo } from './formatters';
+import { getDateKey, TimePeriod, sortByTimestamp } from '../date/dateUtils';
+import { roundTo } from '../format/formatters';
 
 const sortByParsedDate = (sets: WorkoutSet[], ascending: boolean): WorkoutSet[] => {
   return [...sets].sort((a, b) => {

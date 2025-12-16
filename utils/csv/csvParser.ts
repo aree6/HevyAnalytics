@@ -1,8 +1,8 @@
-import { WorkoutSet } from '../types';
+import { WorkoutSet } from '../../types';
 import { parse, isValid } from 'date-fns';
 import Papa from 'papaparse';
-import { toNumber, toInteger, toString } from './formatters';
-import { DATE_FORMAT_HEVY } from './dateUtils';
+import { toNumber, toInteger, toString } from '../format/formatters';
+import { DATE_FORMAT_HEVY } from '../date/dateUtils';
 
 const REQUIRED_HEADERS = [
   'title',

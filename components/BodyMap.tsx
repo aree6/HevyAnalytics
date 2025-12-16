@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
-import { getVolumeColor, SVG_MUSCLE_GROUPS, CSV_TO_SVG_MUSCLE_MAP } from '../utils/muscleMapping';
-import { INTERACTIVE_MUSCLE_IDS } from '../utils/muscleMappingConstants';
+import { getVolumeColor, SVG_MUSCLE_GROUPS, CSV_TO_SVG_MUSCLE_MAP } from '../utils/muscle/muscleMapping';
+import { INTERACTIVE_MUSCLE_IDS } from '../utils/muscle/muscleMappingConstants';
 import MaleFrontBodyMapMuscle from './MaleFrontBodyMapMuscle';
 import MaleBackBodyMapMuscle from './MaleBackBodyMapMuscle';
 import MaleFrontBodyMapGroup from './MaleFrontBodyMapGroup';

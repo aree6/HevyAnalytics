@@ -6,19 +6,19 @@ import {
   getTopExercisesRadial,
   getPrsOverTime,
   getTopExercisesOverTime
-} from '../utils/analytics';
-import { normalizeMuscleGroup, getMuscleVolumeTimeSeriesCalendar, getMuscleVolumeTimeSeriesDetailedCalendar } from '../utils/muscleAnalytics';
-import { CSV_TO_SVG_MUSCLE_MAP, SVG_MUSCLE_NAMES, getVolumeColor } from '../utils/muscleMapping';
+} from '../utils/analysis/analytics';
+import { normalizeMuscleGroup, getMuscleVolumeTimeSeriesCalendar, getMuscleVolumeTimeSeriesDetailedCalendar } from '../utils/muscle/muscleAnalytics';
+import { CSV_TO_SVG_MUSCLE_MAP, SVG_MUSCLE_NAMES, getVolumeColor } from '../utils/muscle/muscleMapping';
 import { BodyMap, BodyMapGender } from './BodyMap';
-import { MUSCLE_COLORS } from '../utils/categories';
-import { getSmartFilterMode, TimeFilterMode, WeightUnit } from '../utils/localStorage';
-import { convertVolume } from '../utils/units';
-import { CHART_TOOLTIP_STYLE, CHART_COLORS, ANIMATION_KEYFRAMES } from '../utils/uiConstants';
+import { MUSCLE_COLORS } from '../utils/domain/categories';
+import { getSmartFilterMode, TimeFilterMode, WeightUnit } from '../utils/storage/localStorage';
+import { convertVolume } from '../utils/format/units';
+import { CHART_TOOLTIP_STYLE, CHART_COLORS, ANIMATION_KEYFRAMES } from '../utils/ui/uiConstants';
 import {
   SVG_TO_MUSCLE_GROUP,
   MUSCLE_GROUP_TO_SVG_IDS,
   getGroupHighlightIds,
-} from '../utils/muscleMappingConstants';
+} from '../utils/muscle/muscleMappingConstants';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   Legend, AreaChart, Area, 
@@ -35,16 +35,16 @@ import {
 } from 'lucide-react';
 import { Target } from 'lucide-react';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, eachDayOfInterval, subDays, differenceInCalendarDays } from 'date-fns';
-import { formatDayContraction, formatDayYearContraction, formatHumanReadableDate, formatWeekContraction, formatMonthYearContraction, getEffectiveNowFromWorkoutData } from '../utils/dateUtils';
-import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
+import { formatDayContraction, formatDayYearContraction, formatHumanReadableDate, formatWeekContraction, formatMonthYearContraction, getEffectiveNowFromWorkoutData } from '../utils/date/dateUtils';
+import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
 import { ViewHeader } from './ViewHeader';
-import { calculateDashboardInsights, detectPlateaus, calculateDelta, DashboardInsights, PlateauAnalysis, SparklinePoint, StreakInfo } from '../utils/insights';
+import { calculateDashboardInsights, detectPlateaus, calculateDelta, DashboardInsights, PlateauAnalysis, SparklinePoint, StreakInfo } from '../utils/analysis/insights';
 import { InsightsPanel, PlateauAlert, RecentPRsPanel, Sparkline, StreakBadge } from './InsightCards';
-import { computationCache } from '../utils/computationCache';
+import { computationCache } from '../utils/storage/computationCache';
 import { LazyRender } from './LazyRender';
 import { ChartSkeleton } from './ChartSkeleton';
-import { summarizeExerciseHistory } from '../utils/exerciseTrend';
-import { formatNumber, formatSignedNumber } from '../utils/formatters';
+import { summarizeExerciseHistory } from '../utils/analysis/exerciseTrend';
+import { formatNumber, formatSignedNumber } from '../utils/format/formatters';
 import { Tooltip as HoverTooltip, TooltipData } from './Tooltip';
 
 const formatSigned = (n: number) => formatSignedNumber(n, { maxDecimals: 2 });

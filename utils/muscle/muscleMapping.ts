@@ -1,6 +1,6 @@
-import { WorkoutSet } from '../types';
+import { WorkoutSet } from '../../types';
 import { startOfWeek, endOfWeek, format, eachWeekOfInterval, subWeeks } from 'date-fns';
-import { getEffectiveNowFromWorkoutData } from './dateUtils';
+import { getEffectiveNowFromWorkoutData } from '../date/dateUtils';
 import {
   INTERACTIVE_MUSCLE_IDS,
   MUSCLE_GROUP_TO_SVG_IDS,

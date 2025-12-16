@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { addYears, startOfMonth, endOfMonth, startOfWeek, addDays, isSameMonth, isSameDay, format } from 'date-fns';
-import { formatDayYearContraction, formatDayContraction } from '../utils/dateUtils';
+import { formatDayYearContraction, formatDayContraction } from '../utils/date/dateUtils';
 
 // ============================================================================
 // Types

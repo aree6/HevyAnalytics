@@ -1,5 +1,5 @@
 import { format, startOfDay } from 'date-fns';
-import { ExerciseHistoryEntry, ExerciseStats } from '../types';
+import { ExerciseHistoryEntry, ExerciseStats } from '../../types';
 
 export type ExerciseTrendStatus = 'overload' | 'stagnant' | 'regression' | 'neutral' | 'new';
 

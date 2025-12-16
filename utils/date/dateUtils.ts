@@ -1,5 +1,5 @@
 import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, differenceInCalendarDays, isValid } from 'date-fns';
-import { WorkoutSet } from '../types';
+import { WorkoutSet } from '../../types';
 
 export type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
 

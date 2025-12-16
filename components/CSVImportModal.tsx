@@ -3,7 +3,7 @@ import { Upload, Check, X } from 'lucide-react';
 import MaleFrontBodyMapGroup from './MaleFrontBodyMapGroup';
 import FemaleFrontBodyMapGroup from './FemaleFrontBodyMapGroup';
 import type { BodyMapGender } from './BodyMap';
-import type { WeightUnit } from '../utils/localStorage';
+import type { WeightUnit } from '../utils/storage/localStorage';
 import { CSV_LOADING_ANIMATION_SRC } from '../constants';
 
 interface CSVImportModalProps {

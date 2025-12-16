@@ -8,9 +8,9 @@ import {
   Dumbbell, Scale
 } from 'lucide-react';
 import { ExerciseStats, ExerciseHistoryEntry } from '../types';
-import { CHART_TOOLTIP_STYLE, FANCY_FONT } from '../utils/uiConstants';
-import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
-import { getDateKey, TimePeriod, formatHumanReadableDate, formatDayContraction } from '../utils/dateUtils';
+import { CHART_TOOLTIP_STYLE, FANCY_FONT } from '../utils/ui/uiConstants';
+import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
+import { getDateKey, TimePeriod, formatHumanReadableDate, formatDayContraction } from '../utils/date/dateUtils';
 import { BodyMap, BodyMapGender } from './BodyMap';
 import { LazyRender } from './LazyRender';
 import { ChartSkeleton } from './ChartSkeleton';
@@ -20,11 +20,11 @@ import {
   getExerciseMuscleVolumes,
   getVolumeColor,
   SVG_MUSCLE_NAMES
-} from '../utils/muscleMapping';
-import { WeightUnit, getSmartFilterMode, TimeFilterMode } from '../utils/localStorage';
-import { convertWeight } from '../utils/units';
-import { summarizeExerciseHistory, analyzeExerciseTrendCore, ExerciseSessionEntry, ExerciseTrendStatus } from '../utils/exerciseTrend';
-import { formatSignedNumber } from '../utils/formatters';
+} from '../utils/muscle/muscleMapping';
+import { WeightUnit, getSmartFilterMode, TimeFilterMode } from '../utils/storage/localStorage';
+import { convertWeight } from '../utils/format/units';
+import { summarizeExerciseHistory, analyzeExerciseTrendCore, ExerciseSessionEntry, ExerciseTrendStatus } from '../utils/analysis/exerciseTrend';
+import { formatSignedNumber } from '../utils/format/formatters';
 
 // --- TYPES & LOGIC ---
 type ExerciseStatus = ExerciseTrendStatus;
