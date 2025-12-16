@@ -383,7 +383,7 @@ export const getVolumeColor = (sets: number, maxSets: number): string => {
   const ratio = sets / Math.max(maxSets, 1);
   const lightness = 84 - ratio * 64; // 84% → 20%
 
-  return `hsl(5, 75%, ${lightness}%)`;
+  return `hsl(var(--heatmap-hue), 75%, ${lightness}%)`;
 };
 
 // Generate muscle volumes for a specific exercise based on its primary/secondary muscles

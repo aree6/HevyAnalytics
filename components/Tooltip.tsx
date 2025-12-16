@@ -27,7 +27,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ data }) => {
     >
       <div
         className={`border rounded-xl p-3 ${theme} inline-block w-fit`}
-        style={{ maxWidth: TOOLTIP_CONFIG.WIDTH }}
+        style={{ maxWidth: TOOLTIP_CONFIG.WIDTH, backgroundColor: 'rgb(var(--mw-tooltip-rgb) / var(--mw-tooltip-alpha))' }}
       >
         <div className="flex items-center gap-2 mb-1 pb-1 border-b border-white/10">
           <span className="font-bold uppercase text-[10px] tracking-wider">{title}</span>

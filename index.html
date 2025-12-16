@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0, user-scalable=yes" />
     <meta name="google-adsense-account" content="ca-pub-1028241234302201">
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1028241234302201" crossorigin="anonymous"></script>
     <title>HevyAnalytics - Workout Visualizer</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><circle cx='100' cy='100' r='100' fill='%23000000'/><g fill='%23ffffff'><path d='M60 120 L85 85 L110 100 L140 60 L150 70 L110 120 Z' stroke='%23ffffff' stroke-width='8' stroke-linecap='round' stroke-linejoin='round' fill='none'/><rect x='60' y='110' width='15' height='20' rx='2'/><rect x='85' y='105' width='15' height='25' rx='2'/><rect x='110' y='100' width='15' height='30' rx='2'/><rect x='135' y='95' width='15' height='35' rx='2'/></g></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,14 +16,14 @@
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #1e293b;
+        background: var(--scrollbar-track);
       }
       ::-webkit-scrollbar-thumb {
-        background: #475569;
+        background: var(--scrollbar-thumb);
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #64748b;
+        background: var(--scrollbar-thumb-hover);
       }
       
       /* Mobile touch improvements */
@@ -91,13 +90,12 @@
       [class*="bg-slate-900 border"] {
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       }
-      
       [class*="bg-slate-900 border"]:hover {
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
       }
     </style>
 </head>
-  <body class="bg-slate-950 text-slate-100 antialiased h-screen overflow-hidden">
+  <body class="antialiased h-screen overflow-hidden">
     <div id="root" class="h-full w-full"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

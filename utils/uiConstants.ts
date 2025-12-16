@@ -14,9 +14,9 @@ export const FANCY_FONT: Readonly<React.CSSProperties> = {
 
 /** Standard Recharts tooltip styling */
 export const CHART_TOOLTIP_STYLE: Readonly<React.CSSProperties> = {
-  backgroundColor: '#0f172a',
-  borderColor: '#334155',
-  color: '#f8fafc',
+  backgroundColor: 'rgb(var(--panel-rgb) / 0.88)',
+  borderColor: 'rgb(var(--border-rgb) / 0.5)',
+  color: 'var(--text-primary)',
   fontSize: '12px',
   borderRadius: '8px',
 };
@@ -33,13 +33,13 @@ export const CHART_COLORS: readonly string[] = [
   '#ef4444',
 ] as const;
 
-/** Tooltip theme classes by status - transparent (no blur, no black block) */
+/** Tooltip theme classes by status */
 export const TOOLTIP_THEMES: Readonly<Record<AnalysisStatus | 'default', string>> = {
-  success: 'border-emerald-500/35 bg-emerald-950/85 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.14)]',
-  warning: 'border-orange-500/35 bg-orange-950/85 text-orange-100 shadow-[0_0_18px_rgba(249,115,22,0.14)]',
-  danger: 'border-rose-500/35 bg-rose-950/85 text-rose-100 shadow-[0_0_18px_rgba(244,63,94,0.14)]',
-  info: 'border-blue-500/35 bg-slate-900/85 text-slate-200 shadow-[0_0_18px_rgba(59,130,246,0.14)]',
-  default: 'border-slate-700/35 bg-slate-950/85 text-slate-300 shadow-xl',
+  success: 'bg-black/90 text-white border-emerald-400/40 shadow-xl',
+  warning: 'bg-black/90 text-white border-orange-400/40 shadow-xl',
+  danger: 'bg-black/90 text-white border-rose-400/40 shadow-xl',
+  info: 'bg-black/90 text-white border-blue-400/40 shadow-xl',
+  default: 'bg-black/90 text-white border-slate-700/50 shadow-xl',
 };
 
 /** Animation keyframes as CSS string for inline style injection */

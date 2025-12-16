@@ -5,6 +5,7 @@ import {
   Sparkles, Weight, Trophy, Timer, Target, Flame, TrendingUp, Award, Repeat2, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { ViewHeader } from './ViewHeader';
+import { useTheme } from './ThemeProvider';
 import { findBestComparison, formatLargeNumber, getRandomComparison } from '../utils/comparisonData';
 import { WeightUnit } from '../utils/localStorage';
 import { convertVolume, convertWeight } from '../utils/units';
@@ -106,10 +107,10 @@ const YearlyHeatmapCard: React.FC<{
 
   const getCellColor = (count: number) => {
     if (count === 0) return isDark ? 'bg-slate-800/50' : 'bg-slate-300/80';
-    if (count <= 15) return 'bg-emerald-900';
-    if (count <= 30) return 'bg-emerald-700';
-    if (count <= 45) return 'bg-emerald-500';
-    return 'bg-emerald-400';
+    if (count <= 15) return 'bg-emerald-400';
+    if (count <= 30) return 'bg-emerald-500';
+    if (count <= 45) return 'bg-emerald-700';
+    return 'bg-emerald-900';
   };
 
   const months = useMemo(() => {
@@ -1155,7 +1156,8 @@ export const FlexView: React.FC<FlexViewProps> = ({
   dailySummaries: dailySummariesProp,
   exerciseStats: exerciseStatsProp,
 }) => {
-  const [cardTheme, setCardTheme] = useState<CardTheme>('dark');
+  const { mode } = useTheme();
+  const cardTheme: CardTheme = mode === 'light' ? 'light' : 'dark';
 
   const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
   const [showFocusedNav, setShowFocusedNav] = useState(false);
@@ -1375,8 +1377,6 @@ export const FlexView: React.FC<FlexViewProps> = ({
     { id: 'streak', label: 'Streak' },
   ];
 
-  const toggleTheme = () => setCardTheme(t => t === 'dark' ? 'light' : 'dark');
-
   const focusAdjacentCard = (direction: -1 | 1) => {
     setFocusedCardId((currentId) => {
       if (!currentId) return currentId;
@@ -1444,24 +1444,6 @@ export const FlexView: React.FC<FlexViewProps> = ({
           rightStats={[{ icon: Weight, value: `${formatLargeNumber(stats.totalVolume)} ${weightUnit}`, label: 'Volume' }]}
           filtersSlot={filtersSlot}
         />
-      </div>
-
-      {/* Theme toggle */}
-      <div className="flex justify-center mb-1">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggleTheme}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all ${
-              cardTheme === 'dark'
-                ? 'bg-slate-800/80 border-slate-700 hover:bg-slate-700 text-slate-200'
-                : 'bg-white/80 border-slate-300 hover:bg-slate-100 text-slate-700'
-            }`}
-            title={cardTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {cardTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            <span className="text-sm font-medium">{cardTheme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-          </button>
-        </div>
       </div>
 
       {/* Carousel container */}

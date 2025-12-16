@@ -620,7 +620,15 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
               >
               
               {/* --- Session Header Card --- */}
-              <div className="bg-slate-950/70 border border-slate-700/50 rounded-2xl p-5 sm:p-7 min-h-[160px] sm:min-h-[168px] flex flex-row justify-between items-stretch gap-3 sm:gap-6 shadow-xl relative overflow-visible group transition-all duration-300 hover:border-slate-600/50">
+              <div
+                className="border border-slate-700/50 rounded-2xl p-5 sm:p-7 min-h-[160px] sm:min-h-[168px] flex flex-row justify-between items-stretch gap-3 sm:gap-6 shadow-xl relative overflow-visible group transition-all duration-300 hover:border-slate-600/50"
+                style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.78)' }}
+              >
+                <div
+                  className="absolute inset-0 pointer-events-none rounded-2xl"
+                  style={{ backgroundColor: 'rgb(var(--mw-history-header-tint-rgb) / var(--mw-history-header-tint-alpha))' }}
+                />
+                <div className="absolute inset-0 bg-slate-700/10 pointer-events-none rounded-2xl" />
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none group-hover:bg-blue-500/10 transition-all duration-700"></div>
                 
                 <div className="relative z-10 flex-1 min-w-0 flex flex-col justify-between gap-2 md:gap-3">

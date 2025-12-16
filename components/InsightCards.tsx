@@ -294,7 +294,7 @@ const ConsistencyRing: React.FC<{ score: number; size?: number }> = ({ score, si
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#1e293b"
+          stroke="rgb(var(--border-rgb) / 0.5)"
           strokeWidth={strokeWidth}
         />
         <circle
@@ -311,7 +311,7 @@ const ConsistencyRing: React.FC<{ score: number; size?: number }> = ({ score, si
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-[9px] font-bold text-white leading-none">{score}%</span>
+        <span className="text-[9px] font-bold text-slate-200 leading-none">{score}%</span>
       </div>
     </div>
   );
@@ -431,18 +431,18 @@ export const RecentPRCard: React.FC<RecentPRCardProps> = ({ pr, isLatest, asset,
       className={`w-full flex items-center gap-3 p-2 rounded-lg text-left ${isLatest ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-black/50'} ${clickable ? 'cursor-pointer hover:bg-black/60 transition-colors' : 'cursor-default'}`}
     >
       {imgSrc ? (
-        <img src={imgSrc} alt="" className="w-9 h-9 rounded-lg object-cover border border-slate-700 flex-shrink-0" loading="lazy" />
+        <img src={imgSrc} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0" loading="lazy" />
       ) : (
         <div className={`p-1.5 rounded-lg ${isLatest ? 'bg-emerald-500/20' : 'bg-black/50'} flex-shrink-0`}>
           <Dumbbell className={`w-4 h-4 ${isLatest ? 'text-emerald-400' : 'text-slate-500'}`} />
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-white truncate">{exercise}</div>
+        <div className="text-sm font-medium text-[color:var(--text-primary)] truncate">{exercise}</div>
         <div className="text-[10px] text-slate-500">{formatHumanReadableDate(date, { now })}</div>
       </div>
       <div className="text-right">
-        <div className="text-sm font-bold text-white">{convertWeight(weight, weightUnit)}{weightUnit}</div>
+        <div className="text-sm font-bold text-[color:var(--text-primary)]">{convertWeight(weight, weightUnit)}{weightUnit}</div>
         {improvement > 0 ? (
           <div className="text-[10px] font-bold text-emerald-400 flex items-center justify-end gap-0.5">
             <TrendingUp className="w-3 h-3" />+{convertWeight(improvement, weightUnit)}{weightUnit}

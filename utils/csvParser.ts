@@ -10,25 +10,106 @@ const REQUIRED_HEADERS = [
   'exercise_title',
   'set_index',
   'set_type',
-  'weight_kg',
   'reps',
 ] as const;
 
-const normalizeHeader = (header: string): string => header.trim().replace(/^\uFEFF/, '');
+const WEIGHT_HEADERS = ['weight_kg', 'weight_lb', 'weight_lbs'] as const;
+const LBS_TO_KG = 0.45359237;
 
-const validateHevyCSV = (fields: string[] | undefined): void => {
-  const normalizedFields = (fields ?? []).map(normalizeHeader);
+type HeaderMode = 'fast' | 'robust';
+
+const normalizeHeaderFast = (header: string): string => header.trim().replace(/^\uFEFF/, '');
+
+const CONSUMED_HEADERS = [
+  'title',
+  'start_time',
+  'end_time',
+  'description',
+  'exercise_title',
+  'superset_id',
+  'exercise_notes',
+  'set_index',
+  'set_type',
+  'reps',
+  'distance_km',
+  'duration_seconds',
+  'rpe',
+  ...WEIGHT_HEADERS,
+] as const;
+
+const HEADER_ALIASES: Record<string, string> = {
+  starttime: 'start_time',
+  exercisetitle: 'exercise_title',
+  setindex: 'set_index',
+  settype: 'set_type',
+  weightkgs: 'weight_kg',
+  weight_kgs: 'weight_kg',
+  weightkg: 'weight_kg',
+  weight_kg: 'weight_kg',
+  weightinkg: 'weight_kg',
+  weight_in_kg: 'weight_kg',
+  weight_in_kgs: 'weight_kg',
+  weightlbs: 'weight_lbs',
+  weightlb: 'weight_lb',
+  weightinlbs: 'weight_lbs',
+  weight_in_lbs: 'weight_lbs',
+  weightinpounds: 'weight_lbs',
+  weight_in_pounds: 'weight_lbs',
+  weightpounds: 'weight_lbs',
+};
+
+const canonicalizeHeader = (header: string): string => {
+  return header
+    .trim()
+    .replace(/^\uFEFF/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+};
+
+const normalizeHeader = (header: string): string => {
+  const canonical = canonicalizeHeader(header);
+  return HEADER_ALIASES[canonical] ?? canonical;
+};
+
+const getHeaderValidation = (
+  fields: string[],
+  headerNormalizer: (header: string) => string
+): { missing: string[]; hasWeightHeader: boolean } => {
+  const normalizedFields = fields.map(headerNormalizer);
   const missing = REQUIRED_HEADERS.filter(h => !normalizedFields.includes(h));
+  const hasWeightHeader = WEIGHT_HEADERS.some(h => normalizedFields.includes(h));
+  return { missing, hasWeightHeader };
+};
 
+const validateHevyCSV = (fields: string[] | undefined): HeaderMode => {
   if (!fields || fields.length === 0) {
     throw new Error('CSV file is empty or missing a header row. Please export your workout data from the Hevy app and try again.');
   }
 
-  if (missing.length > 0) {
+  const fast = getHeaderValidation(fields, normalizeHeaderFast);
+  if (fast.missing.length === 0 && fast.hasWeightHeader) {
+    const fastFields = fields.map(normalizeHeaderFast);
+    const robustFields = fields.map(normalizeHeader);
+    const needsRobustMapping = CONSUMED_HEADERS.some(
+      (h) => robustFields.includes(h) && !fastFields.includes(h)
+    );
+    return needsRobustMapping ? 'robust' : 'fast';
+  }
+
+  const robust = getHeaderValidation(fields, normalizeHeader);
+  if (robust.missing.length === 0 && robust.hasWeightHeader) return 'robust';
+
+  if (robust.missing.length > 0) {
     throw new Error(
       'Invalid CSV format. HevyAnalytics only supports the workout CSV exported from the Hevy app. If you exported in another language, switch the Hevy app language to English before exporting and try again.'
     );
   }
+
+  throw new Error(
+    'Invalid CSV format. Missing required weight column. Expected one of: weight_kg, weight_lb, weight_lbs.'
+  );
 };
 
 const parseHevyDate = (value: string): Date | undefined => {
@@ -41,16 +122,35 @@ const parseHevyDate = (value: string): Date | undefined => {
   }
 };
 
-const normalizeRowKeys = (row: Record<string, unknown>): Record<string, unknown> => {
+const normalizeRowKeysWith = (
+  row: Record<string, unknown>,
+  headerNormalizer: (header: string) => string
+): Record<string, unknown> => {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(row)) {
-    out[normalizeHeader(key)] = value;
+    out[headerNormalizer(key)] = value;
   }
   return out;
 };
 
+const deriveFieldsFromRows = (rows: Record<string, unknown>[]): string[] => {
+  const fields = new Set<string>();
+  for (const row of rows.slice(0, 25)) {
+    for (const key of Object.keys(row)) {
+      fields.add(key);
+    }
+  }
+  return Array.from(fields);
+};
+
+const identityHeader = (header: string): string => header;
+
 const normalizeRow = (row: Record<string, unknown>): WorkoutSet => {
   const start_time = toString(row.start_time);
+  const weightKg =
+    row.weight_kg != null
+      ? toNumber(row.weight_kg)
+      : toNumber((row as Record<string, unknown>).weight_lbs ?? (row as Record<string, unknown>).weight_lb) * LBS_TO_KG;
   return {
     title: toString(row.title),
     start_time,
@@ -61,7 +161,7 @@ const normalizeRow = (row: Record<string, unknown>): WorkoutSet => {
     exercise_notes: toString(row.exercise_notes),
     set_index: toInteger(row.set_index),
     set_type: toString(row.set_type),
-    weight_kg: toNumber(row.weight_kg),
+    weight_kg: weightKg,
     reps: toNumber(row.reps),
     distance_km: toNumber(row.distance_km),
     duration_seconds: toNumber(row.duration_seconds),
@@ -90,8 +190,23 @@ const parseWithPapa = (csvContent: string, useWorker: boolean): Promise<WorkoutS
           if (results.errors && results.errors.length > 0) {
             throw new Error(results.errors[0]?.message ?? 'Failed to parse CSV');
           }
-          const rows = (results.data ?? []).map(normalizeRowKeys);
-          validateHevyCSV(results.meta.fields);
+          const rawRows = (results.data ?? []) as Record<string, unknown>[];
+          const fields =
+            results.meta.fields && results.meta.fields.length > 0
+              ? results.meta.fields
+              : deriveFieldsFromRows(rawRows);
+          const mode = validateHevyCSV(fields);
+          const rows =
+            mode === 'fast'
+              ? (() => {
+                  const rawRowFields = deriveFieldsFromRows(rawRows);
+                  const direct = getHeaderValidation(rawRowFields, identityHeader);
+                  const alreadyNormalized = direct.missing.length === 0 && direct.hasWeightHeader;
+                  return alreadyNormalized
+                    ? rawRows
+                    : rawRows.map(r => normalizeRowKeysWith(r, normalizeHeaderFast));
+                })()
+              : rawRows.map(r => normalizeRowKeysWith(r, normalizeHeader));
           const mapped = rows.map(normalizeRow);
           const withStart = mapped.filter(s => Boolean(s.start_time)).length;
           const withValidDate = mapped.filter(s => Boolean(s.start_time) && Boolean(s.parsedDate)).length;
@@ -109,7 +224,7 @@ const parseWithPapa = (csvContent: string, useWorker: boolean): Promise<WorkoutS
     };
 
     if (!useWorker) {
-      config.transformHeader = (header) => normalizeHeader(header);
+      config.transformHeader = (header) => normalizeHeaderFast(header);
     }
 
     Papa.parse<Record<string, unknown>>(csvContent, config);
@@ -121,13 +236,21 @@ export const parseWorkoutCSV = (csvContent: string): WorkoutSet[] => {
     header: true,
     skipEmptyLines: true,
     dynamicTyping: true,
-    transformHeader: (header) => normalizeHeader(header),
+    transformHeader: (header) => normalizeHeaderFast(header),
   });
   if (result.errors && result.errors.length > 0) {
     throw new Error(result.errors[0]?.message ?? 'Failed to parse CSV');
   }
-  const rows = result.data ?? [];
-  validateHevyCSV(result.meta.fields);
+  const rawRows = (result.data ?? []) as Record<string, unknown>[];
+  const fields =
+    result.meta.fields && result.meta.fields.length > 0
+      ? result.meta.fields
+      : deriveFieldsFromRows(rawRows);
+  const mode = validateHevyCSV(fields);
+  const rows =
+    mode === 'fast'
+      ? rawRows
+      : rawRows.map(r => normalizeRowKeysWith(r, normalizeHeader));
   return sortByDateDesc(rows.map(normalizeRow));
 };
 

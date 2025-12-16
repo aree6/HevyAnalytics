@@ -121,11 +121,11 @@ const TrendBadge: React.FC<{
 }) => {
   const cls =
     tone === 'good'
-      ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-200'
+      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
       : tone === 'bad'
-        ? 'border-rose-500/30 bg-rose-950/40 text-rose-200'
+        ? 'border-rose-500/30 bg-rose-500/10 text-rose-300'
         : tone === 'info'
-          ? 'border-blue-500/30 bg-slate-900/40 text-slate-200'
+          ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
           : 'border-slate-700/40 bg-slate-900/20 text-slate-300';
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-normal border ${cls}`}>
@@ -463,10 +463,10 @@ const Heatmap = memo(({ dailyData, streakInfo, consistencySparkline, onDayClick,
 
   const getColor = (count: number) => {
     if (count === 0) return 'bg-slate-800/50';
-    if (count <= 15) return 'bg-emerald-900';
-    if (count <= 30) return 'bg-emerald-700';
-    if (count <= 45) return 'bg-emerald-500';
-    return 'bg-emerald-400';
+    if (count <= 15) return 'bg-emerald-400';
+    if (count <= 30) return 'bg-emerald-500';
+    if (count <= 45) return 'bg-emerald-700';
+    return 'bg-emerald-900';
   };
 
   const handleMouseEnter = (e: React.MouseEvent, day: any) => {
@@ -1449,7 +1449,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                     <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip
                       contentStyle={TooltipStyle}
-                      cursor={{stroke: 'rgba(255,255,255,0.1)'}}
+                      cursor={{ stroke: 'rgb(var(--border-rgb) / 0.35)' }}
                       labelFormatter={(l, p) => p[0]?.payload?.tooltipLabel || l}
                     />
                       <Area 
@@ -1471,7 +1471,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                       <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
                       <Tooltip
                         contentStyle={TooltipStyle}
-                        cursor={{ fill: 'rgba(0,0,0,0.35)' }}
+                        cursor={{ fill: 'rgb(var(--overlay-rgb) / 0.12)' }}
                         labelFormatter={(l, p) => p[0]?.payload?.tooltipLabel || l}
                       />
                       <Bar dataKey="count" name="PRs Set" fill="#eab308" radius={[8, 8, 0, 0]} animationDuration={1500} />
@@ -1675,21 +1675,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             isMounted={isMounted}
             topSlot={
               weeklySetsView === 'heatmap' ? (
-                <div className="flex items-center gap-3 text-xs text-slate-400 bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5 w-fit">
+                <div className="flex items-center gap-3 text-xs text-slate-400 bg-slate-950/75 border border-slate-700/50 backdrop-blur-sm rounded-lg px-3 py-1.5 w-fit">
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-2 rounded border border-slate-600" style={{ backgroundColor: 'hsla(0, 0%, 100%, 0.1)' }}></div>
+                    <div className="w-3 h-2 rounded border border-slate-700/50" style={{ backgroundColor: 'rgb(var(--tint-rgb) / 0.06)' }}></div>
                     <span>None</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 75%)' }}></div>
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 75%)' }}></div>
                     <span>Low</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 50%)' }}></div>
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 50%)' }}></div>
                     <span>Med</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 25%)' }}></div>
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 25%)' }}></div>
                     <span>High</span>
                   </div>
                 </div>
@@ -1760,7 +1760,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                       <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                       <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={TooltipStyle} cursor={{ fill: 'rgba(0,0,0,0.35)' }} />
+                      <Tooltip contentStyle={TooltipStyle} cursor={{ fill: 'rgb(var(--overlay-rgb) / 0.12)' }} />
                       <Legend wrapperStyle={{fontSize: '11px'}} />
                       <Bar dataKey="Strength" name="Strength (1-5)" stackId="1" fill="#3b82f6" radius={[0, 0, 0, 0]} animationDuration={1500} />
                       <Bar dataKey="Hypertrophy" name="Hypertrophy (6-12)" stackId="1" fill="#10b981" radius={[0, 0, 0, 0]} animationDuration={1500} />
@@ -1916,7 +1916,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                         <XAxis dataKey="dateFormatted" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                         <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                        <Tooltip contentStyle={TooltipStyle} cursor={{ fill: 'rgba(0,0,0,0.35)' }} />
+                        <Tooltip contentStyle={TooltipStyle} cursor={{ fill: 'rgb(var(--overlay-rgb) / 0.12)' }} />
                         <Legend wrapperStyle={{fontSize: '11px'}} />
                         {trendKeys.map((k, idx) => (
                           <Bar key={k} dataKey={k} name={k} stackId="1" fill={MUSCLE_COLORS[(muscleGrouping==='groups'?k:normalizeMuscleGroup(k))] || '#94a3b8'} radius={idx===trendKeys.length-1?[6,6,0,0]:[0,0,0,0]} animationDuration={1200} />
@@ -2012,7 +2012,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                       <XAxis dataKey="subject" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                       <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={TooltipStyle} cursor={{ fill: 'rgba(0,0,0,0.35)' }} />
+                      <Tooltip contentStyle={TooltipStyle} cursor={{ fill: 'rgb(var(--overlay-rgb) / 0.12)' }} />
                       <Bar dataKey="A" name="Workouts" fill="#ec4899" radius={[8, 8, 0, 0]} animationDuration={1500} />
                     </BarChart>
                   )}
@@ -2094,11 +2094,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                       <YAxis stroke="#8b5cf6" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}${weightUnit}`} />
                       <Tooltip 
                         contentStyle={TooltipStyle} 
-                        cursor={{ fill: 'rgba(0,0,0,0.35)' }}
+                        cursor={{ fill: 'rgb(var(--overlay-rgb) / 0.12)' }}
                         labelFormatter={(l, p) => p[0]?.payload?.tooltipLabel || l} 
                         formatter={(val: number, name) => {
                             if (name === `Volume per Set (${weightUnit})`) return [`${val} ${weightUnit}`, name];
-                            return [val, name];
+                            if (name === 'Set Count') return [`${val} sets`, name];
                         }}
                       />
                       <Legend />

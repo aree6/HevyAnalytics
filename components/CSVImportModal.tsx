@@ -1,9 +1,10 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Upload, Check, X } from 'lucide-react';
 import MaleFrontBodyMapGroup from './MaleFrontBodyMapGroup';
 import FemaleFrontBodyMapGroup from './FemaleFrontBodyMapGroup';
 import type { BodyMapGender } from './BodyMap';
 import type { WeightUnit } from '../utils/localStorage';
+import { CSV_LOADING_ANIMATION_SRC } from '../constants';
 
 interface CSVImportModalProps {
   onFileSelect: (file: File, gender: BodyMapGender, unit: WeightUnit) => void;
@@ -29,6 +30,17 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedGender, setSelectedGender] = useState<BodyMapGender | null>(initialGender ?? null);
   const [selectedUnit, setSelectedUnit] = useState<WeightUnit | null>(initialUnit ?? null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(CSV_LOADING_ANIMATION_SRC, {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'force-cache',
+      signal: controller.signal,
+    }).catch(() => {});
+    return () => controller.abort();
+  }, []);
 
   const showNonEnglishHevyDateHelp = Boolean(
     errorMessage && errorMessage.includes("couldn't parse the workout dates")

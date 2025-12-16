@@ -8,7 +8,7 @@ import {
   Dumbbell, Scale
 } from 'lucide-react';
 import { ExerciseStats, ExerciseHistoryEntry } from '../types';
-import { FANCY_FONT } from '../utils/uiConstants';
+import { CHART_TOOLTIP_STYLE, FANCY_FONT } from '../utils/uiConstants';
 import { getExerciseAssets, ExerciseAsset } from '../utils/exerciseAssets';
 import { getDateKey, TimePeriod, formatHumanReadableDate, formatDayContraction } from '../utils/dateUtils';
 import { BodyMap, BodyMapGender } from './BodyMap';
@@ -263,7 +263,15 @@ const CustomTooltip = ({ active, payload, label, weightUnit }: any) => {
     const reps = payload.find((p: any) => p.dataKey === 'reps')?.value;
     const sets = payload.find((p: any) => p.dataKey === 'sets')?.value;
     return (
-      <div className="bg-black/70 border border-slate-700/50 p-3 rounded-lg shadow-2xl shadow-black/50">
+      <div
+        className="p-3 rounded-lg shadow-2xl"
+        style={{
+          ...CHART_TOOLTIP_STYLE,
+          borderStyle: 'solid',
+          borderWidth: 1,
+          boxShadow: '0 20px 50px -15px rgb(0 0 0 / 0.35)',
+        }}
+      >
         <p className="text-slate-400 text-xs mb-2 font-mono">{label}</p>
         <div className="space-y-1">
           {typeof reps === 'number' ? (
@@ -801,7 +809,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                     );
                   })()}
                   <div className="flex flex-col min-w-0">
-                    <span className={`truncate text-xs ${isSelected ? 'text-blue-100 font-semibold' : 'text-slate-300 group-hover:text-white'}`}>
+                    <span className={`truncate text-xs ${isSelected ? 'text-slate-200 font-semibold' : 'text-slate-300 group-hover:text-white'}`}>
                       {ex.name}
                     </span>
                     <span className="text-[10px] text-slate-500 truncate">
@@ -933,7 +941,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
               </div>
 
               {!isSelectedEligible ? (
-                <div className="rounded-lg p-3 border border-slate-700/50 bg-black/85 bg-slate-700/10 relative overflow-hidden">
+                <div
+                  className="rounded-lg p-3 border border-slate-700/50 relative overflow-hidden"
+                  style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.85)' }}
+                >
+                  <div className="absolute inset-0 bg-slate-700/10 pointer-events-none" />
                   <div className="relative z-10">
                     <h4 className="text-sm sm:text-m text-slate-300 mb-1" style={FANCY_FONT}>
                       Inactive
@@ -947,7 +959,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                   <div className="absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl opacity-10 bg-slate-600" />
                 </div>
               ) : (
-                <div className={`rounded-lg p-3 border ${currentStatus.borderColor} bg-black/85 ${currentStatus.bgColor} relative overflow-hidden group transition-all duration-500`}>
+                <div
+                  className={`rounded-lg p-3 border ${currentStatus.borderColor} relative overflow-hidden group transition-all duration-500`}
+                  style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.85)' }}
+                >
+                  <div className={`absolute inset-0 ${currentStatus.bgColor} pointer-events-none`} />
                   <div className="relative z-10 flex gap-3 h-full items-center">
                     <div className={`p-2 rounded-lg bg-black/50 h-fit ${currentStatus.color} flex-shrink-0`}>
                       <currentStatus.icon size={24} />
@@ -1097,32 +1113,32 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border-rgb) / 0.35)" vertical={false} />
                   <XAxis 
                     dataKey="date" 
-                    stroke="#64748b" 
+                    stroke="var(--text-muted)" 
                     fontSize={10} 
-                    tickLine={false} 
-                    axisLine={false}
-                    dy={10}
+                    animationDuration={1000}
                   />
-                  <YAxis 
-                    stroke="#64748b" 
-                    fontSize={10} 
-                    tickLine={false} 
+                  <YAxis
+                    stroke="var(--text-muted)"
+                    fontSize={10}
+                    tickLine={false}
                     axisLine={false}
                     tickFormatter={(val) => isBodyweightLike ? `${val}` : `${val}${weightUnit}`}
                   />
-                  <Tooltip content={<CustomTooltip weightUnit={weightUnit} />} cursor={{ stroke: '#334155', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                  
-                  <Area 
-                    type="monotone" 
+                  <Tooltip
+                    content={<CustomTooltip weightUnit={weightUnit} />}
+                    cursor={{ stroke: 'rgb(var(--border-rgb) / 0.5)', strokeWidth: 1, strokeDasharray: '4 4' }}
+                  />
+                  <Area
+                    type="monotone"
                     dataKey={isBodyweightLike ? 'reps' : 'oneRepMax'}
-                    stroke="#3b82f6" 
-                    strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#color1RM)" 
-                    activeDot={{ r: 5, strokeWidth: 0, fill: '#60a5fa' }}
+                    stroke="#3b82f6"
+                    strokeWidth={2.5}
+                    fill="url(#color1RM)"
+                    dot={{ r: 3, fill: '#3b82f6' }}
+                    activeDot={{ r: 5, strokeWidth: 0 }}
                     isAnimationActive={true}
                     animationDuration={1000}
                   />
@@ -1130,7 +1146,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                   <Line 
                     type="stepAfter" 
                     dataKey={isBodyweightLike ? 'sets' : 'weight'}
-                    stroke="#64748b" 
+                    stroke="var(--text-muted)" 
                     strokeWidth={1}
                     strokeDasharray="4 4" 
                     dot={false}

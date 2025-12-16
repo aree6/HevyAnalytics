@@ -28,9 +28,9 @@ interface BodyMapProps {
   viewMode?: BodyMapViewMode;
 }
 
-// Hover and selection highlight colors (bright blue theme)
-const HOVER_HIGHLIGHT = 'rgba(14, 90, 182, 1)'; 
-const SELECTION_HIGHLIGHT = 'rgba(37, 99, 235, 1)'; 
+// Hover and selection highlight colors (theme-driven)
+const HOVER_HIGHLIGHT = 'rgb(var(--bodymap-hover-rgb) / 1)';
+const SELECTION_HIGHLIGHT = 'rgb(var(--bodymap-selection-rgb) / 1)';
 
 const INTERACTIVE_MUSCLES: readonly string[] = INTERACTIVE_MUSCLE_IDS;
 
@@ -80,6 +80,9 @@ export const BodyMap: React.FC<BodyMapProps> = ({
         
         el.querySelectorAll('path').forEach(path => {
           path.style.transition = 'all 0.15s ease';
+          path.style.stroke = '#000000';
+          path.style.strokeWidth = compact ? '0.6' : '1';
+          path.style.strokeOpacity = compact ? '0.55' : '0.7';
           
           if (isSelected) {
             // Selected state - blend cyan highlight with volume color

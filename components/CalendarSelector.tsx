@@ -56,12 +56,14 @@ const StartEndTooltip: React.FC<{
       <button
         onClick={onStart}
         className="px-2.5 py-1.5 text-[10px] font-semibold rounded-lg bg-black/40 hover:bg-white/5 border border-emerald-500/30 text-emerald-200 whitespace-nowrap transition-colors"
+        style={{ color: 'rgb(var(--mw-calendar-start-rgb, 16 185 129) / 1)' }}
       >
         Set start
       </button>
       <button
         onClick={onEnd}
         className="px-2.5 py-1.5 text-[10px] font-semibold rounded-lg bg-black/40 hover:bg-white/5 border border-rose-500/30 text-rose-200 whitespace-nowrap transition-colors"
+        style={{ color: 'rgb(var(--mw-calendar-end-rgb, 244 63 94) / 1)' }}
       >
         Set end
       </button>
@@ -105,7 +107,7 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
   // ---------------------------------------------------------------------------
   // State
   // ---------------------------------------------------------------------------
-  const [viewMonth, setViewMonth] = useState<Date>(() => initialMonth ?? initialRange?.start ?? new Date());
+  const [viewMonth, setViewMonth] = useState<Date>(() => initialMonth ?? initialRange?.start ?? maxDate ?? new Date());
   const [rangeStart, setRangeStart] = useState<Date | null>(() => initialRange?.start ?? null);
   const [rangeEnd, setRangeEnd] = useState<Date | null>(() => initialRange?.end ?? null);
   const [tooltipDay, setTooltipDay] = useState<Date | null>(null);
@@ -114,7 +116,7 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
   const [tooltipYear, setTooltipYear] = useState(false);
   const [jumpHighlightDay, setJumpHighlightDay] = useState<Date | null>(null);
 
-  const today = useMemo(() => new Date(), []);
+  const today = useMemo(() => maxDate ?? new Date(), [maxDate]);
   const viewYear = viewMonth.getFullYear();
   const hasSelection = rangeStart !== null && rangeEnd !== null;
 
@@ -127,9 +129,9 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
     if (!availableDates) return [];
     return Array.from(availableDates)
       .map(s => new Date(`${s}T12:00:00`))
-      .filter(d => d <= today && (!minDate || d >= minDate) && (!maxDate || d <= maxDate))
+      .filter(d => (!minDate || d >= minDate) && (!maxDate || d <= maxDate))
       .sort((a, b) => a.getTime() - b.getTime());
-  }, [availableDates, today, minDate, maxDate]);
+  }, [availableDates, minDate, maxDate]);
 
   const yearHasData = useMemo(() => {
     return sortedValidDates.some((d) => d.getFullYear() === viewYear);
@@ -160,7 +162,7 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
   // Helper Functions
   // ---------------------------------------------------------------------------
 
-  const isDisabled = (d: Date) => d > today || (minDate && d < minDate) || (maxDate && d > maxDate);
+  const isDisabled = (d: Date) => (minDate && d < minDate) || (maxDate && d > maxDate);
   const hasData = (d: Date) => !availableDates || validDateSet.has(format(d, 'yyyy-MM-dd'));
   const isValidGymDay = (d: Date) => hasData(d) && !isDisabled(d);
   const weekHasData = (week: Date[]) => week.some(isValidGymDay);
@@ -234,7 +236,7 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
   const isMonthDisabled = (year: number, month: number) => {
     const monthStart = new Date(year, month, 1);
     const monthEnd = endOfMonth(monthStart);
-    return monthStart > today || (minDate && monthEnd < minDate) || (maxDate && monthStart > maxDate);
+    return (minDate && monthEnd < minDate) || (maxDate && monthStart > maxDate);
   };
 
   const isRangeEdge = (d: Date): 'start' | 'end' | null => {
@@ -345,12 +347,12 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
   };
 
   const handleGoToToday = () => {
-    setViewMonth(startOfMonth(new Date()));
+    setViewMonth(startOfMonth(today));
     setTooltipDay(null);
     setTooltipWeek(null);
     setTooltipMonth(null);
     setTooltipYear(false);
-    setJumpHighlightDay(new Date());
+    setJumpHighlightDay(today);
     setTimeout(() => setJumpHighlightDay(null), 1200);
   };
 
@@ -458,10 +460,10 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
             onClick={handleYearClick}
             className={`relative px-4 py-1.5 rounded-lg font-bold text-sm border transition-all duration-200 min-w-[80px] ${
               yearStatus === 'full'
-                ? 'border-slate-500/60 bg-white/10 text-white'
+                ? 'border-slate-500/60 bg-white/10 text-slate-200'
                 : yearStatus === 'partial'
                   ? 'border-slate-600/60 bg-white/5 text-slate-200'
-                  : (yearHasData ? 'border-emerald-500/30 bg-emerald-500/10 text-slate-100 hover:bg-emerald-500/15' : 'border-slate-700/50 bg-black/70 text-slate-200 hover:bg-white/5')
+                  : (yearHasData ? 'border-emerald-500/30 bg-emerald-500/10 text-slate-200 hover:bg-emerald-500/15' : 'border-slate-700/50 bg-black/70 text-slate-200 hover:bg-white/5')
             } ${tooltipYear ? 'ring-2 ring-slate-300/30' : ''}`}
             title="Click again to set start/end for the year"
           >
@@ -503,9 +505,9 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
                 className={`group relative aspect-square w-full rounded-md flex items-center justify-center text-[11px] font-semibold border-2 transition-all duration-200
                   ${status === 'full' ? 'border-slate-500/60 bg-white/10 text-white' 
                     : status === 'partial' ? 'border-slate-600/60 bg-white/5 text-slate-200'
-                    : isCurrentView ? (hasDataInMonth ? 'border-emerald-500/30 bg-emerald-500/10 text-slate-100' : 'border-slate-600/60 bg-black/50 text-slate-200')
+                    : isCurrentView ? (hasDataInMonth ? 'border-emerald-500/30 bg-emerald-500/10 text-slate-200' : 'border-slate-600/60 bg-black/50 text-slate-200')
                     : (hasDataInMonth ? 'border-emerald-500/20 bg-emerald-500/5 text-slate-200 hover:bg-emerald-500/10' : 'border-slate-700/50 bg-black/70 text-slate-300 hover:bg-white/5')}
-                  ${disabled || !hasDataInMonth ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
+                  ${disabled || !hasDataInMonth ? 'opacity-20 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
                   ${showTooltip ? 'ring-2 ring-yellow-400' : ''}
                 `}
                 title={`${MONTH_NAMES[idx]}${isCurrentView ? ' (click again to select)' : ''}`}
@@ -549,7 +551,7 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
                   <div className="relative">
                     <button 
                       className={`group flex items-center justify-center cursor-pointer shrink-0 w-6 h-6 rounded-md border-2 transition-all duration-200
-                        ${!enabledWeek ? 'opacity-40 cursor-not-allowed border-slate-700 bg-slate-800' : ''}
+                        ${!enabledWeek ? 'opacity-25 cursor-not-allowed border-slate-700 bg-slate-800' : ''}
                         ${weekStatus === 'full' ? 'border-slate-500/60 bg-white/10' : ''}
                         ${weekStatus === 'partial' ? 'border-slate-600/60 bg-white/5' : ''}
                         ${weekStatus === 'none' && enabledWeek ? 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 hover:scale-105' : ''}
@@ -574,7 +576,7 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
                   <button
                     onClick={() => onSelectWeek && enabledWeek && onSelectWeek({ start: weekStart, end: weekEnd })}
                     className={`text-[9px] px-1.5 py-1 rounded border w-[72px] shrink-0 truncate ${
-                      enabledWeek ? 'bg-black/70 hover:bg-black/60 border-slate-700/50' : 'bg-black/40 border-slate-700/50 opacity-40 cursor-not-allowed'
+                      enabledWeek ? 'bg-black/70 hover:bg-black/60 border-slate-700/50' : 'bg-black/40 border-slate-700/50 opacity-25 cursor-not-allowed'
                     }`}
                     title={`${formatDayContraction(weekStart)}–${formatDayContraction(weekEnd)}`}
                   >
@@ -608,21 +610,21 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
                               ? 'border-sky-400/70 bg-sky-500/25 text-white font-bold shadow-md'
                               : 'border-sky-500/30 bg-sky-500/15 text-white font-medium'
                             : inMonth 
-                              ? hasWorkout ? 'border-emerald-500/35 bg-emerald-500/12 text-slate-100 hover:bg-emerald-500/18 ring-1 ring-emerald-500/15' : 'border-slate-800/60 bg-black/40 text-slate-500'
+                              ? hasWorkout ? 'border-emerald-500/35 bg-emerald-500/12 text-slate-200 hover:bg-emerald-500/18 ring-1 ring-emerald-500/15' : 'border-slate-800/60 bg-black/40 text-slate-500'
                               : 'border-slate-800 text-slate-500'
                           }
                           ${isToday ? 'ring-1 ring-sky-300/70' : ''}
                           ${isJumpTarget ? 'ring-2 ring-sky-300/70' : ''}
-                          ${disabled || !hasWorkout ? 'opacity-30 cursor-not-allowed' : ''}
+                          ${disabled || !hasWorkout ? 'opacity-20 cursor-not-allowed' : ''}
                           ${showDayTooltip ? 'ring-2 ring-yellow-400' : ''}
                         `}
                       >
                         {format(day, 'd')}
                         {isStart && hasSelection && !isSameDay(rangeStart!, rangeEnd!) && (
-                          <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] text-green-300 font-bold">S</span>
+                          <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] text-emerald-400 font-bold">S</span>
                         )}
                         {isEnd && hasSelection && !isSameDay(rangeStart!, rangeEnd!) && (
-                          <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[8px] text-red-300 font-bold">E</span>
+                          <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[8px] text-rose-400 font-bold">E</span>
                         )}
                       </button>
                       {showDayTooltip && (

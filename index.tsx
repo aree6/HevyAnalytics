@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { initGA } from './utils/ga';
+import { ThemeProvider } from './components/ThemeProvider';
 import './tailwind.css';
 
 const rootElement = document.getElementById('root');
@@ -14,6 +15,8 @@ initGA();
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </React.StrictMode>
 );

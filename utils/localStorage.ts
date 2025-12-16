@@ -109,3 +109,27 @@ export const getBodyMapGender = (): StoredBodyMapGender => {
     return 'male';
   }
 };
+
+export type ThemeMode = 'light' | 'medium-dark' | 'midnight-dark' | 'svg';
+
+const THEME_MODE_KEY = 'hevy_analytics_theme_mode';
+
+export const saveThemeMode = (mode: ThemeMode): void => {
+  try {
+    localStorage.setItem(THEME_MODE_KEY, mode);
+  } catch (error) {
+    console.error('Failed to save theme mode to local storage:', error);
+  }
+};
+
+export const getThemeMode = (): ThemeMode => {
+  try {
+    const mode = localStorage.getItem(THEME_MODE_KEY);
+    return mode === 'light' || mode === 'medium-dark' || mode === 'midnight-dark' || mode === 'svg'
+      ? mode
+      : 'svg';
+  } catch (error) {
+    console.error('Failed to retrieve theme mode from local storage:', error);
+    return 'svg';
+  }
+};

@@ -13,13 +13,16 @@ const MuscleAnalysis = React.lazy(() => import('./components/MuscleAnalysis').th
 const FlexView = React.lazy(() => import('./components/FlexView').then(m => ({ default: m.FlexView })));
 import { CSVImportModal } from './components/CSVImportModal';
 import { saveCSVData, getCSVData, clearCSVData, saveWeightUnit, getWeightUnit, WeightUnit, getBodyMapGender, saveBodyMapGender } from './utils/localStorage';
-import { LayoutDashboard, Dumbbell, History, Loader2, CheckCircle2, X, Calendar, BicepsFlexed, Pencil, RefreshCw, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Dumbbell, History, CheckCircle2, X, Calendar, BicepsFlexed, Pencil, RefreshCw, Sparkles } from 'lucide-react';
 import { format, isSameDay, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { CalendarSelector } from './components/CalendarSelector';
 import { formatDayYearContraction, formatHumanReadableDate } from './utils/dateUtils';
 import { trackPageView } from './utils/ga';
-import BackgroundTexture from './components/BackgroundTexture';
+import { initAdSense } from './utils/adsense';
 import { SupportLinks } from './components/SupportLinks';
+import { ThemedBackground } from './components/ThemedBackground';
+import { ThemeToggleButton } from './components/ThemeToggleButton';
+import { CsvLoadingAnimation } from './components/CsvLoadingAnimation';
 
 enum Tab {
   DASHBOARD = 'dashboard',
@@ -28,6 +31,8 @@ enum Tab {
   MUSCLE_ANALYSIS = 'muscle-analysis',
   FLEX = 'flex'
 }
+
+const ADSENSE_CLIENT = 'ca-pub-1028241234302201';
 
 const App: React.FC = () => {
   const [rawData, setRawData] = useState<string>(DEFAULT_CSV_DATA);
@@ -38,6 +43,12 @@ const App: React.FC = () => {
   const [highlightedExercise, setHighlightedExercise] = useState<string | null>(null);
   const [initialMuscleForAnalysis, setInitialMuscleForAnalysis] = useState<{ muscleId: string; viewMode: 'muscle' | 'group' } | null>(null);
 
+  // Loading State
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0); // 0: Parse, 1: Analyze, 2: Visualize
+  const [progress, setProgress] = useState(0);
+  const progressTimerRef = useRef<number | null>(null);
+
   const mainRef = useRef<HTMLElement | null>(null);
   const activeTabRef = useRef<Tab>(activeTab);
   const tabScrollPositionsRef = useRef<Record<string, number>>({});
@@ -46,6 +57,13 @@ const App: React.FC = () => {
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
+
+  useEffect(() => {
+    if (showCSVModal) return;
+    if (isAnalyzing) return;
+    if (parsedData.length === 0) return;
+    initAdSense(ADSENSE_CLIENT);
+  }, [showCSVModal, isAnalyzing, parsedData.length]);
 
   useEffect(() => {
     const el = mainRef.current;
@@ -124,12 +142,6 @@ const App: React.FC = () => {
     setInitialMuscleForAnalysis({ muscleId, viewMode });
     navigateToTab(Tab.MUSCLE_ANALYSIS, 'deep');
   };
-  
-  // Loading State
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(0); // 0: Parse, 1: Analyze, 2: Visualize
-  const [progress, setProgress] = useState(0);
-  const progressTimerRef = useRef<number | null>(null);
 
   const startProgress = () => {
     setProgress(0);
@@ -464,7 +476,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-transparent text-slate-200 font-sans">
-      <BackgroundTexture />
+      <ThemedBackground />
       
       {/* CSV Import Modal */}
       {showCSVModal && (
@@ -487,7 +499,7 @@ const App: React.FC = () => {
       {isAnalyzing && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in">
           <div className="w-full max-w-md p-8 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col items-center">
-            <Loader2 className="w-16 h-16 text-blue-500 animate-spin mb-6" />
+            <CsvLoadingAnimation className="mb-6" size={160} />
             <h2 className="text-2xl font-bold text-white mb-2">Analyzing Workout Data</h2>
             <p className="text-slate-400 mb-8 text-center">Please wait while we process your sets, calculate volume, and identify personal records.</p>
             
@@ -525,9 +537,12 @@ const App: React.FC = () => {
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <img src="/HevyAnalytics.png" alt="HevyAnalytics Logo" className="w-7 h-7 sm:w-8 sm:h-8" decoding="async" />
               <div className="flex items-center gap-3 min-w-0">
-                <span className="font-bold text-lg sm:text-xl tracking-tight text-white inline-flex items-start whitespace-nowrap">
+                <span
+                  className="font-bold text-lg sm:text-xl tracking-tight inline-flex items-start whitespace-nowrap"
+                  style={{ color: 'var(--app-fg)' }}
+                >
                   <span>HevyAnalytics</span>
-                  <sup className="ml-1 inline-block rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-semibold leading-none tracking-wide text-amber-200 align-super -translate-y-0.5 -translate-x-2">
+                  <sup className="ml-1 inline-block rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-semibold leading-none tracking-wide text-amber-400 align-super -translate-y-0.5 -translate-x-2">
                     BETA
                   </sup>
                 </span>
@@ -541,29 +556,35 @@ const App: React.FC = () => {
                   variant="primary"
                   layout="header"
                   primaryRightSlot={(
-                    <button
-                      type="button"
-                      onClick={handleOpenUpdateFlow}
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200 gap-2"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      <span>Update CSV</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <ThemeToggleButton />
+                      <button
+                        type="button"
+                        onClick={handleOpenUpdateFlow}
+                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200 gap-2"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Update CSV</span>
+                      </button>
+                    </div>
                   )}
                 />
               </div>
 
               {/* Mobile: keep Update action */}
               <div className="md:hidden">
-                <button
-                  type="button"
-                  onClick={handleOpenUpdateFlow}
-                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200 gap-2"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  <span className="hidden sm:inline">Update CSV</span>
-                  <span className="sm:hidden">Update</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <ThemeToggleButton compact={true} />
+                  <button
+                    type="button"
+                    onClick={handleOpenUpdateFlow}
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200 gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span className="hidden sm:inline">Update CSV</span>
+                    <span className="sm:hidden">Update</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -576,7 +597,7 @@ const App: React.FC = () => {
                 setInitialMuscleForAnalysis(null);
                 navigateToTab(Tab.DASHBOARD, 'top');
               }}
-              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.DASHBOARD ? 'bg-black/60 border-slate-600/60 text-white ring-2 ring-white/10' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.DASHBOARD ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
             >
               <LayoutDashboard className="w-5 h-5" />
               <span className="hidden sm:inline font-medium">Dashboard</span>
@@ -587,7 +608,7 @@ const App: React.FC = () => {
                 setInitialMuscleForAnalysis(null);
                 navigateToTab(Tab.MUSCLE_ANALYSIS, 'top');
               }}
-              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-black/60 border-slate-600/60 text-white ring-2 ring-white/10' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
             >
               <BicepsFlexed className="w-5 h-5" />
               <span className="hidden sm:inline font-medium">Muscle</span>
@@ -598,7 +619,7 @@ const App: React.FC = () => {
                 setInitialMuscleForAnalysis(null);
                 navigateToTab(Tab.EXERCISES, 'top');
               }}
-              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.EXERCISES ? 'bg-black/60 border-slate-600/60 text-white ring-2 ring-white/10' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.EXERCISES ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
             >
               <Dumbbell className="w-5 h-5" />
               <span className="hidden sm:inline font-medium">Exercises</span>
@@ -609,7 +630,7 @@ const App: React.FC = () => {
                 setInitialMuscleForAnalysis(null);
                 navigateToTab(Tab.HISTORY, 'top');
               }}
-              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.HISTORY ? 'bg-black/60 border-slate-600/60 text-white ring-2 ring-white/10' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.HISTORY ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
             >
               <History className="w-5 h-5" />
               <span className="hidden sm:inline font-medium">History</span>
@@ -620,7 +641,7 @@ const App: React.FC = () => {
                 setInitialMuscleForAnalysis(null);
                 navigateToTab(Tab.FLEX, 'top');
               }}
-              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.FLEX ? 'bg-black/60 border-slate-600/60 text-white ring-2 ring-white/10' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+              className={`w-full flex items-center justify-center gap-2 px-2 sm:px-3 py-2 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.FLEX ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
             >
               <Sparkles className="w-5 h-5" />
               <span className="hidden sm:inline font-medium">Flex</span>
@@ -631,7 +652,7 @@ const App: React.FC = () => {
               onClick={() => setCalendarOpen((v) => !v)}
               className={`sm:hidden w-full h-full relative flex flex-col items-center justify-center px-2 py-2 rounded-lg transition-all duration-200 ${
                 (selectedDay || selectedWeeks.length > 0 || selectedRange)
-                  ? 'bg-black/50 ring-2 ring-white/10 border border-slate-700/50 text-white'
+                  ? 'bg-white/10 ring-2 ring-white/25 border border-slate-700/50 text-white shadow-sm'
                   : 'bg-black/30 hover:bg-black/60 text-slate-200'
               }`}
               title="Calendar"
@@ -667,15 +688,13 @@ const App: React.FC = () => {
           <div className="absolute inset-0 bg-black/40" onClick={() => setCalendarOpen(false)} />
           <CalendarSelector
             mode="both"
-            initialMonth={selectedDay ?? selectedRange?.start ?? selectedWeeks[0]?.start ?? null}
+            initialMonth={selectedDay ?? selectedRange?.start ?? selectedWeeks[0]?.start ?? effectiveNow ?? null}
             initialRange={
-              selectedDay
-                ? { start: startOfDay(selectedDay), end: endOfDay(selectedDay) }
-                : (selectedRange
-                  ? { start: startOfDay(selectedRange.start), end: endOfDay(selectedRange.end) }
-                  : (selectedWeeks.length === 1
-                    ? { start: startOfDay(selectedWeeks[0].start), end: endOfDay(selectedWeeks[0].end) }
-                    : null))
+              selectedRange
+                ? { start: selectedRange.start, end: selectedRange.end }
+                : selectedWeeks.length === 1
+                ? { start: startOfDay(selectedWeeks[0].start), end: endOfDay(selectedWeeks[0].end) }
+                : null
             }
             minDate={minDate}
             maxDate={maxDate}

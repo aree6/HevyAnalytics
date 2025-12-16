@@ -29,6 +29,7 @@ import { normalizeMuscleGroup, NormalizedMuscleGroup } from '../utils/muscleAnal
 import { LazyRender } from './LazyRender';
 import { ChartSkeleton } from './ChartSkeleton';
 import { Tooltip as HoverTooltip, TooltipData } from './Tooltip';
+import { CHART_TOOLTIP_STYLE } from '../utils/uiConstants';
 import {
   SVG_TO_MUSCLE_GROUP,
   MUSCLE_GROUP_ORDER,
@@ -671,21 +672,21 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
           
           {/* Color Legend - Bottom of body map */}
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
-            <div className="flex items-center gap-3 text-xs text-slate-400 bg-black/70 rounded-lg px-3 py-1.5 border border-slate-700/50">
+            <div className="flex items-center gap-3 text-xs text-slate-400 bg-slate-950/75 rounded-lg px-3 py-1.5 border border-slate-700/50">
               <div className="flex items-center gap-1">
-                <div className="w-3 h-2 rounded border border-slate-600" style={{ backgroundColor: 'hsla(0, 0%, 100%, 0.1)' }}></div>
+                <div className="w-3 h-2 rounded border border-slate-700/50" style={{ backgroundColor: 'rgb(var(--tint-rgb) / 0.06)' }}></div>
                 <span>None</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 75%)' }}></div>
+                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 75%)' }}></div>
                 <span>Low</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 50%)' }}></div>
+                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 50%)' }}></div>
                 <span>Med</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(5, 75%, 25%)' }}></div>
+                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 25%)' }}></div>
                 <span>High</span>
               </div>
             </div>
@@ -777,8 +778,8 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                       <AreaChart data={trendData}>
                         <defs>
                           <linearGradient id="muscleColorGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(5, 75%, 50%)" stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor="hsl(5, 75%, 50%)" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="hsl(var(--heatmap-hue), 75%, 50%)" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="hsl(var(--heatmap-hue), 75%, 50%)" stopOpacity={0}/>
                           </linearGradient>
                         </defs>
                         <XAxis 
@@ -790,19 +791,14 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                         />
                         <YAxis hide />
                         <RechartsTooltip
-                          contentStyle={{
-                            backgroundColor: '#1e293b',
-                            border: '1px solid #334155',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                          }}
-                          labelStyle={{ color: '#f1f5f9' }}
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                          labelStyle={{ color: 'var(--text-primary)' }}
                           formatter={(value: number) => [`${value} sets`, '']}
                         />
                         <Area
                           type="monotone"
                           dataKey="sets"
-                          stroke="hsl(5, 75%, 50%)"
+                          stroke="hsl(var(--heatmap-hue), 75%, 50%)"
                           strokeWidth={2}
                           fill="url(#muscleColorGradient)"
                         />
@@ -859,7 +855,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                         key={ex.name}
                         onClick={() => onExerciseClick?.(ex.name)}
                         type="button"
-                        className="group relative w-full text-left rounded-lg border border-slate-700/50 bg-gradient-to-b from-black/60 to-black/40 p-2 shadow-sm transition-all hover:border-slate-600/60 hover:from-black/70 hover:to-black/50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500/30"
+                        className="group relative w-full text-left rounded-lg border border-slate-700/50 bg-black/50 p-2 shadow-sm transition-all hover:border-slate-600/60 hover:bg-black/60 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-500/30"
                         title={ex.name}
                       >
                         {isTopThree ? (
@@ -877,74 +873,61 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                         <div className="grid grid-cols-1 sm:grid-cols-[1fr_5.25rem] items-stretch gap-2">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 min-w-0">
-                            {!isTopThree && (
-                              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-black/60 text-[11px] font-bold border border-slate-700/50 text-slate-300">
-                                {i + 1}
-                              </div>
-                            )}
-                            {imgUrl ? (
-                              <img
-                                src={imgUrl}
-                                alt=""
-                                className="h-10 w-10 rounded-md object-cover flex-shrink-0 border border-slate-700/70"
-                                loading="lazy"
-                                decoding="async"
-                              />
-                            ) : (
-                              <div className="h-10 w-10 rounded-md bg-black/50 flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-700/70">
-                                <Dumbbell className="w-4 h-4" />
-                              </div>
-                            )}
-                            <div className="min-w-0">
-                              <div className="text-sm font-semibold text-white truncate">
-                                {ex.name}
+                              {!isTopThree && (
+                                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-black/60 text-[11px] font-bold border border-slate-700/50 text-slate-300">
+                                  {i + 1}
+                                </div>
+                              )}
+                              {imgUrl ? (
+                                <img
+                                  src={imgUrl}
+                                  alt=""
+                                  className="h-10 w-10 rounded-md object-cover flex-shrink-0 border border-slate-700/70"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              ) : (
+                                <div className="h-10 w-10 rounded-md bg-black/50 flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-700/70">
+                                  <Dumbbell className="w-4 h-4" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold text-white truncate">{ex.name}</div>
                               </div>
                             </div>
-                          </div>
 
-                            <div className="mt-1.5 border-t border-slate-800/70" />
-
-                            <div className="mt-1.5">
-                              <div className="h-1 w-full rounded-full bg-slate-800/60 overflow-hidden border border-slate-700/30">
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{ width: `${Math.min(Math.max(pct, 0), 100)}%`, backgroundColor: chipBg }}
-                                />
+                            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                                <span className="text-slate-400">
+                                  <span className="text-rose-400 font-semibold">{pct}%</span> of sets
+                                </span>
+                                {isPrimary && (
+                                  <span
+                                    className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/60 text-slate-200 border border-slate-700/50"
+                                    title={`${primaryRounded} primary sets`}
+                                  >
+                                    Primary
+                                  </span>
+                                )}
+                                {isSecondary && (
+                                  <span
+                                    className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/60 text-slate-200 border border-slate-700/50"
+                                    title={`${secondaryRounded} secondary sets`}
+                                  >
+                                    Secondary
+                                  </span>
+                                )}
                               </div>
 
-                              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-                                  <span className="text-slate-400">
-                                    <span className="text-red-300 font-semibold">{pct}%</span> of sets
-                                  </span>
-                                  {isPrimary && (
-                                    <span
-                                      className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/60 text-slate-200 border border-slate-700/50"
-                                      title={`${primaryRounded} primary sets`}
-                                    >
-                                      Primary
-                                    </span>
-                                  )}
-                                  {isSecondary && (
-                                    <span
-                                      className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/60 text-slate-200 border border-slate-700/50"
-                                      title={`${secondaryRounded} secondary sets`}
-                                    >
-                                      Secondary
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div className="text-[11px] font-semibold text-slate-200">
-                                  {setsRounded}{' '}
-                                  <span className="text-slate-400 font-medium">sets</span>
-                                </div>
+                              <div className="text-[11px] font-semibold text-slate-200">
+                                {setsRounded}{' '}
+                                <span className="text-slate-400 font-medium">sets</span>
                               </div>
                             </div>
                           </div>
 
                           <div className="hidden sm:flex w-[5.25rem] justify-end">
-                            <div className="h-full w-[5.25rem] rounded-md border border-slate-700/50 bg-black/30 p-1">
+                            <div className="h-full w-[5.25rem] rounded-md p-1">
                               <div className="h-full w-full flex items-center justify-center">
                                 <BodyMap
                                   onPartClick={() => {}}
