@@ -103,7 +103,10 @@ Description:
 The volume chart component fails to render on Safari browser.
 
 Steps to Reproduce:
-1. Import a CSV file
+1. Open the app
+2. Select your platform
+3. Complete setup (Hevy login/CSV or Strong CSV)
+4. Reproduce the issue
 2. Go to Dashboard tab
 3. Observe the volume chart area
 
@@ -309,7 +312,7 @@ Fixes #38
 ```
 
 ```
-docs: update deployment instructions for Vercel
+docs: update deployment instructions for Netlify + Render
 ```
 
 ## Questions?

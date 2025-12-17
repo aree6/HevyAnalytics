@@ -1,0 +1,170 @@
+# Deployment Guide
+
+This project uses a split deployment:
+
+- Frontend: Netlify (static Vite build)
+- Backend: Render or Railway (Node/Express proxy for the Hevy API)
+
+The backend is required for Hevy login because:
+
+- The Hevy API requires an `x-api-key` header.
+- Browsers will block direct calls due to CORS.
+
+
+## 0) What you will deploy
+
+You will deploy two things:
+
+- Frontend repo root (this folder)
+- Backend folder `backend/` (a separate service)
+
+
+## 1) Deploy the backend on Render (recommended)
+
+### 1.1 Create a Render account
+
+1. Open https://render.com
+2. Click **Sign Up**
+3. Sign in with GitHub (recommended)
+
+### 1.2 Create a new Web Service
+
+1. In the Render dashboard, click **New +**
+2. Click **Web Service**
+3. Connect your GitHub repo that contains this project
+4. Choose the repository and click **Connect**
+
+### 1.3 Configure the service
+
+In the “Create a Web Service” form:
+
+- **Name**: `liftshift-backend` (any name is fine)
+- **Region**: pick closest to you
+- **Branch**: `main`
+- **Root Directory**: `backend`
+- **Runtime**: Node
+- **Build Command**:
+  - `npm install && npm run build`
+- **Start Command**:
+  - `npm start`
+
+### 1.4 Add environment variables (Render UI)
+
+1. Scroll to the **Environment** section
+2. Click **Add Environment Variable**
+3. Add these:
+
+- `HEVY_X_API_KEY` = `klean_kanteen_insulated`
+- `CORS_ORIGINS` = `https://liftshift.app,http://localhost:3000`
+
+4. Click **Create Web Service**
+
+### 1.5 Copy your backend URL
+
+After deploy finishes:
+
+1. Open the service
+2. Find the public URL (looks like `https://liftshift-backend.onrender.com`)
+3. Copy it
+
+### 1.6 Quick test
+
+Open in browser:
+
+- `https://YOUR_BACKEND_URL/api/health`
+
+Expected:
+
+- `{ "status": "ok" }`
+
+
+## 2) Deploy the backend on Railway (alternative)
+
+### 2.1 Create a Railway account
+
+1. Open https://railway.app
+2. Click **Login**
+3. Sign in with GitHub
+
+### 2.2 Create a project
+
+1. Click **New Project**
+2. Click **Deploy from GitHub repo**
+3. Select your repository
+
+### 2.3 Configure Root Directory
+
+Railway will build from repo root by default.
+
+To ensure it runs the backend:
+
+1. Open the project
+2. Go to **Settings**
+3. Find the “Root Directory” setting
+4. Set it to `backend`
+
+### 2.4 Add environment variables
+
+1. Go to **Variables**
+2. Add:
+
+- `HEVY_X_API_KEY` = `klean_kanteen_insulated`
+- `CORS_ORIGINS` = `https://liftshift.app,http://localhost:3000`
+
+### 2.5 Confirm start command
+
+Railway usually detects Node projects automatically.
+
+If it asks:
+
+- Build: `npm run build`
+- Start: `npm start`
+
+
+## 3) Deploy the frontend on Netlify
+
+### 3.1 Add frontend environment variables
+
+Your frontend needs to know where the backend is.
+
+1. Open https://app.netlify.com
+2. Click your site (liftshift)
+3. Go to **Site configuration**
+4. Go to **Build & deploy**
+5. Go to **Environment**
+6. Click **Add a variable**
+
+Add:
+
+- `VITE_BACKEND_URL` = `https://YOUR_BACKEND_URL`
+
+### 3.2 Trigger a deploy
+
+1. Go to **Deploys** tab
+2. Click **Trigger deploy**
+3. Choose **Deploy site**
+
+
+## 4) First-run checklist
+
+After both are deployed:
+
+1. Open https://liftshift.app
+2. You should see the platform selector
+3. Choose:
+   - Strong (CSV) or
+   - Hevy (Login or CSV)
+4. After setup, you should see the dashboard
+
+If you ever want to restart onboarding:
+
+- Open DevTools
+- Application → Local Storage
+- Clear keys starting with `hevy_analytics_`
+
+
+## 5) Notes
+
+- Hevy login is proxied through your backend.
+- The app stores the Hevy token in your browser (localStorage).
+- Your workouts are processed client-side into `WorkoutSet[]`.

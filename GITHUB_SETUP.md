@@ -43,7 +43,7 @@ Add these topics to improve discoverability (GitHub → Settings → Topics):
 ## 3. Links to Add
 
 ### About Section (GitHub → Settings → Options):
-- **Website:** Your deployed URL (e.g., https://hevyanalytics.vercel.app)
+- **Website:** Your deployed URL (https://liftshift.app)
 - **Discussions:** Enable GitHub Discussions for community support
 
 ### Repository Links (in README):
@@ -74,21 +74,9 @@ Add a build status badge. For GitHub Actions, add to README:
 ![Build Status](https://github.com/YOUR_USERNAME/HevyAnalytics/workflows/Build%20and%20Deploy/badge.svg)
 ```
 
-## 6. Environment Secrets (If Using GitHub Actions)
+## 6. Environment Secrets (Optional)
 
-For automatic deployments, add these secrets in GitHub Settings → Secrets:
-
-```
-VERCEL_TOKEN=your_vercel_token
-VERCEL_ORG_ID=your_vercel_org_id
-VERCEL_PROJECT_ID=your_vercel_project_id
-```
-
-To get these:
-1. Go to [vercel.com/account/tokens](https://vercel.com/account/tokens)
-2. Create new token, copy it as `VERCEL_TOKEN`
-3. Deploy project once to Vercel
-4. Get `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` from `.vercel/project.json`
+If you later add CI/CD, store any deployment tokens in GitHub Settings → Secrets.
 
 ## 7. Update All Documentation
 
@@ -104,20 +92,10 @@ Search for and replace in these files:
 
 ## 8. First Deployment
 
-### For Vercel:
-1. Go to [vercel.com](https://vercel.com)
-2. Click "New Project"
-3. Select your GitHub repository
-4. Click Import
-5. Leave defaults (auto-detected correctly)
-6. Click Deploy
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for the recommended split deployment:
 
-Your site will be live at: `https://hevyanalytics-[random].vercel.app`
-
-### Custom Domain (Optional):
-1. In Vercel Project Settings → Domains
-2. Add your custom domain
-3. Follow DNS configuration
+- Backend on Render/Railway
+- Frontend on Netlify
 
 ## 9. Add GitHub Badges (Optional)
 
@@ -175,7 +153,7 @@ If you want others to contribute:
 - [ ] Discussions enabled
 - [ ] All documentation updated with GitHub username
 - [ ] All documentation updated with your name
-- [ ] Deployed to Vercel
+- [ ] Deployed backend + frontend
 - [ ] Added deployed URL to About section
 - [ ] Secrets configured for CI/CD (if using GitHub Actions)
 - [ ] Branch protection set up for main (optional)
@@ -187,8 +165,10 @@ For GitHub-specific help:
 - [GitHub Docs](https://docs.github.com)
 - [GitHub Community Forum](https://github.community)
 
-For Vercel deployment help:
-- [Vercel Docs](https://vercel.com/docs)
+For deployment help:
+- [Netlify Docs](https://docs.netlify.com)
+- [Render Docs](https://render.com/docs)
+- [Railway Docs](https://docs.railway.com)
 
 ---
 

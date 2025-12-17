@@ -39,17 +39,15 @@ That's it! The app is now running locally. 🎉
 
 ### First Time Setup
 
-1. **Export from Hevy App**
-   - Open the Hevy app on your phone
-   - Go to Settings → Export Data
-   - Download your workout CSV file
+1. **Select your platform**
+   - Strong (CSV)
+   - Hevy (Login or CSV)
 
-2. **Import into HevyAnalytics**
-   - Click the "Upload CSV" button in the app
-   - Select your exported CSV file
-   - Wait for processing to complete
+2. **Complete setup**
+   - Strong: choose body type + unit, then import Strong CSV
+   - Hevy: login to fetch workouts, or import Hevy CSV
 
-3. **Explore Your Data**
+3. **Explore your data**
    - **Dashboard** - Overview of your training
    - **Exercises** - Detailed performance per exercise
    - **History** - Browse individual workout sessions
@@ -107,15 +105,7 @@ src/
 
 ## 🌐 Deployment
 
-### Deploy to Vercel (1 minute)
-
-1. Push to GitHub: `git push origin main`
-2. Go to [vercel.com](https://vercel.com)
-3. Import your GitHub repository
-4. Click Deploy
-5. Done! Your app is live
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for other platforms.
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for backend (Render/Railway) + frontend (Netlify).
 
 ---
 

@@ -6,7 +6,7 @@
 
 **Transform your Hevy app CSV exports into powerful workout insights.**  
 
-> 🌐 **Check it out live:** [**HevyAnalytics Website**](https://hevyanalytics.netlify.app)
+> 🌐 **Check it out live:** [**HevyAnalytics Website**](https://liftshift.app)
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
@@ -25,8 +25,8 @@
 </div>
 
 
-1. **Export** your workout data from the Hevy app  
-2. **Upload** the CSV file to HevyAnalytics  
+1. **Select your platform** (Hevy / Strong)  
+2. **Hevy**: Login (or import CSV) / **Strong**: Import CSV  
 3. **Explore** your analytics across Dashboard, Exercises, and History tabs  
 4. **Get insights** with real-time feedback and flexible filtering  
 
@@ -51,7 +51,7 @@ Do the following:
 ---
 
 > ⚡ **Pro Tip:** Don’t forget to visit the live site for instant access:  
-[**Open HevyAnalytics Live**](https://hevyanalytics.netlify.app)
+[**Open HevyAnalytics Live**](https://liftshift.app)
 
 ---
 

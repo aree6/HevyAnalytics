@@ -127,9 +127,9 @@ export const getThemeMode = (): ThemeMode => {
     const mode = localStorage.getItem(THEME_MODE_KEY);
     return mode === 'light' || mode === 'medium-dark' || mode === 'midnight-dark' || mode === 'svg'
       ? mode
-      : 'svg';
+      : 'midnight-dark';
   } catch (error) {
     console.error('Failed to retrieve theme mode from local storage:', error);
-    return 'svg';
+    return 'midnight-dark';
   }
 };

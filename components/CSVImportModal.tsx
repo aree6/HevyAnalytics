@@ -6,23 +6,31 @@ import type { BodyMapGender } from './BodyMap';
 import type { WeightUnit } from '../utils/storage/localStorage';
 import { CSV_LOADING_ANIMATION_SRC } from '../constants';
 
+type Intent = 'initial' | 'update';
+
 interface CSVImportModalProps {
+  intent: Intent;
+  platform: 'hevy' | 'strong';
   onFileSelect: (file: File, gender: BodyMapGender, unit: WeightUnit) => void;
   isLoading?: boolean;
   initialGender?: BodyMapGender;
   initialUnit?: WeightUnit;
   errorMessage?: string | null;
+  onBack?: () => void;
   onClose?: () => void;
   onGenderChange?: (gender: BodyMapGender) => void;
   onUnitChange?: (unit: WeightUnit) => void;
 }
 
 export const CSVImportModal: React.FC<CSVImportModalProps> = ({
+  intent,
+  platform,
   onFileSelect,
   isLoading = false,
   initialGender,
   initialUnit,
   errorMessage,
+  onBack,
   onClose,
   onGenderChange,
   onUnitChange,
@@ -94,6 +102,18 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
       <div className="min-h-full w-full px-2 sm:px-3 py-4 sm:py-6">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-start justify-between gap-4 mb-6">
+            <div className="w-28 flex items-center">
+              {onBack ? (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="inline-flex items-center gap-2 h-9 px-3 rounded-md text-xs font-semibold bg-black/60 hover:bg-black/70 border border-slate-700/50 text-slate-200"
+                >
+                  Back
+                </button>
+              ) : null}
+            </div>
+
             <div className="w-full flex justify-center">
               <div className="inline-flex items-center gap-3">
                 <img
@@ -110,7 +130,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-              {onClose ? (
+              {intent === 'update' && onClose ? (
                 <button
                   type="button"
                   onClick={onClose}
@@ -124,7 +144,9 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
           </div>
 
           <p className="text-slate-400 mb-6 text-center text-xs sm:text-sm">
-            Let’s get set up. Choose your body type and unit, then upload your Hevy or Strong CSV export (Strong is BETA).
+            {platform === 'strong'
+              ? 'Let’s get set up. Choose your body type and unit, then upload your Strong CSV export.'
+              : 'Let’s get set up. Choose your body type and unit, then upload your Hevy CSV export.'}
           </p>
 
           {errorMessage ? (
@@ -281,7 +303,9 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
           >
             <Upload className={`w-6 h-6 sm:w-8 sm:h-8 mb-3 ${(selectedGender && selectedUnit) ? 'text-slate-500' : 'text-slate-600'}`} />
             <p className={`font-medium text-center text-sm sm:text-base ${(selectedGender && selectedUnit) ? 'text-slate-300' : 'text-slate-500'}`}>
-              {(selectedGender && selectedUnit) ? 'Drop your Hevy CSV here' : 'Choose body type + unit first'}
+              {(selectedGender && selectedUnit)
+                ? `Drop your ${platform === 'strong' ? 'Strong' : 'Hevy'} CSV here`
+                : 'Choose body type + unit first'}
             </p>
             <p className="text-slate-500 text-xs sm:text-sm mt-1">
               {(selectedGender && selectedUnit) ? 'or click to choose a file' : 'Then upload your CSV'}
@@ -298,23 +322,25 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
           />
 
           {/* Welcome Steps */}
-          <div className="w-full mb-4">
-            <p className="text-xs text-slate-500 mb-2 text-center">Export from Hevy (steps):</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <div className="flex flex-col items-center">
-                <img src="/Step1.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 1" loading="lazy" decoding="async" />
-              </div>
-              <div className="flex flex-col items-center">
-                <img src="/Step2.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 2" loading="lazy" decoding="async" />
-              </div>
-              <div className="flex flex-col items-center">
-                <img src="/Step3.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 3" loading="lazy" decoding="async" />
-              </div>
-              <div className="flex flex-col items-center">
-                <img src="/Step4.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 4" loading="lazy" decoding="async" />
+          {platform === 'hevy' ? (
+            <div className="w-full mb-4">
+              <p className="text-xs text-slate-500 mb-2 text-center">Export from Hevy (steps):</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="flex flex-col items-center">
+                  <img src="/Step1.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 1" loading="lazy" decoding="async" />
+                </div>
+                <div className="flex flex-col items-center">
+                  <img src="/Step2.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 2" loading="lazy" decoding="async" />
+                </div>
+                <div className="flex flex-col items-center">
+                  <img src="/Step3.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 3" loading="lazy" decoding="async" />
+                </div>
+                <div className="flex flex-col items-center">
+                  <img src="/Step4.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Step 4" loading="lazy" decoding="async" />
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
 
           {isLoading && (
             <p className="text-slate-400 text-xs sm:text-sm text-center">
