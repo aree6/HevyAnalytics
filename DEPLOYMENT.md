@@ -48,6 +48,12 @@ In the “Create a Web Service” form:
 - **Start Command**:
   - `npm start`
 
+Important:
+
+- If you leave **Root Directory** blank, Render will deploy the frontend from repo root.
+- That will fail with: `npm error Missing script: "start"`
+- Fix: set **Root Directory** to `backend` (or create a new Render service configured with `backend`).
+
 ### 1.4 Add environment variables (Render UI)
 
 1. Scroll to the **Environment** section

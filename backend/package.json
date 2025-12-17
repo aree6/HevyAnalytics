@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "main": "dist/index.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "tsc -w -p tsconfig.json",
     "dev:serve": "node --watch dist/index.js",
