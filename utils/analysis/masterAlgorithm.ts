@@ -11,6 +11,7 @@ const DROP_THRESHOLD_MODERATE = 25.0; // 15-25% is significant but acceptable
 const DROP_THRESHOLD_SEVERE = 40.0;   // >40% is concerning
 const FATIGUE_BUFFER = 1.5;           // Allow 1.5 reps below expected due to cumulative fatigue
 const MAX_REPS_FOR_1RM = 12;          // Epley becomes unreliable above ~12 reps
+const MAX_EXPECTED_REPS_DISPLAY = 25; // Prevents extreme expected-rep values on backoff/high-rep work
 
 // === TOOLTIP HELPERS ===
 const line = (text: string, color?: TooltipLine['color'], bold?: boolean): TooltipLine => ({ text, color, bold });
@@ -47,11 +48,86 @@ const calculatePercentChange = (oldVal: number, newVal: number): number => {
   return Number((((newVal - oldVal) / oldVal) * 100).toFixed(1));
 };
 
+const clamp = (val: number, min: number, max: number): number => Math.min(max, Math.max(min, val));
+
+const median = (values: number[]): number => {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+};
+
+const percentile = (values: number[], p: number): number => {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = clamp(p, 0, 1) * (sorted.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  const w = idx - lo;
+  return sorted[lo] * (1 - w) + sorted[hi] * w;
+};
+
+const adjustOneRMForRPE = (oneRM: number, rpe: number | null): number => {
+  if (!oneRM || !Number.isFinite(oneRM)) return 0;
+  if (rpe == null || !Number.isFinite(rpe)) return oneRM;
+  if (rpe < 6 || rpe > 10) return oneRM;
+  const boost = clamp((9 - rpe) * 0.02, 0, 0.1);
+  return oneRM * (1 + boost);
+};
+
+interface ExpectedRepsRange {
+  min: number;
+  max: number;
+  center: number;
+  label: string;
+}
+
+// Expected reps uses a rolling, robust 1RM estimate from prior working sets only.
+// This avoids “future set leakage” and reduces sensitivity to a single outlier set.
+const buildExpectedRepsRange = (
+  priorSets: SetMetrics[],
+  targetWeight: number,
+  targetSetNumber: number
+): ExpectedRepsRange => {
+  const candidates = priorSets
+    .map(s => adjustOneRMForRPE(s.oneRM, s.rpe))
+    .filter(v => v > 0);
+
+  if (candidates.length === 0 || targetWeight <= 0) {
+    return { min: 1, max: 1, center: 1, label: '~1' };
+  }
+
+  const recent = candidates.slice(-4);
+  const estimateOneRM = percentile(recent, 0.75) || median(recent) || median(candidates);
+  const basePredicted = predictReps(estimateOneRM, targetWeight);
+
+  const fatiguePenalty = clamp(0.4 * Math.max(0, targetSetNumber - 1), 0, 3);
+  const rawCenter = Math.max(1, basePredicted - fatiguePenalty);
+  const center = Math.min(rawCenter, MAX_EXPECTED_REPS_DISPLAY);
+
+  const q25 = percentile(recent, 0.25);
+  const q75 = percentile(recent, 0.75);
+  const med = median(recent);
+  const spreadPct = med > 0 ? (q75 - q25) / med : 0;
+  const halfWidth = clamp(1 + Math.round(spreadPct * 3), 1, 3);
+
+  let min = Math.max(1, Math.floor(center - halfWidth));
+  let max = Math.max(min, Math.ceil(center + halfWidth));
+  min = Math.min(min, MAX_EXPECTED_REPS_DISPLAY);
+  max = Math.min(max, MAX_EXPECTED_REPS_DISPLAY);
+  if (max < min) max = min;
+
+  const label = min === max ? `~${min}` : `${min}-${max}`;
+  return { min, max, center, label };
+};
+
 interface SetMetrics {
   weight: number;
   reps: number;
   volume: number;
   oneRM: number;
+  rpe: number | null;
 }
 
 const extractSetMetrics = (set: WorkoutSet): SetMetrics => ({
@@ -59,6 +135,7 @@ const extractSetMetrics = (set: WorkoutSet): SetMetrics => ({
   reps: set.reps,
   volume: set.weight_kg * set.reps,
   oneRM: calculateEpley1RM(set.weight_kg, set.reps),
+  rpe: set.rpe ?? null,
 });
 
 const createAnalysisResult = (
@@ -94,7 +171,9 @@ const analyzeSameWeight = (
   setNumber: number
 ): AnalysisResult => {
   const repDiff = currReps - prevReps;
-  const isFirstWorkingSet = setNumber === 1;
+  // `setNumber` is the current working set number in the transition (e.g. Set 1 → 2 passes 2).
+  // We treat the first transition (after the first working set) specially in messaging.
+  const isAfterFirstWorkingSet = setNumber === 2;
   
   // REPS INCREASED
   if (repDiff > 0) {
@@ -140,7 +219,7 @@ const analyzeSameWeight = (
   
   // MODERATE DROP (15-25%)
   if (dropPctAbs <= DROP_THRESHOLD_MODERATE) {
-    const why: TooltipLine[] = isFirstWorkingSet 
+    const why: TooltipLine[] = isAfterFirstWorkingSet 
       ? [line('First set pushed close to failure', 'yellow')]
       : [line('Lst set was near failure', 'yellow'), line('Or rest was shorter than usual', 'gray')];
     
@@ -156,7 +235,7 @@ const analyzeSameWeight = (
   }
   
   // SEVERE DROP (>25%)
-  const why: TooltipLine[] = isFirstWorkingSet
+  const why: TooltipLine[] = isAfterFirstWorkingSet
     ? [line('First set was to failure', 'red'), line('Limits performance on remaining sets', 'gray')]
     : [line('Accumulated fatigue from lst sets', 'red'), line('Or rest time too short', 'gray')];
   
@@ -179,11 +258,10 @@ const analyzeWeightIncrease = (
   currWeight: number,
   prevReps: number,
   currReps: number,
-  bestOneRM: number
+  expected: ExpectedRepsRange
 ): AnalysisResult => {
-  const expectedRepsRaw = predictReps(bestOneRM, currWeight);
-  const expectedRepsInt = Math.round(expectedRepsRaw);
-  const repDiff = currReps - expectedRepsInt;
+  const expectedLabel = expected.label;
+  const expectedTarget = Math.round(expected.center);
   
   const prevVol = prevWeight * prevReps;
   const currVol = currWeight * currReps;
@@ -191,22 +269,22 @@ const analyzeWeightIncrease = (
   const pct = roundTo(weightChangePct, 0);
 
   // EXCEEDED EXPECTATIONS
-  if (currReps > expectedRepsInt) {
+  if (currReps > expected.max) {
     return createAnalysisResult(
-      transition, 'success', weightChangePct, volChangePct, currReps, `~${expectedRepsInt}`,
+      transition, 'success', weightChangePct, volChangePct, currReps, expectedLabel,
       'Strong Progress',
       `+${pct}% weight, ${currReps} reps`,
       buildStructured(`+${pct}% weight`, 'up', [
-        line(`Got ${currReps} reps (expected ~${expectedRepsInt})`, 'green'),
+        line(`Got ${currReps} reps (expected ${expectedLabel})`, 'green'),
         line('Strength gains showing', 'gray'),
       ])
     );
   }
   
   // MET EXPECTATIONS (within fatigue buffer)
-  if (currReps >= (expectedRepsRaw - FATIGUE_BUFFER)) {
+  if (currReps >= (expected.center - FATIGUE_BUFFER) || (currReps >= expected.min && currReps <= expected.max)) {
     return createAnalysisResult(
-      transition, 'success', weightChangePct, volChangePct, currReps, `~${expectedRepsInt}`,
+      transition, 'success', weightChangePct, volChangePct, currReps, expectedLabel,
       'Good Progress',
       `+${pct}% weight, ${currReps} reps`,
       buildStructured(`+${pct}% weight`, 'up', [
@@ -217,13 +295,13 @@ const analyzeWeightIncrease = (
   }
   
   // SLIGHTLY BELOW (1-3 reps under)
-  if (currReps >= expectedRepsInt - 3) {
+  if (currReps >= expectedTarget - 3) {
     return createAnalysisResult(
-      transition, 'warning', weightChangePct, volChangePct, currReps, `~${expectedRepsInt}`,
+      transition, 'warning', weightChangePct, volChangePct, currReps, expectedLabel,
       'Slightly Ambitious',
       `+${pct}% weight, ${currReps} reps`,
       buildStructured(`+${pct}% weight`, 'up', [
-        line(`Got ${currReps} reps (expected ~${expectedRepsInt})`, 'yellow'),
+        line(`Got ${currReps} reps (expected ${expectedLabel})`, 'yellow'),
         line('Weight jump may be slightly aggressive', 'gray'),
       ], [
         line('Keep trying this weight', 'blue'),
@@ -234,11 +312,11 @@ const analyzeWeightIncrease = (
   
   // SIGNIFICANTLY BELOW
   return createAnalysisResult(
-    transition, 'danger', weightChangePct, volChangePct, currReps, `~${expectedRepsInt}`,
+    transition, 'danger', weightChangePct, volChangePct, currReps, expectedLabel,
     'Premature Jump',
     `+${pct}% weight, ${currReps} reps`,
     buildStructured(`+${pct}% weight`, 'up', [
-      line(`Only ${currReps} reps (expected ~${expectedRepsInt})`, 'red'),
+      line(`Only ${currReps} reps (expected ${expectedLabel})`, 'red'),
       line('Weight increase too aggressive', 'gray'),
     ], [
       line('Build more reps at lst weight first', 'blue'),
@@ -255,10 +333,10 @@ const analyzeWeightDecrease = (
   currWeight: number,
   prevReps: number,
   currReps: number,
-  bestOneRM: number
+  expected: ExpectedRepsRange
 ): AnalysisResult => {
-  const expectedRepsRaw = predictReps(bestOneRM, currWeight);
-  const expectedRepsInt = Math.round(expectedRepsRaw);
+  const expectedLabel = expected.label;
+  const expectedTarget = Math.round(expected.center);
   
   const prevVol = prevWeight * prevReps;
   const currVol = currWeight * currReps;
@@ -266,9 +344,9 @@ const analyzeWeightDecrease = (
   const pct = roundTo(weightChangePct, 0);
   
   // MET OR EXCEEDED EXPECTATIONS
-  if (currReps >= expectedRepsInt) {
+  if (currReps >= expected.min) {
     return createAnalysisResult(
-      transition, 'success', weightChangePct, volChangePct, currReps, `~${expectedRepsInt}`,
+      transition, 'success', weightChangePct, volChangePct, currReps, expectedLabel,
       'Effective Backoff',
       `${pct}% weight, ${currReps} reps`,
       buildStructured(`${pct}% weight`, 'down', [
@@ -279,13 +357,13 @@ const analyzeWeightDecrease = (
   }
   
   // SLIGHTLY BELOW
-  if (currReps >= expectedRepsInt - 3) {
+  if (currReps >= expectedTarget - 3) {
     return createAnalysisResult(
-      transition, 'info', weightChangePct, volChangePct, currReps, `~${expectedRepsInt}`,
+      transition, 'info', weightChangePct, volChangePct, currReps, expectedLabel,
       'Fatigued Backoff',
       `${pct}% weight, ${currReps} reps`,
       buildStructured(`${pct}% weight`, 'down', [
-        line(`Got ${currReps} reps (expected ~${expectedRepsInt})`, 'yellow'),
+        line(`Got ${currReps} reps (expected ${expectedLabel})`, 'yellow'),
         line('Accumulated fatigue from earlier sets', 'gray'),
       ])
     );
@@ -293,11 +371,11 @@ const analyzeWeightDecrease = (
   
   // SIGNIFICANTLY BELOW
   return createAnalysisResult(
-    transition, 'warning', weightChangePct, volChangePct, currReps, `~${expectedRepsInt}`,
+    transition, 'warning', weightChangePct, volChangePct, currReps, expectedLabel,
     'Heavy Fatigue',
     `${pct}% weight, ${currReps} reps`,
     buildStructured(`${pct}% weight`, 'down', [
-      line(`Only ${currReps} reps (expected ~${expectedRepsInt})`, 'red'),
+      line(`Only ${currReps} reps (expected ${expectedLabel})`, 'red'),
       line('High accumulated fatigue', 'gray'),
     ], [
       line('Good if training to failure intentionally', 'green'),
@@ -313,16 +391,12 @@ export const analyzeSetProgression = (sets: WorkoutSet[]): AnalysisResult[] => {
   if (workingSets.length < 2) return [];
 
   const results: AnalysisResult[] = [];
-  
-  // Track best 1RM from working sets only
-  let bestSession1RM = 0;
-  for (const set of workingSets) {
-    const metrics = extractSetMetrics(set);
-    bestSession1RM = Math.max(bestSession1RM, metrics.oneRM);
-  }
+
+  // Build expectations from prior working sets only (rolling) to avoid “future set” leakage.
+  const priorMetrics: SetMetrics[] = [extractSetMetrics(workingSets[0])];
 
   for (let i = 1; i < workingSets.length; i++) {
-    const prev = extractSetMetrics(workingSets[i - 1]);
+    const prev = priorMetrics[priorMetrics.length - 1];
     const curr = extractSetMetrics(workingSets[i]);
     const transition = `Set ${i} → ${i + 1}`;
 
@@ -338,24 +412,28 @@ export const analyzeSetProgression = (sets: WorkoutSet[]): AnalysisResult[] => {
     } 
     // Weight increased
     else if (weightChangePct > 0) {
+      const expected = buildExpectedRepsRange(priorMetrics, curr.weight, i + 1);
       result = analyzeWeightIncrease(
         transition, weightChangePct, 
         prev.weight, curr.weight, 
         prev.reps, curr.reps, 
-        bestSession1RM
+        expected
       );
     } 
     // Weight decreased (backoff/drop set)
     else {
+      const expected = buildExpectedRepsRange(priorMetrics, curr.weight, i + 1);
       result = analyzeWeightDecrease(
         transition, weightChangePct,
         prev.weight, curr.weight,
         prev.reps, curr.reps,
-        bestSession1RM
+        expected
       );
     }
 
     results.push(result);
+
+    priorMetrics.push(curr);
   }
 
   return results;

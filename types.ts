@@ -59,6 +59,17 @@ export interface SessionAnalysis {
   avgReps: number;
   setCount: number;
   tooltip?: string;
+  primaryGoal?: string;
+  secondaryGoal?: string;
+  repBands?: {
+    strengthSets: number;
+    hypertrophySets: number;
+    enduranceSets: number;
+    totalWorkingSets: number;
+    strengthPct: number;
+    hypertrophyPct: number;
+    endurancePct: number;
+  };
 }
 
 export type AnalysisStatus = 'success' | 'warning' | 'danger' | 'info';

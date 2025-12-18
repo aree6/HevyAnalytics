@@ -102,8 +102,10 @@ Do the following:
 
 - **Dashboard Analytics** - Volume trends, workout distribution, key metrics
 - **Exercise Tracking** - Personal records, 1RM estimates, performance trends
+- **Trend Confidence** - Trend insights include confidence and short evidence notes to reduce noisy recommendations
 - **History Visualization** - Detailed workout logs with date filtering
-- **Set-by-Set Feedback** - Real-time feedback on your performance
+- **Set-by-Set Feedback** - Real-time feedback on your performance (including rolling, fatigue-aware expected rep ranges)
+- **Session Goal Detection** - Detects whether a session was Strength/Hypertrophy/Endurance/Mixed based on rep-zone distribution
 - **Local Storage** - Data saved in your browser
 - **Theme Modes** - Day (light), Medium dark, Midnight dark, Pure black, and Texture
 

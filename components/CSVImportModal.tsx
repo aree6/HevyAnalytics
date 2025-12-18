@@ -15,6 +15,8 @@ interface CSVImportModalProps {
   intent: Intent;
   platform: 'hevy' | 'strong';
   variant?: CSVImportVariant;
+  /** Hide the body type + weight unit selectors (used when preferences were already collected earlier in onboarding). */
+  hideBodyTypeAndUnit?: boolean;
   onFileSelect?: (file: File, gender: BodyMapGender, unit: WeightUnit) => void;
   onContinue?: (gender: BodyMapGender, unit: WeightUnit) => void;
   continueLabel?: string;
@@ -34,6 +36,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
   platform,
   onFileSelect,
   variant = 'csv',
+  hideBodyTypeAndUnit = false,
   onContinue,
   continueLabel = 'Continue',
   isLoading = false,
@@ -50,6 +53,9 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
   const [selectedGender, setSelectedGender] = useState<BodyMapGender | null>(initialGender ?? null);
   const [selectedUnit, setSelectedUnit] = useState<WeightUnit | null>(initialUnit ?? null);
   const [showExportHelp, setShowExportHelp] = useState(false);
+
+  const showBodyTypeAndUnitSelectors = variant === 'preferences' || !hideBodyTypeAndUnit;
+  const canUploadCsv = Boolean(selectedGender && selectedUnit);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -166,9 +172,11 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
           <p className="text-slate-400 mb-6 text-center text-xs sm:text-sm">
             {variant === 'preferences'
               ? 'Let’s get set up. Choose your body type and unit, then continue.'
-              : platform === 'strong'
-              ? 'Let’s get set up. Choose your body type and unit, then upload your Strong CSV export.'
-              : 'Let’s get set up. Choose your body type and unit, then upload your Hevy CSV export.'}
+              : showBodyTypeAndUnitSelectors
+              ? platform === 'strong'
+                ? 'Let’s get set up. Choose your body type and unit, then upload your Strong CSV export.'
+                : 'Let’s get set up. Choose your body type and unit, then upload your Hevy CSV export.'
+              : `Drop your ${platform === 'strong' ? 'Strong' : 'Hevy'} CSV export below.`}
           </p>
 
           {errorMessage ? (
@@ -188,135 +196,139 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
             </div>
           ) : null}
 
-          {/* Gender Selection with Body Map Preview */}
-          <div className="w-full mb-6">
-            <p className="text-sm font-semibold text-slate-300 mb-3 text-center inline-flex items-center justify-center gap-2 w-full">
-              <UserRound className="w-4 h-4 text-slate-300" />
-              <span>Choose your body type</span>
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-            {/* Male Option */}
-            <button
-              onClick={() => {
-                setSelectedGender('male');
-                onGenderChange?.('male');
-              }}
-              className={`relative p-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center ${
-                selectedGender === 'male'
-                  ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/20'
-                  : 'border-slate-700/50 hover:border-slate-500/70 hover:bg-black/60'
-              }`}
-            >
-              {selectedGender === 'male' && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                  <Check className="w-3 h-3 text-white" />
+          {showBodyTypeAndUnitSelectors ? (
+            <>
+              {/* Gender Selection with Body Map Preview */}
+              <div className="w-full mb-6">
+                <p className="text-sm font-semibold text-slate-300 mb-3 text-center inline-flex items-center justify-center gap-2 w-full">
+                  <UserRound className="w-4 h-4 text-slate-300" />
+                  <span>Choose your body type</span>
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                {/* Male Option */}
+                <button
+                  onClick={() => {
+                    setSelectedGender('male');
+                    onGenderChange?.('male');
+                  }}
+                  className={`relative p-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center ${
+                    selectedGender === 'male'
+                      ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/20'
+                      : 'border-slate-700/50 hover:border-slate-500/70 hover:bg-black/60'
+                  }`}
+                >
+                  {selectedGender === 'male' && (
+                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                  <div className="h-28 sm:h-32 flex items-center justify-center overflow-hidden">
+                    <MaleFrontBodyMapGroup className="h-full w-auto opacity-70" />
+                  </div>
+                  <span className={`mt-1 font-semibold text-xs ${
+                    selectedGender === 'male' ? 'text-blue-400' : 'text-slate-400'
+                  }`}>
+                    Male
+                  </span>
+                </button>
+
+                {/* Female Option */}
+                <button
+                  onClick={() => {
+                    setSelectedGender('female');
+                    onGenderChange?.('female');
+                  }}
+                  className={`relative p-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center ${
+                    selectedGender === 'female'
+                      ? 'border-pink-500 bg-pink-500/10 shadow-lg shadow-pink-500/20'
+                      : 'border-slate-700/50 hover:border-slate-500/70 hover:bg-black/60'
+                  }`}
+                >
+                  {selectedGender === 'female' && (
+                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-pink-500 flex items-center justify-center">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                  <div className="h-28 sm:h-32 flex items-center justify-center overflow-hidden">
+                    <FemaleFrontBodyMapGroup className="h-full w-auto opacity-70" />
+                  </div>
+                  <span className={`mt-1 font-semibold text-xs ${
+                    selectedGender === 'female' ? 'text-pink-400' : 'text-slate-400'
+                  }`}>
+                    Female
+                  </span>
+                </button>
                 </div>
-              )}
-              <div className="h-28 sm:h-32 flex items-center justify-center overflow-hidden">
-                <MaleFrontBodyMapGroup className="h-full w-auto opacity-70" />
               </div>
-              <span className={`mt-1 font-semibold text-xs ${
-                selectedGender === 'male' ? 'text-blue-400' : 'text-slate-400'
-              }`}>
-                Male
-              </span>
-            </button>
 
-            {/* Female Option */}
-            <button
-              onClick={() => {
-                setSelectedGender('female');
-                onGenderChange?.('female');
-              }}
-              className={`relative p-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center ${
-                selectedGender === 'female'
-                  ? 'border-pink-500 bg-pink-500/10 shadow-lg shadow-pink-500/20'
-                  : 'border-slate-700/50 hover:border-slate-500/70 hover:bg-black/60'
-              }`}
-            >
-              {selectedGender === 'female' && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-pink-500 flex items-center justify-center">
-                  <Check className="w-3 h-3 text-white" />
+              {/* Weight Unit Selection */}
+              <div className="w-full mb-6">
+                <p className="text-sm font-semibold text-slate-300 mb-3 text-center inline-flex items-center justify-center gap-2 w-full">
+                  <Weight className="w-4 h-4 text-slate-300" />
+                  <span>Choose your weight unit</span>
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                {/* KG Option */}
+                <button
+                  onClick={() => {
+                    setSelectedUnit('kg');
+                    onUnitChange?.('kg');
+                  }}
+                  className={`relative p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center ${
+                    selectedUnit === 'kg'
+                      ? 'border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/20'
+                      : 'border-slate-700/50 hover:border-slate-500/70 hover:bg-black/60'
+                  }`}
+                >
+                  {selectedUnit === 'kg' && (
+                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                  <span className={`text-2xl font-bold ${
+                    selectedUnit === 'kg' ? 'text-emerald-400' : 'text-slate-400'
+                  }`}>
+                    KG
+                  </span>
+                  <span className={`mt-1 text-xs ${
+                    selectedUnit === 'kg' ? 'text-emerald-400/70' : 'text-slate-500'
+                  }`}>
+                    Kilograms
+                  </span>
+                </button>
+
+                {/* LBS Option */}
+                <button
+                  onClick={() => {
+                    setSelectedUnit('lbs');
+                    onUnitChange?.('lbs');
+                  }}
+                  className={`relative p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center ${
+                    selectedUnit === 'lbs'
+                      ? 'border-orange-500 bg-orange-500/10 shadow-lg shadow-orange-500/20'
+                      : 'border-slate-700/50 hover:border-slate-500/70 hover:bg-black/60'
+                  }`}
+                >
+                  {selectedUnit === 'lbs' && (
+                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                  <span className={`text-2xl font-bold ${
+                    selectedUnit === 'lbs' ? 'text-orange-400' : 'text-slate-400'
+                  }`}>
+                    LBS
+                  </span>
+                  <span className={`mt-1 text-xs ${
+                    selectedUnit === 'lbs' ? 'text-orange-400/70' : 'text-slate-500'
+                  }`}>
+                    Pounds
+                  </span>
+                </button>
                 </div>
-              )}
-              <div className="h-28 sm:h-32 flex items-center justify-center overflow-hidden">
-                <FemaleFrontBodyMapGroup className="h-full w-auto opacity-70" />
               </div>
-              <span className={`mt-1 font-semibold text-xs ${
-                selectedGender === 'female' ? 'text-pink-400' : 'text-slate-400'
-              }`}>
-                Female
-              </span>
-            </button>
-            </div>
-          </div>
-
-          {/* Weight Unit Selection */}
-          <div className="w-full mb-6">
-            <p className="text-sm font-semibold text-slate-300 mb-3 text-center inline-flex items-center justify-center gap-2 w-full">
-              <Weight className="w-4 h-4 text-slate-300" />
-              <span>Choose your weight unit</span>
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-            {/* KG Option */}
-            <button
-              onClick={() => {
-                setSelectedUnit('kg');
-                onUnitChange?.('kg');
-              }}
-              className={`relative p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center ${
-                selectedUnit === 'kg'
-                  ? 'border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/20'
-                  : 'border-slate-700/50 hover:border-slate-500/70 hover:bg-black/60'
-              }`}
-            >
-              {selectedUnit === 'kg' && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
-                  <Check className="w-3 h-3 text-white" />
-                </div>
-              )}
-              <span className={`text-2xl font-bold ${
-                selectedUnit === 'kg' ? 'text-emerald-400' : 'text-slate-400'
-              }`}>
-                KG
-              </span>
-              <span className={`mt-1 text-xs ${
-                selectedUnit === 'kg' ? 'text-emerald-400/70' : 'text-slate-500'
-              }`}>
-                Kilograms
-              </span>
-            </button>
-
-            {/* LBS Option */}
-            <button
-              onClick={() => {
-                setSelectedUnit('lbs');
-                onUnitChange?.('lbs');
-              }}
-              className={`relative p-4 rounded-xl border-2 transition-all duration-200 flex flex-col items-center ${
-                selectedUnit === 'lbs'
-                  ? 'border-orange-500 bg-orange-500/10 shadow-lg shadow-orange-500/20'
-                  : 'border-slate-700/50 hover:border-slate-500/70 hover:bg-black/60'
-              }`}
-            >
-              {selectedUnit === 'lbs' && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center">
-                  <Check className="w-3 h-3 text-white" />
-                </div>
-              )}
-              <span className={`text-2xl font-bold ${
-                selectedUnit === 'lbs' ? 'text-orange-400' : 'text-slate-400'
-              }`}>
-                LBS
-              </span>
-              <span className={`mt-1 text-xs ${
-                selectedUnit === 'lbs' ? 'text-orange-400/70' : 'text-slate-500'
-              }`}>
-                Pounds
-              </span>
-            </button>
-            </div>
-          </div>
+            </>
+          ) : null}
 
           {variant === 'preferences' ? (
             <button
@@ -332,23 +344,25 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
             <>
               {/* Drag and Drop Area - Only enabled after gender and unit selection */}
               <div
-                onDragOver={(selectedGender && selectedUnit) ? handleDragOver : undefined}
-                onDrop={(selectedGender && selectedUnit) ? handleDrop : undefined}
-                onClick={() => (selectedGender && selectedUnit) && fileInputRef.current?.click()}
+                onDragOver={canUploadCsv ? handleDragOver : undefined}
+                onDrop={canUploadCsv ? handleDrop : undefined}
+                onClick={() => canUploadCsv && fileInputRef.current?.click()}
                 className={`w-full p-6 mb-6 border-2 border-dashed rounded-xl transition-all flex flex-col items-center justify-center ${
-                  (selectedGender && selectedUnit)
+                  canUploadCsv
                     ? 'border-slate-600 hover:border-slate-400 hover:bg-black/60 cursor-pointer'
                     : 'border-slate-800 bg-black/40 cursor-not-allowed opacity-50'
                 }`}
               >
-                <Upload className={`w-6 h-6 sm:w-8 sm:h-8 mb-3 ${(selectedGender && selectedUnit) ? 'text-slate-500' : 'text-slate-600'}`} />
-                <p className={`font-medium text-center text-sm sm:text-base ${(selectedGender && selectedUnit) ? 'text-slate-300' : 'text-slate-500'}`}>
-                  {(selectedGender && selectedUnit)
+                <Upload className={`w-6 h-6 sm:w-8 sm:h-8 mb-3 ${canUploadCsv ? 'text-slate-500' : 'text-slate-600'}`} />
+                <p className={`font-medium text-center text-sm sm:text-base ${canUploadCsv ? 'text-slate-300' : 'text-slate-500'}`}>
+                  {canUploadCsv
                     ? `Drop your ${platform === 'strong' ? 'Strong' : 'Hevy'} CSV here`
+                    : hideBodyTypeAndUnit
+                    ? 'Go back to choose body type + unit first'
                     : 'Choose body type + unit first'}
                 </p>
                 <p className="text-slate-500 text-xs sm:text-sm mt-1">
-                  {(selectedGender && selectedUnit) ? 'or click to choose a file' : 'Then upload your CSV'}
+                  {canUploadCsv ? 'or click to choose a file' : 'Then upload your CSV'}
                 </p>
               </div>
 
@@ -358,7 +372,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
                 accept=".csv"
                 onChange={handleFileChange}
                 className="hidden"
-                disabled={isLoading || !selectedGender || !selectedUnit}
+                disabled={isLoading || !canUploadCsv}
               />
             </>
           )}

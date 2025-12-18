@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, Trophy, Target, Hash, HelpCircle,
   AlertTriangle, Info, TrendingUp, TrendingDown, Calendar, Clock, Dumbbell
 } from 'lucide-react';
-import { analyzeSetProgression, analyzeSession, getStatusColor, analyzeProgression, getWisdomColor, isWarmupSet } from '../utils/analysis/masterAlgorithm';
+import { analyzeSetProgression, getStatusColor, analyzeProgression, getWisdomColor, isWarmupSet } from '../utils/analysis/masterAlgorithm';
 import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
 import { BodyMap, BodyMapGender } from './BodyMap';
 import { 
@@ -340,7 +340,7 @@ const TooltipPortal: React.FC<{ data: TooltipState }> = ({ data }) => {
           </div>
         ) : (
           /* Fallback to simple body text */
-          <div className="text-sm leading-relaxed opacity-90 break-words">{body}</div>
+          <div className="text-sm leading-relaxed opacity-90 break-words whitespace-pre-line">{body}</div>
         )}
         
         {/* Metrics footer */}
@@ -603,7 +603,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
   const currentSessions = sessions.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   // Tooltip Logic
-  const buildTooltipState = (rect: DOMRect, data: any, variant: 'set' | 'macro' | 'session'): TooltipState => {
+  const buildTooltipState = (rect: DOMRect, data: any, variant: 'set' | 'macro'): TooltipState => {
     let title = '';
     let body = '';
     let status: AnalysisResult['status'] = 'info';
@@ -624,21 +624,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
       title = insight.message;
       body = insight.tooltip || '';
       status = insight.type === 'promote' ? 'success' : insight.type === 'demote' ? 'warning' : 'info';
-    } else if (variant === 'session') {
-      title = 'Session Goal';
-      body = data.tooltip;
-      status = 'info';
     }
 
     return { rect, title, body, status, metrics, structured };
   };
 
-  const handleMouseEnter = (e: React.MouseEvent, data: any, variant: 'set' | 'macro' | 'session') => {
+  const handleMouseEnter = (e: React.MouseEvent, data: any, variant: 'set' | 'macro') => {
     const rect = e.currentTarget.getBoundingClientRect();
     setTooltip(buildTooltipState(rect, data, variant));
   };
 
-  const handleTooltipToggle = (e: React.MouseEvent, data: any, variant: 'set' | 'macro' | 'session') => {
+  const handleTooltipToggle = (e: React.MouseEvent, data: any, variant: 'set' | 'macro') => {
     e.preventDefault();
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();

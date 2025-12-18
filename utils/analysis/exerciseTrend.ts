@@ -20,6 +20,8 @@ export interface ExerciseTrendCoreResult {
   status: ExerciseTrendStatus;
   isBodyweightLike: boolean;
   diffPct?: number;
+  confidence?: 'low' | 'medium' | 'high';
+  evidence?: string[];
   plateau?: {
     weight: number;
     minReps: number;
@@ -35,6 +37,31 @@ const TREND_MIN_ABS_1RM_KG = 0.25;
 const TREND_MIN_ABS_REPS = 1;
 
 const avg = (xs: number[]): number => (xs.length > 0 ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+
+const clampEvidence = (xs: string[], max: number = 3): string[] | undefined => {
+  const cleaned = xs.filter(Boolean).slice(0, max);
+  return cleaned.length > 0 ? cleaned : undefined;
+};
+
+const keepDynamicEvidence = (xs: string[] | undefined): string[] | undefined => {
+  if (!xs || xs.length === 0) return undefined;
+  // Keep only lines that contain at least one digit so we don't repeat generic prose.
+  const filtered = xs.filter(t => /\d/.test(t));
+  return filtered.length > 0 ? filtered : undefined;
+};
+
+const fmtSignedPct = (pct: number): string => {
+  if (!Number.isFinite(pct)) return '0.0%';
+  const sign = pct > 0 ? '+' : '';
+  return `${sign}${pct.toFixed(1)}%`;
+};
+
+const getConfidence = (historyLen: number, windowSize: number): 'low' | 'medium' | 'high' => {
+  if (historyLen < MIN_SESSIONS_FOR_TREND) return 'low';
+  if (historyLen >= 10 && windowSize >= 6) return 'high';
+  if (historyLen >= 6) return 'medium';
+  return 'low';
+};
 
 export const summarizeExerciseHistory = (history: ExerciseHistoryEntry[]): ExerciseSessionEntry[] => {
   const bySession = new Map<string, ExerciseSessionEntry>();
@@ -84,6 +111,7 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
     return {
       status: 'new',
       isBodyweightLike: false,
+      confidence: 'low',
     };
   }
 
@@ -104,6 +132,11 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
     return {
       status: 'new',
       isBodyweightLike,
+      confidence: 'low',
+      evidence: keepDynamicEvidence(clampEvidence([
+        // Keep this dynamic: it will show "weight ≈ 0" which contains a digit.
+        isBodyweightLike ? 'Most recent sessions look bodyweight-like (weight ≈ 0).' : 'Most recent sessions have near-zero load.',
+      ])),
     };
   }
 
@@ -112,6 +145,10 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
     return {
       status: 'new',
       isBodyweightLike,
+      confidence: 'low',
+      evidence: keepDynamicEvidence(clampEvidence([
+        `Only ${history.length} session${history.length === 1 ? '' : 's'} logged (need ${MIN_SESSIONS_FOR_TREND}+).`,
+      ])),
     };
   }
 
@@ -125,9 +162,16 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
   const isRepStatic = (maxRepsMetric - minRepsMetric) <= REP_STATIC_EPSILON;
 
   if (isWeightStatic && isRepStatic) {
+    const confidence = getConfidence(history.length, 4);
     return {
       status: 'stagnant',
       isBodyweightLike,
+      confidence,
+      evidence: keepDynamicEvidence(clampEvidence([
+        isBodyweightLike
+          ? `Top reps stayed within ~${Math.max(0, maxRepsMetric - minRepsMetric)} rep(s).`
+          : `Top weight stayed within ~${WEIGHT_STATIC_EPSILON_KG}kg and reps within ~${REP_STATIC_EPSILON} rep(s).`,
+      ])),
       plateau: {
         weight: weights[0] ?? 0,
         minReps: minRepsMetric,
@@ -154,6 +198,8 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
     return {
       status: 'new',
       isBodyweightLike,
+      confidence: 'low',
+      evidence: undefined,
     };
   }
 
@@ -165,24 +211,37 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
     : diffAbs <= -TREND_MIN_ABS_1RM_KG && diffPct <= -TREND_PCT_THRESHOLD;
 
   if (meetsOverload) {
+    const confidence = getConfidence(history.length, windowSize);
     return {
       status: 'overload',
       isBodyweightLike,
       diffPct,
+      confidence,
+      evidence: keepDynamicEvidence(clampEvidence([
+        isBodyweightLike ? `Reps: ${fmtSignedPct(diffPct)}` : `Strength: ${fmtSignedPct(diffPct)}`,
+      ])),
     };
   }
 
   if (meetsRegression) {
+    const confidence = getConfidence(history.length, windowSize);
     return {
       status: 'regression',
       isBodyweightLike,
       diffPct,
+      confidence,
+      evidence: keepDynamicEvidence(clampEvidence([
+        isBodyweightLike ? `Reps: ${fmtSignedPct(diffPct)}` : `Strength: ${fmtSignedPct(diffPct)}`,
+      ])),
     };
   }
 
+  const confidence = getConfidence(history.length, windowSize);
   return {
     status: 'neutral',
     isBodyweightLike,
     diffPct,
+    confidence,
+    evidence: undefined,
   };
 };

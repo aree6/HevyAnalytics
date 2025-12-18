@@ -1086,6 +1086,7 @@ const App: React.FC = () => {
         <CSVImportModal
           intent={onboarding.intent}
           platform="hevy"
+          hideBodyTypeAndUnit
           onFileSelect={(file, gender, unit) => {
             setBodyMapGender(gender);
             setWeightUnit(unit);
