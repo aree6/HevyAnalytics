@@ -19,9 +19,10 @@ import { ViewHeader } from './ViewHeader';
 import { FANCY_FONT, TOOLTIP_THEMES, calculateCenteredTooltipPosition } from '../utils/ui/uiConstants';
 import { format } from 'date-fns';
 import { WeightUnit } from '../utils/storage/localStorage';
-import { convertWeight, convertVolume } from '../utils/format/units';
+import { convertWeight } from '../utils/format/units';
 import { formatSignedNumber } from '../utils/format/formatters';
-import { formatRelativeWithDate, getEffectiveNowFromWorkoutData } from '../utils/date/dateUtils';
+import { formatDisplayVolume } from '../utils/format/volumeDisplay';
+import { formatRelativeWithDate, getEffectiveNowFromWorkoutData, getSessionKey } from '../utils/date/dateUtils';
 import { LazyRender } from './LazyRender';
 
 interface HistoryViewProps {
@@ -29,6 +30,7 @@ interface HistoryViewProps {
   filtersSlot?: React.ReactNode;
   weightUnit?: WeightUnit;
   bodyMapGender?: BodyMapGender;
+  stickyHeader?: boolean;
   onExerciseClick?: (exerciseName: string) => void;
   onDayTitleClick?: (date: Date) => void;
 }
@@ -365,7 +367,7 @@ const useExerciseVolumeHistory = (data: WorkoutSet[]) => {
       if (isWarmupSet(set)) continue;
       if (!Number.isFinite(set.weight_kg) || !Number.isFinite(set.reps)) continue;
       if ((set.weight_kg || 0) <= 0 || (set.reps || 0) <= 0) continue;
-      const sessionKey = `${set.start_time}_${set.title}`;
+      const sessionKey = getSessionKey(set);
       const exercise = set.exercise_title;
       
       if (!sessionExercises.has(sessionKey)) {
@@ -410,8 +412,16 @@ const useExerciseBestHistory = (data: WorkoutSet[]) => {
     
     // First, collect all sets sorted by date ascending (oldest first)
     const sortedSets = [...data]
-      .filter(s => s.parsedDate && s.weight_kg > 0)
-      .sort((a, b) => a.parsedDate!.getTime() - b.parsedDate!.getTime());
+      .filter(s => s.parsedDate && s.weight_kg > 0 && !isWarmupSet(s))
+      .map((s, i) => ({ s, i }))
+      .sort((a, b) => {
+        const dt = a.s.parsedDate!.getTime() - b.s.parsedDate!.getTime();
+        if (dt !== 0) return dt;
+        const dsi = (a.s.set_index || 0) - (b.s.set_index || 0);
+        if (dsi !== 0) return dsi;
+        return a.i - b.i;
+      })
+      .map((x) => x.s);
     
     // Track running best for each exercise
     const runningBest = new Map<string, number>();
@@ -419,7 +429,7 @@ const useExerciseBestHistory = (data: WorkoutSet[]) => {
     for (const set of sortedSets) {
       const exercise = set.exercise_title;
       const currentBest = runningBest.get(exercise) || 0;
-      const sessionKey = `${set.start_time}_${set.title}`;
+      const sessionKey = getSessionKey(set);
       
       if (set.weight_kg > currentBest) {
         // New PR!
@@ -446,39 +456,60 @@ const useExerciseBestHistory = (data: WorkoutSet[]) => {
   }, [data]);
 };
 
-// Helper to track exercise best session volume over time
-const useExerciseVolumeBestHistory = (exerciseVolumeHistory: Map<string, { date: Date; volume: number; sessionKey: string }[]>) => {
+// Helper to track exercise best single-set volume over time ("Volume PR")
+const useExerciseVolumePrHistory = (data: WorkoutSet[]) => {
   return useMemo(() => {
-    const exerciseVolumeBests = new Map<string, { date: Date; volume: number; sessionKey: string; previousBest: number }[]>();
-    const currentBestVolumes = new Map<string, number>();
+    const exerciseVolumePrBests = new Map<
+      string,
+      {
+        date: Date;
+        volume: number;
+        sessionKey: string;
+        previousBest: number;
+        weight: number;
+        reps: number;
+        setIndex: number;
+      }[]
+    >();
 
-    exerciseVolumeHistory.forEach((history, exerciseName) => {
-      const sortedAsc = [...history].sort((a, b) => a.date.getTime() - b.date.getTime());
-      let runningBest = 0;
+    const runningBest = new Map<string, number>();
 
-      for (const entry of sortedAsc) {
-        if (entry.volume > runningBest) {
-          if (!exerciseVolumeBests.has(exerciseName)) {
-            exerciseVolumeBests.set(exerciseName, []);
-          }
-          exerciseVolumeBests.get(exerciseName)!.push({
-            date: entry.date,
-            volume: entry.volume,
-            sessionKey: entry.sessionKey,
-            previousBest: runningBest,
-          });
-          runningBest = entry.volume;
-        }
+    const sortedSets = [...data]
+      .filter(s => s.parsedDate && !isWarmupSet(s) && (s.weight_kg || 0) > 0 && (s.reps || 0) > 0)
+      .sort((a, b) => {
+        const dt = a.parsedDate!.getTime() - b.parsedDate!.getTime();
+        if (dt !== 0) return dt;
+        return (a.set_index || 0) - (b.set_index || 0);
+      });
+
+    for (const set of sortedSets) {
+      const exercise = set.exercise_title;
+      const vol = (set.weight_kg || 0) * (set.reps || 0);
+      const currentBest = runningBest.get(exercise) || 0;
+      if (vol <= currentBest) continue;
+
+      if (!exerciseVolumePrBests.has(exercise)) {
+        exerciseVolumePrBests.set(exercise, []);
       }
 
-      currentBestVolumes.set(exerciseName, runningBest);
-    });
+      exerciseVolumePrBests.get(exercise)!.push({
+        date: set.parsedDate!,
+        volume: Number(vol.toFixed(2)),
+        sessionKey: getSessionKey(set),
+        previousBest: Number(currentBest.toFixed(2)),
+        weight: set.weight_kg,
+        reps: set.reps,
+        setIndex: set.set_index,
+      });
 
-    return { exerciseVolumeBests, currentBestVolumes };
-  }, [exerciseVolumeHistory]);
+      runningBest.set(exercise, vol);
+    }
+
+    return { exerciseVolumePrBests };
+  }, [data]);
 };
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, weightUnit = 'kg', bodyMapGender = 'male', onExerciseClick, onDayTitleClick }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, weightUnit = 'kg', bodyMapGender = 'male', stickyHeader = false, onExerciseClick, onDayTitleClick }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
@@ -492,8 +523,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
   // Exercise best weights for PR tracking
   const { exerciseBests, currentBests } = useExerciseBestHistory(data);
 
-  // Exercise best session volume PR tracking
-  const { exerciseVolumeBests } = useExerciseVolumeBestHistory(exerciseVolumeHistory);
+  // Exercise best single-set volume PR tracking
+  const { exerciseVolumePrBests } = useExerciseVolumePrHistory(data);
 
   useEffect(() => setCurrentPage(1), [data]);
 
@@ -511,29 +542,47 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
   const sessions: Session[] = useMemo(() => {
     const sessionMap = new Map<string, WorkoutSet[]>();
     data.forEach(set => {
-      const key = `${set.start_time}_${set.title}`;
+      const key = getSessionKey(set);
       if (!sessionMap.has(key)) sessionMap.set(key, []);
       sessionMap.get(key)!.push(set);
     });
     
     return Array.from(sessionMap.entries()).map(([key, sets]) => {
+      // Group sets by exercise name (preserving first-seen order) so supersets/interleaving
+      // don't split the same exercise into multiple cards.
       const groupedExercises: GroupedExercise[] = [];
-      let currentExercise: GroupedExercise | null = null;
+      const setsByExercise = new Map<string, WorkoutSet[]>();
+      const exerciseOrder: string[] = [];
 
-      // Calculate session totals
+      // Calculate session totals (working sets only)
       let totalVolume = 0;
       let totalPRs = 0;
+      let totalSets = 0;
       
-      sets.forEach(set => {
-        if (!currentExercise || currentExercise.exerciseName !== set.exercise_title) {
-          if (currentExercise) groupedExercises.push(currentExercise);
-          currentExercise = { exerciseName: set.exercise_title, sets: [] };
+      sets.forEach((set) => {
+        const exerciseName = set.exercise_title || 'Unknown';
+        if (!setsByExercise.has(exerciseName)) {
+          setsByExercise.set(exerciseName, []);
+          exerciseOrder.push(exerciseName);
         }
-        currentExercise.sets.push(set);
-        totalVolume += (set.weight_kg || 0) * (set.reps || 0);
-        if (set.isPr) totalPRs++;
+        setsByExercise.get(exerciseName)!.push(set);
+
+        if (!isWarmupSet(set)) {
+          totalSets += 1;
+          totalVolume += (set.weight_kg || 0) * (set.reps || 0);
+          if (set.isPr) totalPRs++;
+        }
       });
-      if (currentExercise) groupedExercises.push(currentExercise);
+
+      for (const exerciseName of exerciseOrder) {
+        const exerciseSets = setsByExercise.get(exerciseName) || [];
+        const sortedSets = exerciseSets
+          .map((s, i) => ({ s, i }))
+          .sort((a, b) => (a.s.set_index || 0) - (b.s.set_index || 0) || a.i - b.i)
+          .map((x) => x.s);
+
+        groupedExercises.push({ exerciseName, sets: sortedSets });
+      }
 
       return {
         key,
@@ -541,11 +590,13 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
         title: sets[0].title,
         startTime: sets[0].start_time,
         exercises: groupedExercises,
-        totalSets: sets.length,
+        totalSets,
         totalVolume,
         totalPRs,
       };
-    }).sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
+    })
+      .filter((s) => s.totalSets > 0)
+      .sort((a, b) => (b.date?.getTime() || 0) - (a.date?.getTime() || 0));
   }, [data]);
 
   const totalPages = Math.ceil(sessions.length / ITEMS_PER_PAGE);
@@ -602,7 +653,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
 
   // Stats for header
   const totalSessions = sessions.length;
-  const totalSets = data.length;
+  const totalSets = useMemo(() => {
+    let count = 0;
+    for (const s of data) {
+      if (isWarmupSet(s)) continue;
+      count += 1;
+    }
+    return count;
+  }, [data]);
 
   // Pagination controls for header
   const paginationControls = (
@@ -634,12 +692,13 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
         if (tooltip) setTooltip(null);
       }}
     >
-      {/* Header - consistent with Dashboard */}
-      <div className="hidden sm:block">
+      {/* Header - sticky when a calendar filter is active */}
+      <div className="hidden sm:contents">
         <ViewHeader
           leftStats={[{ icon: Calendar, value: totalSessions, label: 'Sessions' }]}
           rightStats={[{ icon: Dumbbell, value: totalSets, label: 'Sets' }]}
           filtersSlot={filtersSlot}
+          sticky={stickyHeader}
           rightSlot={totalPages > 1 ? paginationControls : null}
         />
       </div>
@@ -722,14 +781,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                     <span className="whitespace-nowrap">{session.totalSets} Sets</span>
                     <span className="flex items-baseline min-w-0">
                       <span className="whitespace-nowrap min-w-0 truncate">
-                        {Math.round(convertVolume(session.totalVolume, weightUnit)).toLocaleString()} {weightUnit}
+                        {formatDisplayVolume(session.totalVolume, weightUnit, { round: 'int' })} {weightUnit}
                       </span>
                       {prevSession && (
                         <span className="flex-none overflow-visible">
                           <SessionDeltaBadge
                             current={session.totalVolume}
                             previous={prevSession.totalVolume}
-                            label="vol"
+                            label="volume"
                             context="vs lst"
                           />
                         </span>
@@ -777,30 +836,50 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                   const insights = analyzeSetProgression(group.sets);
                   const macroInsight = analyzeProgression(group.sets);
                   
-                  // Get exercise best weight / best volume and check for PRs in this session
+                  // Get exercise best weight and check for PRs / Volume PRs in this session
                   const exerciseBest = currentBests.get(group.exerciseName) || 0;
                   const prEventsForSession = (exerciseBests.get(group.exerciseName) || []).filter((e) => e.sessionKey === session.key);
 
-                  const volPrEventsForSession = (exerciseVolumeBests.get(group.exerciseName) || []).filter((e) => e.sessionKey === session.key);
-                  const volPrEvent = volPrEventsForSession.length > 0 ? volPrEventsForSession[0] : null;
+                  const volPrEventsForSession = (exerciseVolumePrBests.get(group.exerciseName) || []).filter((e) => e.sessionKey === session.key);
+                  const volPrEvent = volPrEventsForSession.reduce(
+                    (best, e) => (!best || e.volume > best.volume ? e : best),
+                    null as (typeof volPrEventsForSession)[number] | null
+                  );
                   
                   // Get volume trend for sparkline (last 6 sessions, reversed for chronological order)
                   const volHistory = exerciseVolumeHistory.get(group.exerciseName) || [];
-                  const exerciseBestVolume = volHistory.reduce((acc, v) => Math.max(acc, v.volume), 0);
                   const sparklineData = volHistory.slice(0, 6).map(v => v.volume).reverse();
 
-                  const firstPrSetIndex = group.sets.findIndex((s) => !!s.isPr);
-                  const lastWorkingSetIndex = (() => {
-                    for (let i = group.sets.length - 1; i >= 0; i--) {
-                      if (!isWarmupSet(group.sets[i])) return i;
+                  const volPrAnchorIndex = (() => {
+                    if (!volPrEvent) return -1;
+
+                    const idx = group.sets.findIndex(
+                      (s) =>
+                        !isWarmupSet(s) &&
+                        s.set_index === volPrEvent.setIndex &&
+                        s.weight_kg === volPrEvent.weight &&
+                        s.reps === volPrEvent.reps
+                    );
+                    if (idx >= 0) return idx;
+
+                    // Fallback: anchor to the highest-volume working set within this session.
+                    let bestIdx = -1;
+                    let bestVol = -Infinity;
+                    for (let i = 0; i < group.sets.length; i++) {
+                      const s = group.sets[i];
+                      if (isWarmupSet(s)) continue;
+                      const v = (s.weight_kg || 0) * (s.reps || 0);
+                      if (v > bestVol) {
+                        bestVol = v;
+                        bestIdx = i;
+                      }
                     }
-                    return group.sets.length - 1;
+                    return bestIdx;
                   })();
-                  const volPrAnchorIndex = firstPrSetIndex >= 0 ? firstPrSetIndex : lastWorkingSetIndex;
 
                   return (
                     <LazyRender
-                      key={idx}
+                      key={`${session.key}:${group.exerciseName}`}
                       className="w-full"
                       placeholder={<HistoryCardSkeleton minHeight={260} />}
                       rootMargin="400px 0px"
@@ -820,14 +899,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                               <img
                                 src={asset.thumbnail || asset.source}
                                 alt=""
-                                className="w-10 h-10 rounded object-cover border border-slate-800 flex-shrink-0 row-span-2"
+                                className="w-10 h-10 rounded object-cover flex-shrink-0 row-span-2"
                                 loading="lazy"
                                 decoding="async"
                               />
                             );
                           }
                           return (
-                            <div className="w-10 h-10 rounded bg-black/50 border border-slate-700 row-span-2" />
+                            <div className="w-10 h-10 rounded bg-black/50 row-span-2" />
                           );
                         })()}
 
@@ -970,10 +1049,13 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                                       )}
 
                                       {volPrEvent && sIdx === volPrAnchorIndex && (
-                                        <span className="inline-flex items-center leading-none">
+                                        <span
+                                          className="inline-flex items-center leading-none"
+                                          title="Volume PR (best-ever single-set volume)"
+                                          aria-label="Volume PR (best-ever single-set volume)"
+                                        >
                                           {set.isPr && <span className="hidden sm:inline text-slate-600 dark:text-slate-300 mx-1">·</span>}
-                                          <span className="sm:hidden">VPR</span>
-                                          <span className="hidden sm:inline">Vol PR</span>
+                                          <span>Vol PR</span>
                                           {volPrEvent.previousBest > 0 && (
                                             <span className="ml-0.5 text-[5px] sm:text-[8px] font-extrabold text-yellow-500 dark:text-yellow-300 leading-none">
                                               {formatSignedNumber(((volPrEvent.volume - volPrEvent.previousBest) / volPrEvent.previousBest) * 100, { maxDecimals: 0 })}%

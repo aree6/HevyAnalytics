@@ -93,6 +93,13 @@ export const WeeklySetsCard = ({
     return getGroupHighlightIds(heatmapHoveredMuscle);
   }, [heatmapHoveredMuscle, compositionGrouping]);
 
+  const handleBodyMapClick = (muscleId: string) => {
+    if (!onMuscleClick) return;
+    const isDesktop = typeof window === 'undefined' ? true : (window.matchMedia?.('(min-width: 640px)')?.matches ?? true);
+    if (!isDesktop) return;
+    onMuscleClick(muscleId, compositionGrouping === 'groups' ? 'group' : 'muscle');
+  };
+
   const weeklySetsHoverMeta = useMemo(() => {
     if (!heatmapHoveredMuscle) return null;
 
@@ -235,9 +242,7 @@ export const WeeklySetsCard = ({
                   <div className="relative flex justify-center w-full mt-4 sm:mt-6">
                     <div className="transform scale-[0.5] origin-center">
                       <BodyMap
-                        onPartClick={(muscleId) =>
-                          onMuscleClick?.(muscleId, compositionGrouping === 'groups' ? 'group' : 'muscle')
-                        }
+                        onPartClick={handleBodyMapClick}
                         selectedPart={null}
                         muscleVolumes={heatmap.volumes}
                         maxVolume={heatmap.maxVolume}

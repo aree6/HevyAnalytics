@@ -26,6 +26,7 @@ import type { ExerciseAsset } from '../data/exerciseAssets';
 import { buildTimeSeries } from '../analysis/aggregators';
 import { format, startOfDay } from 'date-fns';
 import { getMuscleContributionsFromAsset } from './muscleContributions';
+import { isWarmupSet } from '../analysis/setClassification';
 import {
   getMuscleVolumeTimeSeriesRolling,
   getLatestRollingWeeklyVolume,
@@ -138,6 +139,7 @@ export const getMuscleVolumeTimeSeriesCalendar = (
 ): MuscleTimeSeriesResult => {
   const lowerMap = getLowerMap(assetsMap);
   const result = buildTimeSeries<WorkoutSet>(data, period as TimePeriod, (set) => {
+    if (isWarmupSet(set)) return {};
     const name = set.exercise_title || '';
     const asset = lookupAsset(name, assetsMap, lowerMap);
     if (!asset) return {};
@@ -159,6 +161,7 @@ export const getMuscleVolumeTimeSeriesDetailedCalendar = (
 ): MuscleTimeSeriesResult => {
   const lowerMap = getLowerMap(assetsMap);
   const result = buildTimeSeries<WorkoutSet>(data, period as TimePeriod, (set) => {
+    if (isWarmupSet(set)) return {};
     const name = set.exercise_title || '';
     const asset = lookupAsset(name, assetsMap, lowerMap);
     if (!asset) return {};
@@ -248,6 +251,7 @@ function buildSimpleDailyTimeSeries(
 
   for (const set of data) {
     if (!set.parsedDate) continue;
+    if (isWarmupSet(set)) continue;
     
     const name = set.exercise_title || '';
     const asset = lookupAsset(name, assetsMap, lowerMap);

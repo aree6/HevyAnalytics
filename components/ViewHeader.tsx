@@ -12,6 +12,7 @@ export interface ViewHeaderProps {
   leftStats?: StatItem[];
   rightStats?: StatItem[];
   filtersSlot?: React.ReactNode;
+  sticky?: boolean;
   configureOptions?: { key: string; label: string; visible: boolean }[];
   onConfigureToggle?: (key: string) => void;
   rightSlot?: React.ReactNode;
@@ -22,6 +23,7 @@ export const ViewHeader: React.FC<ViewHeaderProps> = ({
   leftStats,
   rightStats,
   filtersSlot,
+  sticky = false,
   configureOptions,
   onConfigureToggle,
   rightSlot,
@@ -30,7 +32,7 @@ export const ViewHeader: React.FC<ViewHeaderProps> = ({
   const leftItems = leftStats ?? stats;
 
   return (
-    <div className="bg-black/70 p-2 sm:p-3 rounded-xl">
+    <div className={`${sticky ? 'sticky top-0 z-30' : ''} bg-black/70 p-2 sm:p-3 rounded-xl`}>
       <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr),auto,minmax(0,1fr)] items-center gap-2">
         {/* Left: Stats */}
         <div className="hidden sm:flex items-center gap-2 justify-start min-w-0">

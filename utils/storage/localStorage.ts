@@ -153,7 +153,7 @@ export const clearPreferencesConfirmed = (): void => {
   }
 };
 
-export type ThemeMode = 'light' | 'medium-dark' | 'midnight-dark' | 'svg';
+export type ThemeMode = 'light' | 'medium-dark' | 'midnight-dark' | 'pure-black' | 'svg';
 
 const THEME_MODE_KEY = 'hevy_analytics_theme_mode';
 
@@ -168,7 +168,7 @@ export const saveThemeMode = (mode: ThemeMode): void => {
 export const getThemeMode = (): ThemeMode => {
   try {
     const mode = localStorage.getItem(THEME_MODE_KEY);
-    return mode === 'light' || mode === 'medium-dark' || mode === 'midnight-dark' || mode === 'svg'
+    return mode === 'light' || mode === 'medium-dark' || mode === 'midnight-dark' || mode === 'pure-black' || mode === 'svg'
       ? mode
       : 'midnight-dark';
   } catch (error) {

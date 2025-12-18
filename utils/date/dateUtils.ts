@@ -135,3 +135,14 @@ export const sortByTimestamp = <T extends { timestamp: number }>(arr: T[], ascen
 };
 
 export const DATE_FORMAT_HEVY = 'd MMM yyyy, HH:mm';
+
+export const getSessionKey = (set: Pick<WorkoutSet, 'start_time' | 'title' | 'parsedDate'>): string => {
+  const start = String(set.start_time ?? '').trim();
+  const title = String(set.title ?? '').trim();
+  const ts = set.parsedDate?.getTime?.() ?? NaN;
+  const dateKey = Number.isFinite(ts) ? String(ts) : '';
+  if (start && title) return `${start}_${title}`;
+  if (start) return start;
+  if (dateKey && title) return `${dateKey}_${title}`;
+  return dateKey || title;
+};

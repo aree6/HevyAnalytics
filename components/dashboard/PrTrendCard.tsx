@@ -140,7 +140,7 @@ export const PrTrendCard = ({
                 <Area
                   type="monotone"
                   dataKey="count"
-                  name="PRs Set"
+                  name="PRs"
                   stroke="#eab308"
                   strokeWidth={3}
                   fill="url(#gPRs)"
@@ -159,7 +159,7 @@ export const PrTrendCard = ({
                   cursor={{ fill: 'rgb(var(--overlay-rgb) / 0.12)' }}
                   labelFormatter={(l, p) => (p as any)?.[0]?.payload?.tooltipLabel || l}
                 />
-                <Bar dataKey="count" name="PRs Set" fill="#eab308" radius={[8, 8, 0, 0]} animationDuration={1500} />
+                <Bar dataKey="count" name="PRs" fill="#eab308" radius={[8, 8, 0, 0]} animationDuration={1500} />
               </BarChart>
             )}
           </ResponsiveContainer>

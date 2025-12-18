@@ -47,6 +47,7 @@ interface MuscleAnalysisProps {
   onExerciseClick?: (exerciseName: string) => void;
   initialMuscle?: { muscleId: string; viewMode: 'muscle' | 'group' } | null;
   onInitialMuscleConsumed?: () => void;
+  stickyHeader?: boolean;
   bodyMapGender?: BodyMapGender;
 }
 
@@ -56,7 +57,7 @@ type ViewMode = 'muscle' | 'group';
 /** Alias to centralized constant for backward compatibility within this file */
 const MUSCLE_GROUP_DISPLAY = SVG_TO_MUSCLE_GROUP;
 
-export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlot, onExerciseClick, initialMuscle, onInitialMuscleConsumed, bodyMapGender = 'male' }) => {
+export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlot, onExerciseClick, initialMuscle, onInitialMuscleConsumed, stickyHeader = false, bodyMapGender = 'male' }) => {
   const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -689,12 +690,12 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
   return (
     <div className="space-y-2">
       {/* Header - consistent with Dashboard */}
-      <div className="hidden sm:block">
+      <div className="hidden sm:contents">
         <ViewHeader
           leftStats={[{ icon: Activity, value: totalSets, label: 'Total Sets' }]}
           rightStats={[{ icon: Dumbbell, value: musclesWorked, label: 'Muscles' }]}
           filtersSlot={filtersSlot}
-          rightSlot={null}
+          sticky={stickyHeader}
         />
       </div>
 

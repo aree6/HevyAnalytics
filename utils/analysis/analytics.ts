@@ -1,14 +1,27 @@
 import { WorkoutSet, ExerciseStats, DailySummary } from '../../types';
 import { format, startOfDay, subDays, eachDayOfInterval, getDay, parse, differenceInMinutes, isValid } from 'date-fns';
-import { getDateKey, TimePeriod, sortByTimestamp } from '../date/dateUtils';
+import { getDateKey, TimePeriod, sortByTimestamp, getSessionKey } from '../date/dateUtils';
 import { roundTo } from '../format/formatters';
+import { isWarmupSet } from './setClassification';
 
 const sortByParsedDate = (sets: WorkoutSet[], ascending: boolean): WorkoutSet[] => {
-  return [...sets].sort((a, b) => {
-    const timeA = a.parsedDate?.getTime() ?? 0;
-    const timeB = b.parsedDate?.getTime() ?? 0;
-    return ascending ? timeA - timeB : timeB - timeA;
-  });
+  const sign = ascending ? 1 : -1;
+  return [...sets]
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => {
+      const timeA = a.s.parsedDate?.getTime() ?? 0;
+      const timeB = b.s.parsedDate?.getTime() ?? 0;
+      const dt = timeA - timeB;
+      if (dt !== 0) return dt * sign;
+
+      const siA = a.s.set_index ?? 0;
+      const siB = b.s.set_index ?? 0;
+      const dsi = siA - siB;
+      if (dsi !== 0) return dsi * sign;
+
+      return (a.i - b.i) * sign;
+    })
+    .map((x) => x.s);
 };
 
 export const identifyPersonalRecords = (data: WorkoutSet[]): WorkoutSet[] => {
@@ -16,6 +29,7 @@ export const identifyPersonalRecords = (data: WorkoutSet[]): WorkoutSet[] => {
   const maxWeightMap = new Map<string, number>();
 
   const dataWithPrs = sorted.map(set => {
+    if (isWarmupSet(set)) return { ...set, isPr: false };
     const exercise = set.exercise_title;
     const currentWeight = set.weight_kg || 0;
     const previousMax = maxWeightMap.get(exercise) ?? 0;
@@ -77,10 +91,13 @@ export const getDailySummaries = (data: WorkoutSet[]): DailySummary[] => {
       grouped.set(dateKey, acc);
     }
     
-    if (!acc.sessions.has(set.start_time)) {
-      acc.sessions.add(set.start_time);
+    const sessionKey = getSessionKey(set);
+    if (sessionKey && !acc.sessions.has(sessionKey)) {
+      acc.sessions.add(sessionKey);
       acc.durationMinutes += parseSessionDuration(set.parsedDate, set.end_time);
     }
+
+    if (isWarmupSet(set)) continue;
 
     acc.totalVolume += (set.weight_kg || 0) * (set.reps || 0);
     acc.sets += 1;
@@ -98,7 +115,7 @@ export const getDailySummaries = (data: WorkoutSet[]): DailySummary[] => {
     density: d.durationMinutes > 0 ? Math.round(d.totalVolume / d.durationMinutes) : 0,
   }));
 
-  return sortByTimestamp(summaries);
+  return sortByTimestamp(summaries.filter(s => s.sets > 0));
 };
 
 const calculateOneRepMax = (weight: number, reps: number): number => {
@@ -110,6 +127,7 @@ export const getExerciseStats = (data: WorkoutSet[]): ExerciseStats[] => {
   const grouped = new Map<string, ExerciseStats>();
 
   for (const set of data) {
+    if (isWarmupSet(set)) continue;
     const name = set.exercise_title;
     if (!name || !set.parsedDate) continue;
 
@@ -284,6 +302,7 @@ export const getTopExercisesOverTime = (
 
   for (const set of data) {
     if (!set.parsedDate || !topSet.has(set.exercise_title)) continue;
+    if (isWarmupSet(set)) continue;
     
     const { key, timestamp, label } = getDateKey(set.parsedDate, period);
     
@@ -332,6 +351,7 @@ export const getPrsOverTime = (
 
   for (const set of data) {
     if (!set.parsedDate || !set.isPr) continue;
+    if (isWarmupSet(set)) continue;
     
     const { key, timestamp, label } = getDateKey(set.parsedDate, period);
     

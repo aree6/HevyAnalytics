@@ -63,7 +63,7 @@ export const COMPARISON_DATA: ComparisonData = {
     "Chicken_whole_skinned.svg": {
       weight: 1.8,
       label: "Chickens",
-      description: "Meal prep meets overload—don’t drop your protein."
+      description: "Meal prep meets big volume—don’t drop your protein."
     },
     "Decorated-Elephant.svg": {
       weight: 5400.0,
@@ -78,7 +78,7 @@ export const COMPARISON_DATA: ComparisonData = {
     "Egyptian-pyramids.svg": {
       weight: 6000000.0,
       label: "Pyramids",
-      description: "Civilization-level overload—ancient engineers approve."
+      description: "Civilization-level volume—ancient engineers approve."
     },
     "Egyptian-sphinx.svg": {
       weight: 2000000.0,
@@ -213,7 +213,7 @@ export const COMPARISON_DATA: ComparisonData = {
     "yellow-banana.svg": {
       weight: 0.2,
       label: "Bananas",
-      description: "Potassium overload—small weight, big morale."
+      description: "Potassium boost—small weight, big morale."
     },
     "yeti.svg": {
       weight: 180.0,

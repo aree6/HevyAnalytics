@@ -5,6 +5,7 @@ import { MUSCLE_GROUP_TO_SVG_IDS, SVG_TO_MUSCLE_GROUP } from './muscleMappingCon
 import { getSvgIdsForCsvMuscleName } from './muscleMapping';
 import { getMuscleContributionsFromAsset } from './muscleContributions';
 import { normalizeMuscleGroup } from './muscleNormalization';
+import { isWarmupSet } from '../analysis/setClassification';
 
 export type WeeklySetsWindow = 'all' | '7d' | '30d' | '365d';
 export type WeeklySetsGrouping = 'groups' | 'muscles';
@@ -62,6 +63,7 @@ export const computeWeeklySetsDashboardData = (
 
   const totals = new Map<string, number>();
   for (const s of data) {
+    if (isWarmupSet(s)) continue;
     const d = s.parsedDate;
     if (!d) continue;
     if (d < windowStart || d > now) continue;

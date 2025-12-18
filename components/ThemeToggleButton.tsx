@@ -10,6 +10,8 @@ const labelForMode = (mode: string) => {
       return 'Medium';
     case 'midnight-dark':
       return 'Midnight';
+    case 'pure-black':
+      return 'Pure Black';
     case 'svg':
       return 'Texture';
     default:
@@ -27,6 +29,7 @@ export const ThemeToggleButton: React.FC<{ className?: string; compact?: boolean
     if (mode === 'light') return { Icon: Sun, label: 'Day' };
     if (mode === 'medium-dark') return { Icon: Moon, label: 'Medium' };
     if (mode === 'midnight-dark') return { Icon: Sparkles, label: 'Midnight' };
+    if (mode === 'pure-black') return { Icon: Moon, label: 'Pure Black' };
     return { Icon: Palette, label: 'Texture' };
   }, [mode]);
 

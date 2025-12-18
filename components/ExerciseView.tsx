@@ -22,8 +22,8 @@ import {
   SVG_MUSCLE_NAMES
 } from '../utils/muscle/muscleMapping';
 import { WeightUnit, getSmartFilterMode, TimeFilterMode } from '../utils/storage/localStorage';
-import { convertWeight } from '../utils/format/units';
-import { summarizeExerciseHistory, analyzeExerciseTrendCore, ExerciseSessionEntry, ExerciseTrendStatus } from '../utils/analysis/exerciseTrend';
+import { convertWeight, getStandardWeightIncrementKg } from '../utils/format/units';
+import { summarizeExerciseHistory, analyzeExerciseTrendCore, ExerciseSessionEntry, ExerciseTrendStatus, MIN_SESSIONS_FOR_TREND } from '../utils/analysis/exerciseTrend';
 import { formatSignedNumber } from '../utils/format/formatters';
 
 // --- TYPES & LOGIC ---
@@ -115,9 +115,11 @@ interface StatusResult {
   title: string;
   description: string;
   subtext?: string;
+  label: string;
+  isBodyweightLike: boolean;
 }
 
-const analyzeExerciseTrend = (stats: ExerciseStats): StatusResult => {
+const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUnit): StatusResult => {
   const core = analyzeExerciseTrendCore(stats);
 
   if (core.status === 'new') {
@@ -127,8 +129,10 @@ const analyzeExerciseTrend = (stats: ExerciseStats): StatusResult => {
       bgColor: 'bg-blue-500/10',
       borderColor: 'border-blue-500/20',
       icon: Activity,
-      title: "Gathering Data",
-      description: "Keep training! We need a few more sessions to detect your trend."
+      title: 'Building baseline',
+      description: 'Log a few more sessions and we’ll summarize your trend.',
+      label: 'baseline',
+      isBodyweightLike: core.isBodyweightLike,
     };
   }
 
@@ -136,19 +140,23 @@ const analyzeExerciseTrend = (stats: ExerciseStats): StatusResult => {
     const minReps = core.plateau?.minReps ?? 0;
     const maxReps = core.plateau?.maxReps ?? 0;
     const w = core.plateau?.weight ?? 0;
+    const plateauWeight = convertWeight(w, weightUnit);
+    const suggestedNext = convertWeight(w + getStandardWeightIncrementKg(weightUnit), weightUnit);
     return {
       status: 'stagnant',
       color: 'text-amber-400',
       bgColor: 'bg-amber-500/10',
       borderColor: 'border-amber-500/20',
       icon: AlertTriangle,
-      title: "Plateau Detected",
+      title: 'Plateauing',
       description: core.isBodyweightLike
         ? `You've hit ${minReps}-${maxReps} reps consistently.`
-        : `You've lifted ${w}kg for ${minReps}-${maxReps} reps consistently.`,
+        : `You've lifted ${plateauWeight}${weightUnit} for ${minReps}-${maxReps} reps consistently.`,
       subtext: core.isBodyweightLike
         ? 'Try adding 1-2 reps or an extra set next session.'
-        : `Try increasing weight to ${(w + 2.5).toFixed(1)}kg next session.`
+        : `Try increasing weight to ${suggestedNext}${weightUnit} next session.`,
+      label: 'plateauing',
+      isBodyweightLike: core.isBodyweightLike,
     };
   }
 
@@ -160,13 +168,15 @@ const analyzeExerciseTrend = (stats: ExerciseStats): StatusResult => {
       bgColor: 'bg-emerald-500/10',
       borderColor: 'border-emerald-500/20',
       icon: TrendingUp,
-      title: "Progressive Overload",
+      title: 'Gaining',
       description: core.isBodyweightLike
-        ? "Excellent work! Your reps are trending upwards."
-        : "Excellent work! Your estimated strength is trending upwards.",
+        ? 'Nice. Your reps are trending up.'
+        : 'Nice. Your estimated strength is trending up.',
       subtext: core.isBodyweightLike
         ? `Reps +${diffPct.toFixed(1)}% recently.`
-        : `Strength +${diffPct.toFixed(1)}% recently.`
+        : `Strength +${diffPct.toFixed(1)}% recently.`,
+      label: 'gaining',
+      isBodyweightLike: core.isBodyweightLike,
     };
   }
 
@@ -178,13 +188,15 @@ const analyzeExerciseTrend = (stats: ExerciseStats): StatusResult => {
       bgColor: 'bg-rose-500/10',
       borderColor: 'border-rose-500/20',
       icon: TrendingDown,
-      title: "Performance Dip",
+      title: 'Losing',
       description: core.isBodyweightLike
-        ? "Reps are trending down. Could be fatigue or form correction."
-        : "Numbers are trending down. Could be fatigue or form correction.",
+        ? 'Reps are trending down (often fatigue, stress, or form changes).'
+        : 'Strength is trending down (often fatigue, stress, or form changes).',
       subtext: core.isBodyweightLike
         ? `Reps -${Math.abs(diffPct).toFixed(1)}%. Consider a deload.`
-        : `Strength -${Math.abs(diffPct).toFixed(1)}%. Consider a deload.`
+        : `Strength -${Math.abs(diffPct).toFixed(1)}%. Consider a deload.`,
+      label: 'losing',
+      isBodyweightLike: core.isBodyweightLike,
     };
   }
 
@@ -194,13 +206,15 @@ const analyzeExerciseTrend = (stats: ExerciseStats): StatusResult => {
     bgColor: 'bg-indigo-500/10',
     borderColor: 'border-indigo-500/20',
     icon: Minus,
-    title: "Maintenance Mode",
+    title: 'Maintaining',
     description: core.isBodyweightLike
-      ? 'Performance is stable. Keep building reps and control.'
-      : 'Strength levels are stable. Maintaining gains effectively.',
+      ? 'Performance is stable. Keep building reps with good control.'
+      : 'Strength is stable. Keep consistency and small progressions.',
     subtext: core.isBodyweightLike
       ? 'Try progressing reps, tempo, or adding external load.'
-      : 'Push intensity to trigger new growth.'
+      : 'Push intensity to trigger new growth.',
+    label: 'maintaining',
+    isBodyweightLike: core.isBodyweightLike,
   };
 };
 
@@ -312,9 +326,10 @@ interface ExerciseViewProps {
   onHighlightApplied?: () => void;
   weightUnit?: WeightUnit;
   bodyMapGender?: BodyMapGender;
+  stickyHeader?: boolean;
 }
 
-export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, highlightedExercise, onHighlightApplied, weightUnit = 'kg', bodyMapGender = 'male' }) => {
+export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, highlightedExercise, onHighlightApplied, weightUnit = 'kg', bodyMapGender = 'male', stickyHeader = false }) => {
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>(highlightedExercise || stats[0]?.name || "");
   const [trendFilter, setTrendFilter] = useState<ExerciseTrendStatus | null>(null);
 
@@ -412,7 +427,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     const activeSince = subDays(effectiveNow, 60);
     const lastDate = selectedSessions[0]?.date ?? null;
     const tooOld = !lastDate || lastDate < activeSince;
-    const notEnoughData = selectedSessions.length < 5;
+    const notEnoughData = selectedSessions.length < MIN_SESSIONS_FOR_TREND;
 
     if (!tooOld && !notEnoughData) return null;
 
@@ -462,10 +477,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
   const statusMap = useMemo(() => {
     const map: Record<string, StatusResult> = {};
     stats.forEach(s => {
-      map[s.name] = analyzeExerciseTrend(s);
+      map[s.name] = analyzeExerciseTrend(s, weightUnit);
     });
     return map;
-  }, [stats]);
+  }, [stats, weightUnit]);
 
   const selectedExerciseMuscleInfo = useMemo(() => {
     const exData = selectedStats ? exerciseMuscleData.get(selectedStats.name.toLowerCase()) : undefined;
@@ -512,13 +527,20 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
     const statusByName = new Map<string, ExerciseTrendStatus>();
     const eligibleNames = new Set<string>();
+    const eligibilityByName = new Map<string, { isEligible: boolean; inactiveLabel: string }>();
 
     for (const stat of stats) {
       const sessions = summarizeExerciseHistory(stat.history);
       const lastDate = sessions[0]?.date ?? null;
-      if (!lastDate) continue;
-      if (lastDate < activeSince) continue;
-      if (sessions.length < 5) continue;
+      const tooOld = !lastDate || lastDate < activeSince;
+      const notEnoughData = sessions.length < MIN_SESSIONS_FOR_TREND;
+      const isEligible = !tooOld && !notEnoughData;
+      eligibilityByName.set(stat.name, {
+        isEligible,
+        inactiveLabel: notEnoughData ? 'baseline' : 'inactive',
+      });
+
+      if (!isEligible) continue;
 
       eligibleNames.add(stat.name);
 
@@ -541,6 +563,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       newCount,
       statusByName,
       eligibleNames,
+      eligibilityByName,
     };
   }, [effectiveNow, stats]);
 
@@ -595,10 +618,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
             {trainingStructure.activeCount} active exercises
           </span>
           <button type="button" onClick={() => toggle('overload')} className={chipCls('overload', 'good')}>
-            {trainingStructure.overloadCount} overload
+            {trainingStructure.overloadCount} gaining
           </button>
           <button type="button" onClick={() => toggle('stagnant')} className={chipCls('stagnant', 'warn')}>
-            {trainingStructure.plateauCount} plateau
+            {trainingStructure.plateauCount} plateauing
           </button>
         </div>
 
@@ -606,13 +629,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
         <div className="flex items-center gap-2 justify-end min-w-0">
           <button type="button" onClick={() => toggle('regression')} className={chipCls('regression', 'bad')}>
-            {trainingStructure.regressionCount} down
+            {trainingStructure.regressionCount} losing
           </button>
           <button type="button" onClick={() => toggle('neutral')} className={chipCls('neutral', 'neutral')}>
-            {trainingStructure.neutralCount} stable
+            {trainingStructure.neutralCount} maintaining
           </button>
           <button type="button" onClick={() => toggle('new')} className={chipCls('new', 'info')}>
-            {trainingStructure.newCount} gathering
+            {trainingStructure.newCount} baseline
           </button>
         </div>
       </div>
@@ -662,8 +685,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
   const currentStatus = selectedStats ? statusMap[selectedStats.name] : null;
   const isSelectedEligible = useMemo(() => {
     if (!selectedStats) return true;
-    return trainingStructure.eligibleNames.has(selectedStats.name);
-  }, [selectedStats, trainingStructure.eligibleNames]);
+    return trainingStructure.eligibilityByName.get(selectedStats.name)?.isEligible ?? false;
+  }, [selectedStats, trainingStructure.eligibilityByName]);
 
   // Calculate deltas for selected exercise
   const exerciseDeltas = useMemo(() => {
@@ -701,12 +724,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     return sum / last3.length;
   }, [selectedSessions]);
 
-  const isBodyweightLike = useMemo(() => {
-    if (selectedSessions.length === 0) return false;
-    let maxWeight = 0;
-    for (const s of selectedSessions) maxWeight = Math.max(maxWeight, s.weight);
-    return maxWeight <= 0.0001;
-  }, [selectedSessions]);
+  const isBodyweightLike = currentStatus?.isBodyweightLike ?? false;
 
   return (
     <div className="flex flex-col gap-2 w-full text-slate-200 pb-10">
@@ -718,27 +736,27 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                 {trainingStructure.activeCount} active
               </button>
               <button type="button" onClick={() => setTrendFilter(prev => (prev === 'overload' ? null : 'overload'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-emerald-500/10 text-emerald-300 border-emerald-500/20 ${trendFilter === 'overload' ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
-                {trainingStructure.overloadCount} overload
+                {trainingStructure.overloadCount} gaining
               </button>
               <button type="button" onClick={() => setTrendFilter(prev => (prev === 'stagnant' ? null : 'stagnant'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-amber-500/10 text-amber-300 border-amber-500/20 ${trendFilter === 'stagnant' ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
-                {trainingStructure.plateauCount} plateau
+                {trainingStructure.plateauCount} plateauing
               </button>
               <button type="button" onClick={() => setTrendFilter(prev => (prev === 'regression' ? null : 'regression'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-rose-500/10 text-rose-300 border-rose-500/20 ${trendFilter === 'regression' ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
-                {trainingStructure.regressionCount} down
+                {trainingStructure.regressionCount} losing
               </button>
               <button type="button" onClick={() => setTrendFilter(prev => (prev === 'neutral' ? null : 'neutral'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-indigo-500/10 text-indigo-300 border-indigo-500/20 ${trendFilter === 'neutral' ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
-                {trainingStructure.neutralCount} stable
+                {trainingStructure.neutralCount} maintaining
               </button>
               <button type="button" onClick={() => setTrendFilter(prev => (prev === 'new' ? null : 'new'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-blue-500/10 text-blue-300 border-blue-500/20 ${trendFilter === 'new' ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
-                {trainingStructure.newCount} gathering
+                {trainingStructure.newCount} baseline
               </button>
             </div>
           ) : null}
         </div>
       </div>
 
-      <div className="hidden sm:block">
-        <div className="bg-black/70 p-2 sm:p-3 rounded-xl">
+      <div className="hidden sm:contents">
+        <div className={`${stickyHeader ? 'sticky top-0 z-30' : ''} bg-black/70 p-2 sm:p-3 rounded-xl`}>
           {headerCenterSlot}
         </div>
       </div>
@@ -774,7 +792,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
             const status = statusMap[ex.name];
             const isSelected = selectedExerciseName === ex.name;
             const asset = assetsMap?.get(ex.name);
-            const isEligible = trainingStructure.eligibleNames.has(ex.name);
+            const isEligible = trainingStructure.eligibilityByName.get(ex.name)?.isEligible ?? false;
+            const subLabel = isEligible
+              ? status.label
+              : (trainingStructure.eligibilityByName.get(ex.name)?.inactiveLabel ?? 'inactive');
 
             const selectedHighlight = getSelectedHighlightClasses(status.status, !isEligible ? 'soft' : 'strong');
             const RowStatusIcon = status.icon;
@@ -801,7 +822,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                     );
                     const imgUrl = asset.sourceType === 'video' ? asset.thumbnail : (asset.thumbnail || asset.source);
                     return imgUrl ? (
-                      <img src={imgUrl} alt="" className={`w-6 h-6 rounded object-cover flex-shrink-0 border ${isSelected ? selectedHighlight.thumbBorder : 'border-slate-800'}`} loading="lazy" decoding="async" />
+                      <img src={imgUrl} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0" loading="lazy" decoding="async" />
                     ) : (
                       <div className="w-6 h-6 rounded bg-black/50 flex items-center justify-center text-slate-500 flex-shrink-0">
                         <Dumbbell className="w-3.5 h-3.5" />
@@ -813,7 +834,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                       {ex.name}
                     </span>
                     <span className={`truncate text-[10px] ${isSelected ? 'text-slate-400' : 'text-slate-500 group-hover:text-slate-400'}`}>
-                      {isEligible ? status.label : status.inactiveLabel}
+                      {subLabel}
                     </span>
                   </div>
                 </div>
@@ -906,24 +927,28 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
                   if (videoSrc) {
                     return (
-                      <video
-                        key={videoSrc}
-                        width={80}
-                        height={80}
-                        className="w-20 h-20 rounded-lg object-cover"
-                        poster={a.thumbnail}
-                        src={videoSrc}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        preload="metadata"
-                      />
+                      <div className="w-20 h-20 rounded-lg overflow-hidden flex-none">
+                        <video
+                          key={videoSrc}
+                          width={80}
+                          height={80}
+                          className="w-full h-full object-cover"
+                          poster={a.thumbnail}
+                          src={videoSrc}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      </div>
                     );
                   }
 
                   return imgSrc ? (
-                    <img src={imgSrc} alt={selectedStats.name} className="w-20 h-20 rounded-lg object-cover" loading="lazy" decoding="async" />
+                    <div className="w-20 h-20 rounded-lg overflow-hidden flex-none">
+                      <img src={imgSrc} alt={selectedStats.name} width={80} height={80} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                    </div>
                   ) : null;
                 })()}
               </div>

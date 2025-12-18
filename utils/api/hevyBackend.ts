@@ -9,12 +9,55 @@ const isLocalhostUrl = (url: string): boolean => {
   }
 };
 
+const getWindowHostname = (): string | null => {
+  try {
+    return typeof window !== 'undefined' ? window.location.hostname : null;
+  } catch {
+    return null;
+  }
+};
+
+const isPrivateLanHostname = (hostname: string): boolean => {
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+  if (/^10\./.test(hostname)) return true;
+  if (/^192\.168\./.test(hostname)) return true;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)) return true;
+  return false;
+};
+
+const isWindowLocalhost = (): boolean => {
+  const host = getWindowHostname();
+  return host === 'localhost' || host === '127.0.0.1';
+};
+
+const rewriteLocalhostToWindowHostname = (url: string): string => {
+  try {
+    const u = new URL(url);
+    const host = getWindowHostname();
+    if (!host || isWindowLocalhost()) return url;
+    if (!isPrivateLanHostname(host)) return url;
+    if (u.hostname !== 'localhost' && u.hostname !== '127.0.0.1') return url;
+    u.hostname = host;
+    return u.toString().replace(/\/+$/g, '');
+  } catch {
+    return url;
+  }
+};
+
 export const getBackendBaseUrl = (): string => {
   const envUrl = (import.meta as any).env?.VITE_BACKEND_URL as string | undefined;
   if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
     const normalized = normalizeBaseUrl(envUrl.trim());
     // In dev, prefer same-origin + Vite proxy so the app works on LAN devices.
     if ((import.meta as any).env?.DEV && isLocalhostUrl(normalized)) return '';
+
+    // If you built with a localhost backend URL and then open the app from another device
+    // (e.g. phone on LAN), "localhost" will point at the phone. Rewrite to the current
+    // page hostname to keep local preview/testing functional.
+    if (isLocalhostUrl(normalized) && !isWindowLocalhost()) {
+      return rewriteLocalhostToWindowHostname(normalized);
+    }
+
     return normalized;
   }
   if ((import.meta as any).env?.DEV) return '';

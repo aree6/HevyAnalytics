@@ -105,7 +105,12 @@ Do the following:
 - **History Visualization** - Detailed workout logs with date filtering
 - **Set-by-Set Feedback** - Real-time feedback on your performance
 - **Local Storage** - Data saved in your browser
-- **Dark Mode UI** - Responsive UI
+- **Theme Modes** - Day (light), Medium dark, Midnight dark, Pure black, and Texture
+
+## PR Definitions
+
+- **PR**: Best-ever **weight** for an exercise (shown with **absolute** change).
+- **Volume PR**: Best-ever **single-set volume** for an exercise (`weight × reps`, across all history; shown with **percent** change).
 
 ---
 

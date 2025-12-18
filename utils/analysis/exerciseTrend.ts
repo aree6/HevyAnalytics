@@ -1,7 +1,9 @@
-import { format, startOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import { ExerciseHistoryEntry, ExerciseStats } from '../../types';
 
 export type ExerciseTrendStatus = 'overload' | 'stagnant' | 'regression' | 'neutral' | 'new';
+
+export const MIN_SESSIONS_FOR_TREND = 4;
 
 export interface ExerciseSessionEntry {
   date: Date;
@@ -25,20 +27,29 @@ export interface ExerciseTrendCoreResult {
   };
 }
 
+export const WEIGHT_STATIC_EPSILON_KG = 0.5;
+const MIN_SIGNAL_REPS = 2;
+const REP_STATIC_EPSILON = 1;
+const TREND_PCT_THRESHOLD = 2.5;
+const TREND_MIN_ABS_1RM_KG = 0.25;
+const TREND_MIN_ABS_REPS = 1;
+
+const avg = (xs: number[]): number => (xs.length > 0 ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+
 export const summarizeExerciseHistory = (history: ExerciseHistoryEntry[]): ExerciseSessionEntry[] => {
-  const byDay = new Map<string, ExerciseSessionEntry>();
+  const bySession = new Map<string, ExerciseSessionEntry>();
 
   for (const h of history) {
     const d = h.date;
     if (!d) continue;
 
-    const day = startOfDay(d);
-    const key = format(day, 'yyyy-MM-dd');
+    const ts = d.getTime();
+    const key = Number.isFinite(ts) ? String(ts) : format(d, 'yyyy-MM-dd');
 
-    let entry = byDay.get(key);
+    let entry = bySession.get(key);
     if (!entry) {
       entry = {
-        date: day,
+        date: d,
         weight: 0,
         reps: 0,
         oneRepMax: 0,
@@ -47,7 +58,7 @@ export const summarizeExerciseHistory = (history: ExerciseHistoryEntry[]): Exerc
         totalReps: 0,
         maxReps: 0,
       };
-      byDay.set(key, entry);
+      bySession.set(key, entry);
     }
 
     entry.sets += 1;
@@ -62,40 +73,56 @@ export const summarizeExerciseHistory = (history: ExerciseHistoryEntry[]): Exerc
     }
   }
 
-  return Array.from(byDay.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+  return Array.from(bySession.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
 };
 
 export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCoreResult => {
   const history = summarizeExerciseHistory(stats.history);
 
-  if (history.length < 3) {
+  // No usable history yet.
+  if (history.length === 0) {
     return {
       status: 'new',
       isBodyweightLike: false,
     };
   }
 
-  const recent = history.slice(0, 4);
+  const recent = history.slice(0, Math.min(4, history.length));
   const weights = recent.map(h => h.weight);
-  const maxWeightInRecent = Math.max(...weights);
-  const isBodyweightLike = maxWeightInRecent <= 0.0001;
-  const reps = isBodyweightLike
-    ? recent.map(h => h.maxReps)
-    : recent.map(h => h.reps || (h.weight > 0 ? h.volume / h.weight : 0));
+  const reps = recent.map(h => h.maxReps);
+  // Safe max for short windows.
+  const maxWeightInRecent = Math.max(0, ...weights);
+  const maxRepsInRecent = Math.max(0, ...reps);
+  const zeroWeightSessions = weights.filter(w => w <= 0.0001).length;
+  const isBodyweightLike = zeroWeightSessions >= Math.ceil(recent.length * 0.75);
 
-  const maxReps = Math.max(...reps);
-  const minReps = Math.min(...reps);
-  const hasMeaningfulSignal = maxWeightInRecent > 0.0001 || maxReps >= 2;
+  const hasMeaningfulSignal = isBodyweightLike
+    ? maxRepsInRecent >= MIN_SIGNAL_REPS
+    : maxWeightInRecent > 0.0001;
 
   if (!hasMeaningfulSignal) {
     return {
       status: 'new',
-      isBodyweightLike: true,
+      isBodyweightLike,
     };
   }
 
-  const isWeightStatic = weights.every(w => Math.abs(w - weights[0]) < 1);
-  const isRepStatic = (maxReps - minReps) <= 1;
+  // Not enough history to compare windows reliably.
+  if (history.length < MIN_SESSIONS_FOR_TREND) {
+    return {
+      status: 'new',
+      isBodyweightLike,
+    };
+  }
+
+  const repsMetric = isBodyweightLike
+    ? recent.map(h => h.maxReps)
+    : recent.map(h => h.reps || (h.weight > 0 ? h.volume / h.weight : 0));
+  const maxRepsMetric = Math.max(...repsMetric);
+  const minRepsMetric = Math.min(...repsMetric);
+
+  const isWeightStatic = weights.every(w => Math.abs(w - (weights[0] ?? 0)) < WEIGHT_STATIC_EPSILON_KG);
+  const isRepStatic = (maxRepsMetric - minRepsMetric) <= REP_STATIC_EPSILON;
 
   if (isWeightStatic && isRepStatic) {
     return {
@@ -103,29 +130,41 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
       isBodyweightLike,
       plateau: {
         weight: weights[0] ?? 0,
-        minReps,
-        maxReps,
+        minReps: minRepsMetric,
+        maxReps: maxRepsMetric,
       },
     };
   }
 
-  const currentMetric = isBodyweightLike
-    ? (reps[0] + (reps[1] ?? reps[0])) / 2
-    : (recent[0].oneRepMax + recent[1].oneRepMax) / 2;
-  const previousMetric = isBodyweightLike
-    ? (reps[2] + (reps[3] ?? reps[2])) / 2
-    : (recent[2].oneRepMax + (recent[3]?.oneRepMax || recent[2].oneRepMax)) / 2;
+  // Trend: compare a recent window vs a previous window (3v3 if possible, else 2v2).
+  const windowSize = history.length >= 6 ? 6 : 4;
+  const window = history.slice(0, windowSize);
 
-  if (currentMetric <= 0 && previousMetric <= 0) {
+  const metric = isBodyweightLike
+    ? window.map(h => h.maxReps)
+    : window.map(h => h.oneRepMax);
+
+  const half = windowSize / 2;
+  const currentMetric = avg(metric.slice(0, half));
+  const previousMetric = avg(metric.slice(half));
+  const diffAbs = currentMetric - previousMetric;
+  const diffPct = previousMetric > 0 ? (diffAbs / previousMetric) * 100 : 0;
+
+  if (currentMetric <= 0 || previousMetric <= 0) {
     return {
       status: 'new',
       isBodyweightLike,
     };
   }
 
-  const diffPct = previousMetric > 0 ? ((currentMetric - previousMetric) / previousMetric) * 100 : 0;
+  const meetsOverload = isBodyweightLike
+    ? diffAbs >= TREND_MIN_ABS_REPS && diffPct >= TREND_PCT_THRESHOLD
+    : diffAbs >= TREND_MIN_ABS_1RM_KG && diffPct >= TREND_PCT_THRESHOLD;
+  const meetsRegression = isBodyweightLike
+    ? diffAbs <= -TREND_MIN_ABS_REPS && diffPct <= -TREND_PCT_THRESHOLD
+    : diffAbs <= -TREND_MIN_ABS_1RM_KG && diffPct <= -TREND_PCT_THRESHOLD;
 
-  if (diffPct > 2.5) {
+  if (meetsOverload) {
     return {
       status: 'overload',
       isBodyweightLike,
@@ -133,7 +172,7 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
     };
   }
 
-  if (diffPct < -2.5) {
+  if (meetsRegression) {
     return {
       status: 'regression',
       isBodyweightLike,

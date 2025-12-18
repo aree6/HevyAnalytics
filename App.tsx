@@ -913,6 +913,7 @@ const App: React.FC = () => {
                   exerciseStats={exerciseStats} 
                   fullData={filteredData} 
                   filtersSlot={desktopFilterControls}
+                  stickyHeader={hasActiveCalendarFilter}
                   onDayClick={handleDayClick}
                   onMuscleClick={handleMuscleClick}
                   onExerciseClick={handleExerciseClick}
@@ -928,6 +929,7 @@ const App: React.FC = () => {
                   onHighlightApplied={() => setHighlightedExercise(null)}
                   weightUnit={weightUnit}
                   bodyMapGender={bodyMapGender}
+                  stickyHeader={hasActiveCalendarFilter}
                 />
               )}
               {activeTab === Tab.HISTORY && (
@@ -936,6 +938,7 @@ const App: React.FC = () => {
                   filtersSlot={desktopFilterControls}
                   weightUnit={weightUnit}
                   bodyMapGender={bodyMapGender}
+                  stickyHeader={hasActiveCalendarFilter}
                   onExerciseClick={handleExerciseClick}
                   onDayTitleClick={handleHistoryDayTitleClick}
                 />
@@ -948,6 +951,7 @@ const App: React.FC = () => {
                   initialMuscle={initialMuscleForAnalysis}
                   onInitialMuscleConsumed={() => setInitialMuscleForAnalysis(null)}
                   bodyMapGender={bodyMapGender}
+                  stickyHeader={hasActiveCalendarFilter}
                 />
               )}
               {activeTab === Tab.FLEX && (
@@ -957,6 +961,7 @@ const App: React.FC = () => {
                   weightUnit={weightUnit}
                   dailySummaries={dailySummaries}
                   exerciseStats={exerciseStats}
+                  stickyHeader={hasActiveCalendarFilter}
                 />
               )}
             </Suspense>
@@ -1012,7 +1017,7 @@ const App: React.FC = () => {
           onBack={
             onboarding.intent === 'initial'
               ? () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
-              : undefined
+              : () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
           }
           onClose={
             onboarding.intent === 'update'
@@ -1036,7 +1041,7 @@ const App: React.FC = () => {
           onBack={
             onboarding.intent === 'initial'
               ? () => setOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' })
-              : undefined
+              : () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
           }
           onClose={
             onboarding.intent === 'update'
@@ -1067,7 +1072,7 @@ const App: React.FC = () => {
           onBack={
             onboarding.intent === 'initial'
               ? () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
-              : undefined
+              : () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
           }
           onClose={
             onboarding.intent === 'update'

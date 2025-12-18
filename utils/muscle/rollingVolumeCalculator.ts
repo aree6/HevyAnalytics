@@ -23,6 +23,7 @@ import type { ExerciseAsset } from '../data/exerciseAssets';
 import { startOfDay, differenceInDays, startOfMonth, startOfYear, format, subDays } from 'date-fns';
 import { roundTo } from '../format/formatters';
 import { getMuscleContributionsFromAsset } from './muscleContributions';
+import { isWarmupSet } from '../analysis/setClassification';
 
 // ============================================================================
 // Constants
@@ -137,6 +138,7 @@ export function computeDailyMuscleVolumes(
   
   for (const set of data) {
     if (!set.parsedDate) continue;
+    if (isWarmupSet(set)) continue;
     
     const exerciseName = set.exercise_title || '';
     const asset = lookupExerciseAsset(exerciseName, assetsMap, lowerMap);

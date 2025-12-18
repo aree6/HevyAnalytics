@@ -8,16 +8,18 @@ import { ViewHeader } from './ViewHeader';
 import { useTheme } from './ThemeProvider';
 import { findBestComparison, formatLargeNumber, getRandomComparison } from '../utils/data/comparisonData';
 import { WeightUnit } from '../utils/storage/localStorage';
-import { convertVolume, convertWeight } from '../utils/format/units';
+import { convertWeight } from '../utils/format/units';
+import { getDisplayVolume } from '../utils/format/volumeDisplay';
 import { FANCY_FONT } from '../utils/ui/uiConstants';
 import { calculateStreakInfo, calculatePRInsights, StreakInfo, PRInsights } from '../utils/analysis/insights';
 import { getExerciseStats, getDailySummaries } from '../utils/analysis/analytics';
 import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
+import { isWarmupSet } from '../utils/analysis/setClassification';
 import { normalizeMuscleGroup, type NormalizedMuscleGroup } from '../utils/muscle/muscleNormalization';
 import { MUSCLE_GROUP_TO_SVG_IDS } from '../utils/muscle/muscleMappingConstants';
 import { BodyMap } from './BodyMap';
 import { format, getMonth, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
-import { getEffectiveNowFromWorkoutData } from '../utils/date/dateUtils';
+import { getEffectiveNowFromWorkoutData, getSessionKey } from '../utils/date/dateUtils';
 import CountUp from './CountUp';
 import { FlexCard, CardTheme, FlexCardFooter } from './FlexCard';
 import { LazyRender } from './LazyRender';
@@ -28,6 +30,7 @@ interface FlexViewProps {
   weightUnit?: WeightUnit;
   dailySummaries?: DailySummary[];
   exerciseStats?: ExerciseStats[];
+  stickyHeader?: boolean;
 }
 
 type ComparisonMode = 'best' | 'random';
@@ -81,14 +84,16 @@ const YearlyHeatmapCard: React.FC<{
       if (!minDate || d.getTime() < minDate.getTime()) minDate = d;
       if (!maxDate || d.getTime() > maxDate.getTime()) maxDate = d;
 
+      if (isWarmupSet(s)) continue;
+
       const key = format(d, 'yyyy-MM-dd');
       dayCount.set(key, (dayCount.get(key) || 0) + 1);
 
       const y = d.getFullYear();
-      const st = s.start_time;
-      if (st) {
+      const sessionKey = getSessionKey(s);
+      if (sessionKey) {
         if (!workoutSessionsByYear.has(y)) workoutSessionsByYear.set(y, new Set());
-        workoutSessionsByYear.get(y)!.add(st);
+        workoutSessionsByYear.get(y)!.add(sessionKey);
       }
     }
 
@@ -1012,14 +1017,15 @@ const MuscleFocusCard: React.FC<{
 // Card component for volume comparison - designed to be screenshot-friendly
 const VolumeComparisonCard: React.FC<{
   totalVolume: number;
+  totalVolumeKg: number;
   weightUnit: WeightUnit;
   theme: CardTheme;
   comparisonMode?: ComparisonMode;
   randomKey?: number;
   onThemeToggle?: () => void;
   showThemeToggle?: boolean;
-}> = ({ totalVolume, weightUnit, theme, comparisonMode = 'best', randomKey = 0, onThemeToggle, showThemeToggle = false }) => {
-  const volumeInKg = weightUnit === 'lbs' ? totalVolume / 2.20462 : totalVolume;
+}> = ({ totalVolume, totalVolumeKg, weightUnit, theme, comparisonMode = 'best', randomKey = 0, onThemeToggle, showThemeToggle = false }) => {
+  const volumeInKg = totalVolumeKg;
   
   const comparison = useMemo(() => {
     if (volumeInKg <= 0) return null;
@@ -1155,6 +1161,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
   weightUnit = 'kg',
   dailySummaries: dailySummariesProp,
   exerciseStats: exerciseStatsProp,
+  stickyHeader = false,
 }) => {
   const { mode } = useTheme();
   const cardTheme: CardTheme = mode === 'light' ? 'light' : 'dark';
@@ -1232,7 +1239,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
 
   // Calculate all stats from data
   const stats = useMemo(() => {
-    let totalVolume = 0;
+    let totalVolumeKg = 0;
     let totalReps = 0;
     let totalDuration = 0;
     const sessions = new Set<string>();
@@ -1245,12 +1252,12 @@ export const FlexView: React.FC<FlexViewProps> = ({
     assetsMap.forEach((v, k) => lowerAssetsMap.set(k.toLowerCase(), v));
 
     for (const set of data) {
-      totalVolume += (set.weight_kg || 0) * (set.reps || 0);
+      if (isWarmupSet(set)) continue;
+      totalVolumeKg += (set.weight_kg || 0) * (set.reps || 0);
       totalReps += set.reps || 0;
       
-      if (set.start_time) {
-        sessions.add(set.start_time);
-      }
+      const sessionKey = getSessionKey(set);
+      if (sessionKey) sessions.add(sessionKey);
 
       // Count exercises
       const exerciseName = set.exercise_title || '';
@@ -1264,8 +1271,8 @@ export const FlexView: React.FC<FlexViewProps> = ({
         if (!monthlyWorkouts.has(month)) {
           monthlyWorkouts.set(month, new Set());
         }
-        if (set.start_time) {
-          monthlyWorkouts.get(month)!.add(set.start_time);
+        if (sessionKey) {
+          monthlyWorkouts.get(month)!.add(sessionKey);
         }
 
         // Muscle groups
@@ -1327,8 +1334,9 @@ export const FlexView: React.FC<FlexViewProps> = ({
     }));
 
     return {
-      totalVolume: Math.round(convertVolume(totalVolume, weightUnit)),
-      totalSets: data.length,
+      totalVolume: getDisplayVolume(totalVolumeKg, weightUnit, { round: 'int' }),
+      totalVolumeKg,
+      totalSets: data.reduce((acc, s) => acc + (isWarmupSet(s) ? 0 : 1), 0),
       totalReps,
       totalDuration,
       totalWorkouts: sessions.size,
@@ -1406,6 +1414,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
         return (
           <VolumeComparisonCard
             totalVolume={stats.totalVolume}
+            totalVolumeKg={stats.totalVolumeKg}
             weightUnit={weightUnit}
             theme={cardTheme}
             showThemeToggle={false}
@@ -1438,11 +1447,12 @@ export const FlexView: React.FC<FlexViewProps> = ({
   return (
     <div className="flex flex-col gap-2 w-full text-slate-200 pb-6">
       {/* Header */}
-      <div className="hidden sm:block">
+      <div className="hidden sm:contents">
         <ViewHeader
           leftStats={[{ icon: Dumbbell, value: stats.totalSets, label: 'Total Sets' }]}
           rightStats={[{ icon: Weight, value: `${formatLargeNumber(stats.totalVolume)} ${weightUnit}`, label: 'Volume' }]}
           filtersSlot={filtersSlot}
+          sticky={stickyHeader}
         />
       </div>
 

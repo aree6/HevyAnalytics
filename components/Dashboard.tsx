@@ -10,7 +10,7 @@ import {
 import { getMuscleVolumeTimeSeries, getMuscleVolumeTimeSeriesDetailed } from '../utils/muscle/muscleAnalytics';
 import type { BodyMapGender } from './BodyMap';
 import { getSmartFilterMode, TimeFilterMode, WeightUnit } from '../utils/storage/localStorage';
-import { convertVolume } from '../utils/format/units';
+import { getDisplayVolume } from '../utils/format/volumeDisplay';
 import { CHART_TOOLTIP_STYLE, CHART_COLORS, ANIMATION_KEYFRAMES } from '../utils/ui/uiConstants';
 import { computeWeeklySetsDashboardData } from '../utils/muscle/dashboardWeeklySets';
 import { bucketRollingWeeklySeriesToWeeks } from '../utils/muscle/rollingSeriesBucketing';
@@ -20,13 +20,14 @@ import {
   Clock, Dumbbell
 } from 'lucide-react';
 import { format, startOfDay, endOfDay, startOfWeek, startOfMonth, subDays } from 'date-fns';
-import { formatDayContraction, formatDayYearContraction, formatWeekContraction, formatMonthYearContraction, getEffectiveNowFromWorkoutData } from '../utils/date/dateUtils';
+import { formatDayContraction, formatDayYearContraction, formatWeekContraction, formatMonthYearContraction, getEffectiveNowFromWorkoutData, getSessionKey } from '../utils/date/dateUtils';
 import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
 import { ViewHeader } from './ViewHeader';
 import { calculateDashboardInsights, detectPlateaus, calculateDelta, DashboardInsights, PlateauAnalysis, SparklinePoint, StreakInfo } from '../utils/analysis/insights';
 import { InsightsPanel, PlateauAlert, RecentPRsPanel } from './InsightCards';
 import { computationCache } from '../utils/storage/computationCache';
-import { summarizeExerciseHistory } from '../utils/analysis/exerciseTrend';
+import { MIN_SESSIONS_FOR_TREND, summarizeExerciseHistory } from '../utils/analysis/exerciseTrend';
+import { isWarmupSet } from '../utils/analysis/setClassification';
 import { ChartSkeleton } from './ChartSkeleton';
 import { LazyRender } from './LazyRender';
 
@@ -40,6 +41,7 @@ interface DashboardProps {
   onMuscleClick?: (muscleId: string, viewMode: 'muscle' | 'group') => void;
   onExerciseClick?: (exerciseName: string) => void;
   filtersSlot?: React.ReactNode;
+  stickyHeader?: boolean;
   bodyMapGender?: BodyMapGender;
   weightUnit?: WeightUnit;
 }
@@ -54,7 +56,7 @@ const TopExercisesCard = React.lazy(() => import('./dashboard/TopExercisesCard')
 
 // --- MAIN DASHBOARD ---
 
-export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick, onMuscleClick, onExerciseClick, filtersSlot, bodyMapGender = 'male' as BodyMapGender, weightUnit = 'kg' as WeightUnit }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick, onMuscleClick, onExerciseClick, filtersSlot, stickyHeader = false, bodyMapGender = 'male' as BodyMapGender, weightUnit = 'kg' as WeightUnit }) => {
   // State to control animation retriggering on mount
   const [isMounted, setIsMounted] = useState(false);
 
@@ -77,8 +79,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   const totalWorkouts = useMemo(() => {
     const sessions = new Set<string>();
     for (const s of fullData) {
-      if (!s.start_time) continue;
-      sessions.add(s.start_time);
+      if (isWarmupSet(s)) continue;
+      const key = getSessionKey(s);
+      if (!key) continue;
+      sessions.add(key);
     }
     return sessions.size;
   }, [fullData]);
@@ -154,7 +158,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
   const totalPrs = useMemo(() => exerciseStats.reduce((acc, curr) => acc + curr.prCount, 0), [exerciseStats]);
 
-  const totalSets = useMemo(() => fullData.length, [fullData]);
+  const totalSets = useMemo(() => {
+    let count = 0;
+    for (const s of fullData) {
+      if (isWarmupSet(s)) continue;
+      count += 1;
+    }
+    return count;
+  }, [fullData]);
 
   // Dashboard Insights (deltas, streaks, PR info, sparklines) - cached across tab switches
   const dashboardInsights = useMemo(() => {
@@ -171,10 +182,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     return computationCache.getOrCompute(
       'plateauAnalysis',
       fullData,
-      () => detectPlateaus(fullData, exerciseStats, effectiveNow),
+      () => detectPlateaus(fullData, exerciseStats, effectiveNow, weightUnit),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, exerciseStats, effectiveNow]);
+  }, [fullData, exerciseStats, effectiveNow, weightUnit]);
 
   const exerciseStatsMap = useMemo(() => {
     const m = new Map<string, ExerciseStats>();
@@ -190,7 +201,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
       const sessions = summarizeExerciseHistory(stat.history);
       const lastDate = sessions[0]?.date ?? null;
       if (!lastDate) return false;
-      if (sessions.length < 5) return false;
+      if (sessions.length < MIN_SESSIONS_FOR_TREND) return false;
       return lastDate >= activeSince;
     });
   }, [plateauAnalysis.plateauedExercises, exerciseStatsMap, effectiveNow]);
@@ -274,6 +285,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         const countStyles = (start: Date, end: Date) => {
           const counts = { Strength: 0, Hypertrophy: 0, Endurance: 0 };
           for (const s of fullData) {
+            if (isWarmupSet(s)) continue;
             const d = s.parsedDate;
             if (!d) continue;
             if (d < start || d > end) continue;
@@ -345,7 +357,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             ...d,
             dateFormatted: formatDayContraction(new Date(d.timestamp)),
             tooltipLabel: formatDayYearContraction(new Date(d.timestamp)),
-            volumePerSet: d.sets > 0 ? convertVolume(Math.round(d.totalVolume / d.sets), weightUnit) : 0
+            volumePerSet: d.sets > 0 ? getDisplayVolume(d.totalVolume / d.sets, weightUnit, { round: 'int' }) : 0
           }));
         }
 
@@ -363,14 +375,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
           });
           return Object.values(weeklyData).sort((a,b) => a.timestamp - b.timestamp).map(w => {
             const isCurrent = w.timestamp === startOfWeek(effectiveNow, { weekStartsOn: 1 }).getTime();
-            const totalVol = Math.round(w.volSum);
-            const totalSets = Math.round(w.setSum);
+            const totalVol = w.volSum;
+            const totalSets = w.setSum;
+            const volumePerSetKg = totalSets > 0 ? totalVol / totalSets : 0;
             return {
               dateFormatted: formatWeekContraction(new Date(w.timestamp)),
               tooltipLabel: `wk of ${formatDayYearContraction(new Date(w.timestamp))}${isCurrent ? ' (to date)' : ''}`,
-              totalVolume: convertVolume(totalVol, weightUnit),
+              totalVolume: getDisplayVolume(totalVol, weightUnit, { round: 'int' }),
               sets: totalSets,
-              volumePerSet: totalSets > 0 ? convertVolume(Math.round(totalVol / totalSets), weightUnit) : 0
+              volumePerSet: getDisplayVolume(volumePerSetKg, weightUnit, { round: 'int' })
             };
           });
         }
@@ -389,14 +402,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
           });
           return Object.values(monthlyData).sort((a,b) => a.timestamp - b.timestamp).map(m => {
             const isCurrent = m.timestamp === startOfMonth(effectiveNow).getTime();
-            const totalVol = Math.round(m.volSum);
-            const totalSets = Math.round(m.setSum);
+            const totalVol = m.volSum;
+            const totalSets = m.setSum;
             return {
               dateFormatted: formatMonthYearContraction(new Date(m.timestamp)),
               tooltipLabel: `${format(new Date(m.timestamp), 'MMMM yyyy')}${isCurrent ? ' (to date)' : ''}`,
-              totalVolume: convertVolume(totalVol, weightUnit),
+              totalVolume: getDisplayVolume(totalVol, weightUnit, { round: 'int' }),
               sets: totalSets,
-              volumePerSet: totalSets > 0 ? convertVolume(Math.round(totalVol / totalSets), weightUnit) : 0
+              volumePerSet: totalSets > 0 ? getDisplayVolume(totalVol / totalSets, weightUnit, { round: 'int' }) : 0
             };
           });
         }
@@ -454,6 +467,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         // 'all' => start stays null (use all)
         const counts = new Map<string, number>();
         for (const s of fullData) {
+          if (isWarmupSet(s)) continue;
           const d = s.parsedDate;
           if (!d) continue;
           if (start && d < start) continue;
@@ -479,6 +493,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         const getSetCountBetween = (start: Date | null, end: Date) => {
           let count = 0;
           for (const s of fullData) {
+            if (isWarmupSet(s)) continue;
             const d = s.parsedDate;
             if (!d) continue;
             if (d > end) continue;
@@ -491,11 +506,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         const getWorkoutCountBetween = (start: Date | null, end: Date) => {
           const sessions = new Set<string>();
           for (const s of fullData) {
+            if (isWarmupSet(s)) continue;
             const d = s.parsedDate;
-            if (!d || !s.start_time) continue;
+            if (!d) continue;
             if (d > end) continue;
             if (start && d < start) continue;
-            sessions.add(s.start_time);
+            const key = getSessionKey(s);
+            if (!key) continue;
+            sessions.add(key);
           }
           return sessions.size;
         };
@@ -598,10 +616,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         const getWorkoutCountBetween = (start: Date, end: Date) => {
           const sessions = new Set<string>();
           for (const s of fullData) {
+            if (isWarmupSet(s)) continue;
             const d = s.parsedDate;
-            if (!d || !s.start_time) continue;
+            if (!d) continue;
             if (d < start || d > end) continue;
-            sessions.add(s.start_time);
+            const key = getSessionKey(s);
+            if (!key) continue;
+            sessions.add(key);
           }
           return sessions.size;
         };
@@ -618,6 +639,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
           const add = (k: string, v: number) => totals.set(k, (totals.get(k) || 0) + v);
 
           for (const s of fullData) {
+            if (isWarmupSet(s)) continue;
             const d = s.parsedDate;
             if (!d) continue;
             if (d < start || d > end) continue;
@@ -689,7 +711,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
       <style>{ANIMATION_KEYFRAMES}</style>
       <div className={`space-y-2 pb-12 transition-opacity duration-700 ease-out ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
       
-        <div className="hidden sm:block">
+        <div className="hidden sm:contents">
           <ViewHeader
             leftStats={[
               { icon: Clock, value: totalWorkouts, label: 'Workouts' },
@@ -698,6 +720,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               { icon: Dumbbell, value: totalSets, label: 'Sets' },
             ]}
             filtersSlot={filtersSlot}
+            sticky={stickyHeader}
           />
         </div>
 

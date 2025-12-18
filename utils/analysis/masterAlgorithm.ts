@@ -1,5 +1,8 @@
 import { WorkoutSet, SessionAnalysis, AnalysisResult, SetWisdom, AnalysisStatus, StructuredTooltip, TooltipLine } from '../../types';
 import { roundTo } from '../format/formatters';
+import { isWarmupSet } from './setClassification';
+
+export { isWarmupSet } from './setClassification';
 
 // === CONSTANTS ===
 const EPLEY_FACTOR = 30;
@@ -191,7 +194,7 @@ const analyzeWeightIncrease = (
   if (currReps > expectedRepsInt) {
     return createAnalysisResult(
       transition, 'success', weightChangePct, volChangePct, currReps, `~${expectedRepsInt}`,
-      'Strong Overload',
+      'Strong Progress',
       `+${pct}% weight, ${currReps} reps`,
       buildStructured(`+${pct}% weight`, 'up', [
         line(`Got ${currReps} reps (expected ~${expectedRepsInt})`, 'green'),
@@ -204,11 +207,11 @@ const analyzeWeightIncrease = (
   if (currReps >= (expectedRepsRaw - FATIGUE_BUFFER)) {
     return createAnalysisResult(
       transition, 'success', weightChangePct, volChangePct, currReps, `~${expectedRepsInt}`,
-      'Good Overload',
+      'Good Progress',
       `+${pct}% weight, ${currReps} reps`,
       buildStructured(`+${pct}% weight`, 'up', [
         line(`Hit ${currReps} reps as expected`, 'green'),
-        line('Progressive overload achieved', 'gray'),
+        line('Progress achieved', 'gray'),
       ])
     );
   }
@@ -301,11 +304,6 @@ const analyzeWeightDecrease = (
       line('Otherwise: end exercise or rest longer', 'gray'),
     ])
   );
-};
-
-// Helper to check if a set is a warmup (based on set_type field from CSV only)
-export const isWarmupSet = (set: WorkoutSet): boolean => {
-  return set.set_type?.toLowerCase().includes('warmup') || set.set_type?.toLowerCase() === 'w';
 };
 
 export const analyzeSetProgression = (sets: WorkoutSet[]): AnalysisResult[] => {

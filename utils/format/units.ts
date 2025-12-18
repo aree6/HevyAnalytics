@@ -28,6 +28,18 @@ export const getUnitLabel = (unit: WeightUnit | string): string => {
 };
 
 /**
+ * Standard progression step in kg, matching typical plate jumps.
+ * - kg: +2.5kg
+ * - lbs: +5lbs (converted to kg)
+ */
+export const getStandardWeightIncrementKg = (unit: WeightUnit | string): number => {
+  if (unit === 'lbs') {
+    return 5 / KG_TO_LBS;
+  }
+  return 2.5;
+};
+
+/**
  * Convert volume (weight * reps) from kg to the specified unit
  */
 export const convertVolume = (volumeKg: number, unit: WeightUnit | string): number => {

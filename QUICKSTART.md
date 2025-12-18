@@ -60,6 +60,11 @@ That's it! The app is now running locally. 🎉
 - **Filters** - Filter by month or specific dates
 - **Offline** - All data stored locally, no uploads
 
+### PR Definitions
+
+- **PR**: Best-ever **weight** for an exercise (shown with **absolute** change)
+- **Volume PR**: Best-ever **single-set volume** for an exercise (`weight × reps`, across all history; shown with **percent** change)
+
 ---
 
 ## 🛠️ Development

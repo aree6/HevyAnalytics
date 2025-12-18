@@ -1,6 +1,10 @@
 import { WorkoutSet, ExerciseStats, DailySummary } from '../../types';
 import { format, differenceInDays, differenceInCalendarWeeks, startOfDay, endOfDay, startOfWeek, subDays, subWeeks, isWithinInterval, isSameDay } from 'date-fns';
-import { analyzeExerciseTrendCore, summarizeExerciseHistory } from './exerciseTrend';
+import { analyzeExerciseTrendCore, summarizeExerciseHistory, WEIGHT_STATIC_EPSILON_KG } from './exerciseTrend';
+import { getSessionKey } from '../date/dateUtils';
+import { isWarmupSet } from './setClassification';
+import { WeightUnit } from '../storage/localStorage';
+import { convertWeight, getStandardWeightIncrementKg } from '../format/units';
 
 // ============================================================================
 // DELTA CALCULATIONS - Show movement vs previous periods
@@ -32,15 +36,19 @@ export const calculatePeriodStats = (data: WorkoutSet[], startDate: Date, endDat
   const sessions = new Set<string>();
   let totalVolume = 0;
   let totalPRs = 0;
+  let totalSets = 0;
 
   for (const set of filtered) {
-    if (set.start_time) sessions.add(set.start_time);
+    if (isWarmupSet(set)) continue;
+
+    const sessionKey = getSessionKey(set);
+    if (sessionKey) sessions.add(sessionKey);
+    totalSets += 1;
     totalVolume += (set.weight_kg || 0) * (set.reps || 0);
     if (set.isPr) totalPRs++;
   }
 
   const totalWorkouts = sessions.size;
-  const totalSets = filtered.length;
 
   return {
     totalVolume,
@@ -132,8 +140,8 @@ export interface StreakInfo {
   longestStreak: number;      // All-time longest streak
   isOnStreak: boolean;        // Did they work out this week?
   streakType: 'hot' | 'warm' | 'cold'; // Visual indicator
-  workoutsThisWeek: number;
-  avgWorkoutsPerWeek: number;
+  workoutsThisWeek: number;   // Unique sessions this week
+  avgWorkoutsPerWeek: number; // Avg unique sessions per week
   totalWeeksTracked: number;
   weeksWithWorkouts: number;
   consistencyScore: number;   // 0-100 score
@@ -154,14 +162,21 @@ export const calculateStreakInfo = (data: WorkoutSet[], now: Date = new Date(0))
     };
   }
 
-  // Get all unique workout dates
+  // Get unique session and date markers (session = unique workout instance)
   const workoutDates = new Set<string>();
   const workoutWeeks = new Set<string>();
+  const workoutSessions = new Set<string>();
+  const sessionsThisWeek = new Set<string>();
   
   for (const set of data) {
-    if (set.parsedDate) {
+    if (set.parsedDate && !isWarmupSet(set)) {
       workoutDates.add(format(set.parsedDate, 'yyyy-MM-dd'));
       workoutWeeks.add(format(startOfWeek(set.parsedDate, { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+
+      const sessionKey = getSessionKey(set);
+      if (sessionKey) {
+        workoutSessions.add(sessionKey);
+      }
     }
   }
 
@@ -185,14 +200,16 @@ export const calculateStreakInfo = (data: WorkoutSet[], now: Date = new Date(0))
   const lastDate = new Date(sortedDates[sortedDates.length - 1]);
   const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
 
-  // Count workouts this week
-  let workoutsThisWeek = 0;
-  for (const dateStr of sortedDates) {
-    const d = new Date(dateStr);
-    if (d >= thisWeekStart && d <= now) {
-      workoutsThisWeek++;
-    }
+  for (const set of data) {
+    if (!set.parsedDate) continue;
+    if (isWarmupSet(set)) continue;
+    if (set.parsedDate < thisWeekStart || set.parsedDate > now) continue;
+    const sessionKey = getSessionKey(set);
+    if (sessionKey) sessionsThisWeek.add(sessionKey);
   }
+
+  // Count workouts this week
+  const workoutsThisWeek = sessionsThisWeek.size;
 
   // Calculate week-based streaks
   const sortedWeeks = Array.from(workoutWeeks).sort();
@@ -243,7 +260,7 @@ export const calculateStreakInfo = (data: WorkoutSet[], now: Date = new Date(0))
 
   // Average workouts per week
   const avgWorkoutsPerWeek = totalWeeksTracked > 0 
-    ? Math.round((workoutDates.size / totalWeeksTracked) * 10) / 10 
+    ? Math.round((workoutSessions.size / totalWeeksTracked) * 10) / 10 
     : 0;
 
   // Determine streak type
@@ -288,11 +305,41 @@ export interface PRInsights {
 }
 
 export const calculatePRInsights = (data: WorkoutSet[], now: Date = new Date(0)): PRInsights => {
-  const prs = data.filter(s => s.isPr && s.parsedDate).sort((a, b) => 
-    (b.parsedDate?.getTime() || 0) - (a.parsedDate?.getTime() || 0)
-  );
+  const sorted = [...data]
+    .filter((s) => s.parsedDate && !isWarmupSet(s) && (s.weight_kg || 0) > 0)
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => {
+      const dt = (a.s.parsedDate!.getTime() || 0) - (b.s.parsedDate!.getTime() || 0);
+      if (dt !== 0) return dt;
+      const dsi = (a.s.set_index || 0) - (b.s.set_index || 0);
+      if (dsi !== 0) return dsi;
+      return a.i - b.i;
+    })
+    .map((x) => x.s);
 
-  if (prs.length === 0) {
+  // Scan in chronological order and record PR events with their true previous best.
+  const runningBest = new Map<string, number>();
+  const prEvents: RecentPR[] = [];
+
+  for (const set of sorted) {
+    const exercise = set.exercise_title;
+    const currentWeight = set.weight_kg || 0;
+    const previousBest = runningBest.get(exercise) ?? 0;
+    if (currentWeight <= previousBest) continue;
+
+    prEvents.push({
+      date: set.parsedDate!,
+      exercise,
+      weight: Number(currentWeight.toFixed(2)),
+      reps: set.reps,
+      previousBest: Number(previousBest.toFixed(2)),
+      improvement: Number((currentWeight - previousBest).toFixed(2)),
+    });
+
+    runningBest.set(exercise, currentWeight);
+  }
+
+  if (prEvents.length === 0) {
     return {
       daysSinceLastPR: -1,
       lastPRDate: null,
@@ -304,57 +351,25 @@ export const calculatePRInsights = (data: WorkoutSet[], now: Date = new Date(0))
     };
   }
 
-  const lastPR = prs[0];
-  const daysSinceLastPR = differenceInDays(now, lastPR.parsedDate!);
-  
-  // Build exercise history for finding previous bests
-  const exerciseMaxWeights = new Map<string, { weight: number; date: Date }[]>();
-  for (const set of data) {
-    if (!set.parsedDate || !set.weight_kg) continue;
-    const exercise = set.exercise_title;
-    if (!exerciseMaxWeights.has(exercise)) {
-      exerciseMaxWeights.set(exercise, []);
-    }
-    exerciseMaxWeights.get(exercise)!.push({ weight: set.weight_kg, date: set.parsedDate });
-  }
-  
-  // Sort each exercise's history by date
-  for (const [, history] of exerciseMaxWeights) {
-    history.sort((a, b) => a.date.getTime() - b.date.getTime());
-  }
-  
-  // Get recent PRs (last 5) with previous best info
-  const recentPRs: RecentPR[] = prs.slice(0, 5).map(pr => {
-    const exerciseHistory = exerciseMaxWeights.get(pr.exercise_title) || [];
-    // Find the max weight before this PR date
-    const previousSets = exerciseHistory.filter(h => h.date < pr.parsedDate!);
-    const previousBest = previousSets.length > 0 
-      ? Math.max(...previousSets.map(h => h.weight))
-      : 0;
-    
-    return {
-      date: pr.parsedDate!,
-      exercise: pr.exercise_title,
-      weight: Number(pr.weight_kg.toFixed(2)),
-      reps: pr.reps,
-      previousBest: Number(previousBest.toFixed(2)),
-      improvement: Number((pr.weight_kg - previousBest).toFixed(2)),
-    };
-  });
+  const lastPR = prEvents[prEvents.length - 1];
+  const daysSinceLastPR = differenceInDays(now, lastPR.date);
+
+  // Most recent first.
+  const recentPRs: RecentPR[] = prEvents.slice(-5).reverse();
 
   // Calculate PR frequency (last 30 days)
   const thirtyDaysAgo = subDays(now, 30);
-  const recentPRCount = prs.filter(pr => pr.parsedDate! >= thirtyDaysAgo).length;
+  const recentPRCount = prEvents.filter((pr) => pr.date >= thirtyDaysAgo).length;
   const prFrequency = Math.round((recentPRCount / 4) * 10) / 10; // Per week
 
   return {
     daysSinceLastPR,
-    lastPRDate: lastPR.parsedDate!,
-    lastPRExercise: lastPR.exercise_title,
+    lastPRDate: lastPR.date,
+    lastPRExercise: lastPR.exercise,
     prDrought: daysSinceLastPR > 14,
     recentPRs,
     prFrequency,
-    totalPRs: prs.length,
+    totalPRs: prEvents.length,
   };
 };
 
@@ -377,7 +392,12 @@ export interface PlateauAnalysis {
   overallTrend: 'improving' | 'maintaining' | 'declining';
 }
 
-export const detectPlateaus = (data: WorkoutSet[], exerciseStats: ExerciseStats[], now: Date = new Date(0)): PlateauAnalysis => {
+export const detectPlateaus = (
+  data: WorkoutSet[],
+  exerciseStats: ExerciseStats[],
+  now: Date = new Date(0),
+  weightUnit: WeightUnit = 'kg'
+): PlateauAnalysis => {
   const plateauedExercises: ExercisePlateauInfo[] = [];
   const improvingExercises: string[] = [];
 
@@ -400,7 +420,7 @@ export const detectPlateaus = (data: WorkoutSet[], exerciseStats: ExerciseStats[
 
     for (const s of sessions) {
       const repsMetric = core.isBodyweightLike ? s.maxReps : (s.reps || (s.weight > 0 ? s.volume / s.weight : 0));
-      const isWeightMatch = Math.abs((s.weight ?? 0) - plateauWeight) < 1;
+      const isWeightMatch = Math.abs((s.weight ?? 0) - plateauWeight) < WEIGHT_STATIC_EPSILON_KG;
       const isRepsMatch = repsMetric >= (plateauMinReps - 1) && repsMetric <= (plateauMaxReps + 1);
       if (!isWeightMatch || !isRepsMatch) break;
       earliestPlateauDate = s.date;
@@ -419,7 +439,7 @@ export const detectPlateaus = (data: WorkoutSet[], exerciseStats: ExerciseStats[
       isPlateaued: true,
       suggestion: core.isBodyweightLike
         ? 'Try adding 1-2 reps or an extra set next session.'
-        : `Try increasing weight to ${(plateauWeight + 2.5).toFixed(1)}kg next session.`,
+        : `Try increasing weight to ${convertWeight(plateauWeight + getStandardWeightIncrementKg(weightUnit), weightUnit)}${weightUnit} next session.`,
     });
   }
 
@@ -477,9 +497,10 @@ export const getWorkoutSparkline = (data: WorkoutSet[], weeks: number = 8, now: 
     
     const sessions = new Set<string>();
     for (const set of data) {
-      if (set.parsedDate && set.start_time && 
-          isWithinInterval(set.parsedDate, { start: weekStart, end: weekEnd })) {
-        sessions.add(set.start_time);
+      if (isWarmupSet(set)) continue;
+      if (set.parsedDate && isWithinInterval(set.parsedDate, { start: weekStart, end: weekEnd })) {
+        const sessionKey = getSessionKey(set);
+        if (sessionKey) sessions.add(sessionKey);
       }
     }
     
@@ -500,6 +521,7 @@ export const getPRSparkline = (data: WorkoutSet[], weeks: number = 8, now: Date 
     const weekEnd = subDays(subWeeks(weekStart, -1), 1);
     
     const prCount = data.filter(s => 
+      !isWarmupSet(s) &&
       s.isPr && 
       s.parsedDate && 
       isWithinInterval(s.parsedDate, { start: weekStart, end: weekEnd })
@@ -522,6 +544,7 @@ export const getSetsSparkline = (data: WorkoutSet[], weeks: number = 8, now: Dat
     const weekEnd = subDays(subWeeks(weekStart, -1), 1);
     
     const setsCount = data.filter(s => 
+      !isWarmupSet(s) &&
       s.parsedDate && 
       isWithinInterval(s.parsedDate, { start: weekStart, end: weekEnd })
     ).length;
@@ -544,9 +567,10 @@ export const getConsistencySparkline = (data: WorkoutSet[], weeks: number = 8, n
     
     const sessions = new Set<string>();
     for (const set of data) {
-      if (set.parsedDate && set.start_time && 
-          isWithinInterval(set.parsedDate, { start: weekStart, end: weekEnd })) {
-        sessions.add(set.start_time);
+      if (isWarmupSet(set)) continue;
+      if (set.parsedDate && isWithinInterval(set.parsedDate, { start: weekStart, end: weekEnd })) {
+        const sessionKey = getSessionKey(set);
+        if (sessionKey) sessions.add(sessionKey);
       }
     }
     
