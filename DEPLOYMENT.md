@@ -183,6 +183,10 @@ If Hevy login fails in production, verify backend environment variables:
 - `HEVY_X_API_KEY` is set
 - `CORS_ORIGINS` includes your frontend origin (example: `https://liftshift.app`)
 
+If you see Render logs mentioning `X-Forwarded-For` / `trust proxy` (from `express-rate-limit`), ensure your backend is deployed with the latest code (the backend enables `trust proxy` so rate limiting works correctly behind Render/Cloudflare).
+
+If the frontend receives `401 Unauthorized` from `POST /api/hevy/login`, that status is typically coming from the upstream Hevy API and almost always indicates `HEVY_X_API_KEY` is missing or incorrect in your backend environment.
+
 If you ever want to restart onboarding:
 
 - Open DevTools

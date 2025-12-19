@@ -6,13 +6,17 @@ import { hevyGetAccount, hevyGetWorkoutsPaged, hevyLogin, hevyValidateAuthToken 
 import { mapHevyWorkoutsToWorkoutSets } from './mapToWorkoutSets';
 
 const PORT = Number(process.env.PORT ?? 5000);
+const isProd = process.env.NODE_ENV === 'production';
 
 const app = express();
 
+// Render/Cloudflare set X-Forwarded-For. Enabling trust proxy allows express-rate-limit
+// to correctly identify clients and avoids ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
+// We keep this enabled even if NODE_ENV isn't set, since hosted platforms commonly omit it.
+app.set('trust proxy', 1);
+
 app.disable('x-powered-by');
 app.use(express.json({ limit: '1mb' }));
-
-const isProd = process.env.NODE_ENV === 'production';
 
 const isPrivateLanOrigin = (origin: string): boolean => {
   try {
@@ -85,7 +89,13 @@ app.post('/api/hevy/login', loginLimiter, async (req, res) => {
     res.json({ auth_token: data.auth_token, user_id: data.user_id, expires_at: data.expires_at });
   } catch (err) {
     const status = (err as any).statusCode ?? 500;
-    res.status(status).json({ error: (err as Error).message || 'Login failed' });
+    const message = (err as Error).message || 'Login failed';
+    if (status === 401) {
+      return res.status(401).json({
+        error: `${message}. If this happens in production, verify the backend has HEVY_X_API_KEY configured correctly.`,
+      });
+    }
+    res.status(status).json({ error: message });
   }
 });
 
