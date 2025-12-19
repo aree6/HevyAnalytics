@@ -23,6 +23,7 @@ import { convertWeight } from '../utils/format/units';
 import { formatSignedNumber } from '../utils/format/formatters';
 import { formatDisplayVolume } from '../utils/format/volumeDisplay';
 import { formatRelativeWithDate, getEffectiveNowFromWorkoutData, getSessionKey } from '../utils/date/dateUtils';
+import { parseHevyDateString } from '../utils/date/parseHevyDateString';
 import { LazyRender } from './LazyRender';
 
 interface HistoryViewProps {
@@ -212,6 +213,42 @@ const formatRestDuration = (ms: number) => {
   if (mins >= 1) return `${mins} min rest`;
 
   return 'less than 1 min rest';
+};
+
+const formatWorkoutDuration = (ms: number): string | null => {
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+
+  const totalMinutes = Math.round(ms / (60 * 1000));
+  if (totalMinutes <= 0) return 'less than 1 min';
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  const hourPart = hours > 0 ? `${hours} hour${hours === 1 ? '' : 's'}` : '';
+  const minutePart = minutes > 0 ? `${minutes} min${minutes === 1 ? '' : 's'}` : '';
+
+  if (hourPart && minutePart) return `${hourPart} ${minutePart}`;
+  return hourPart || minutePart;
+};
+
+const getSessionDurationMs = (session: Session): number | null => {
+  const start = session.date;
+  if (!start) return null;
+
+  // Hevy exports the same end_time for all sets in a session; Strong derives end_time.
+  // Still: pick the latest parseable end_time across the session to be safe.
+  let endMs = NaN;
+  for (const ex of session.exercises) {
+    for (const s of ex.sets) {
+      const end = parseHevyDateString(String(s.end_time ?? '').trim());
+      const t = end?.getTime?.() ?? NaN;
+      if (Number.isFinite(t)) endMs = Math.max(Number.isFinite(endMs) ? endMs : t, t);
+    }
+  }
+
+  if (!Number.isFinite(endMs)) return null;
+  const dur = endMs - start.getTime();
+  return Number.isFinite(dur) && dur > 0 ? dur : null;
 };
 
 // Simple sparkline component for volume trend
@@ -514,6 +551,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
   const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
+  const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(() => new Set());
 
   const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(data, new Date(0)), [data]);
   
@@ -527,6 +565,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
   const { exerciseVolumePrBests } = useExerciseVolumePrHistory(data);
 
   useEffect(() => setCurrentPage(1), [data]);
+
+  useEffect(() => {
+    // When the dataset changes significantly (e.g. import/new filter), reset collapses.
+    setCollapsedSessions(new Set());
+  }, [data]);
 
   useEffect(() => {
     let mounted = true;
@@ -707,6 +750,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
         {currentSessions.map((session, index) => {
           const allSessionSets = session.exercises.flatMap(e => e.sets);
           const sessionHeatmap = buildSessionMuscleHeatmap(allSessionSets, exerciseMuscleData);
+          const isCollapsed = collapsedSessions.has(session.key);
+          const sessionDurationMs = getSessionDurationMs(session);
+          const sessionDurationText = sessionDurationMs != null ? formatWorkoutDuration(sessionDurationMs) : null;
+          const exerciseCount = session.exercises.length;
 
           const previousDisplayedSession = index > 0 ? currentSessions[index - 1] : null;
           const restMs = previousDisplayedSession?.date && session.date
@@ -739,7 +786,30 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
               
               {/* --- Session Header Card --- */}
               <div
-                className="border border-slate-700/50 rounded-2xl p-5 sm:p-7 min-h-[160px] sm:min-h-[168px] flex flex-row justify-between items-stretch gap-3 sm:gap-6 shadow-xl relative overflow-visible group transition-all duration-300 hover:border-slate-600/50"
+                role="button"
+                tabIndex={0}
+                aria-expanded={!isCollapsed}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  e.preventDefault();
+                  setCollapsedSessions((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(session.key)) next.delete(session.key);
+                    else next.add(session.key);
+                    return next;
+                  });
+                }}
+                onClick={(e) => {
+                  const el = e.target as Element | null;
+                  if (el?.closest('button,a,input,select,textarea,[data-no-toggle]')) return;
+                  setCollapsedSessions((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(session.key)) next.delete(session.key);
+                    else next.add(session.key);
+                    return next;
+                  });
+                }}
+                className="border border-slate-700/50 rounded-2xl p-5 sm:p-7 min-h-[160px] sm:min-h-[168px] flex flex-row justify-between items-stretch gap-3 sm:gap-6 shadow-xl relative overflow-visible group transition-all duration-300 hover:border-slate-600/50 cursor-pointer active:scale-[0.99]"
                 style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.78)' }}
               >
                 <div
@@ -755,7 +825,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                       <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
                     <h3
-                      className="text-lg sm:text-2xl md:text-3xl text-white tracking-tight truncate capitalize"
+                      className="text-lg sm:text-2xl md:text-3xl text-slate-200 tracking-tight truncate capitalize"
                       style={FANCY_FONT}
                       title={session.title}
                     >
@@ -767,14 +837,32 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                         {session.totalPRs} PR{session.totalPRs > 1 ? 's' : ''}
                       </span>
                     )}
+
+                    <div className="ml-auto flex items-center gap-1.5 pl-2 flex-shrink-0 text-black dark:text-slate-300">
+                      <ChevronRight
+                        className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
+                        aria-hidden
+                      />
+                    </div>
                   </div>
 
-                  <div className="text-xs sm:text-sm md:text-base text-slate-400 pl-1">
+                  <div className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 pl-1">
                     {session.date ? formatRelativeWithDate(session.date, { now: effectiveNow }) : session.startTime}
                   </div>
 
-                  <div className="flex items-center gap-3 sm:gap-3 md:gap-4 text-xs sm:text-sm md:text-base text-slate-400 pl-1 flex-nowrap min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-x-4 text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 pl-1 min-w-0">
                     <span className="whitespace-nowrap">{session.totalSets} Sets</span>
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      <Dumbbell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400" aria-hidden />
+                      <span>{exerciseCount} Exercise{exerciseCount === 1 ? '' : 's'}</span>
+                    </span>
+                    {sessionDurationText && (
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                        <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400" aria-hidden />
+                        <span>{sessionDurationText}</span>
+                      </span>
+                    )}
+
                     <span className="flex items-baseline min-w-0">
                       <span className="whitespace-nowrap min-w-0 truncate">
                         {formatDisplayVolume(session.totalVolume, weightUnit, { round: 'int' })} {weightUnit}
@@ -794,7 +882,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                 </div>
 
                 {sessionHeatmap.volumes.size > 0 && (
-                  <div className="relative z-10 flex-shrink-0 flex items-stretch pl-3 sm:pl-4 py-1 sm:py-2 border-l border-slate-800/50 self-stretch overflow-visible">
+                  <div data-no-toggle className="relative z-10 flex-shrink-0 flex items-stretch pl-3 sm:pl-4 py-1 sm:py-2 border-l border-slate-800/50 self-stretch overflow-visible">
                     <div className="w-28 h-24 sm:w-32 sm:h-28 md:w-60 md:h-36 md:-mr-6 flex items-center justify-center overflow-visible">
                       <div className="w-full h-full md:scale-[1.25] origin-center overflow-visible">
                         <BodyMap
@@ -827,7 +915,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
               </div>
 
               {/* --- Exercises Grid --- */}
-              <div className="grid grid-cols-1 gap-2 sm:gap-2">
+              {!isCollapsed && (
+              <div className="grid grid-cols-1 gap-2 sm:gap-2 animate-in fade-in duration-300">
                 {session.exercises.map((group, idx) => {
                   const insights = analyzeSetProgression(group.sets);
                   const macroInsight = analyzeProgression(group.sets);
@@ -1154,6 +1243,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                   );
                 })}
               </div>
+              )}
 
               </div>
             </React.Fragment>
