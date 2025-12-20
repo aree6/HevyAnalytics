@@ -40,6 +40,7 @@ import { ThemedBackground } from './components/ThemedBackground';
 import { ThemeToggleButton } from './components/ThemeToggleButton';
 import { CsvLoadingAnimation } from './components/CsvLoadingAnimation';
 import { DataSourceModal } from './components/DataSourceModal';
+import { LandingPage } from './components/LandingPage';
 import { HevyLoginModal } from './components/HevyLoginModal';
 import type { DataSourceChoice } from './utils/dataSources/types';
 import {
@@ -1024,7 +1025,27 @@ const App: React.FC = () => {
         </>
       )}
 
-      {onboarding?.step === 'platform' ? (
+      {/* Landing page for initial visitors - shows real content for SEO/AdSense */}
+      {onboarding?.intent === 'initial' && onboarding?.step === 'platform' ? (
+        <LandingPage
+          onSelectPlatform={(source) => {
+            setCsvImportError(null);
+            setHevyLoginError(null);
+            if (source === 'strong') {
+              setOnboarding({ intent: onboarding.intent, step: 'strong_csv', platform: 'strong' });
+              return;
+            }
+            if (source === 'lyfta') {
+              setOnboarding({ intent: onboarding.intent, step: 'lyfta_csv', platform: 'lyfta' });
+              return;
+            }
+            setOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' });
+          }}
+        />
+      ) : null}
+
+      {/* Modal for update flow only */}
+      {onboarding?.intent === 'update' && onboarding?.step === 'platform' ? (
         <DataSourceModal
           intent={onboarding.intent}
           onSelect={(source) => {
@@ -1040,11 +1061,7 @@ const App: React.FC = () => {
             }
             setOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' });
           }}
-          onClose={
-            onboarding.intent === 'update'
-              ? () => setOnboarding(null)
-              : undefined
-          }
+          onClose={() => setOnboarding(null)}
         />
       ) : null}
 

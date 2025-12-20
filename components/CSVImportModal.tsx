@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import { Upload, Check, X, ArrowLeft, ArrowRight, Trash2, UserRound, Weight } from 'lucide-react';
 import MaleFrontBodyMapGroup from './MaleFrontBodyMapGroup';
 import FemaleFrontBodyMapGroup from './FemaleFrontBodyMapGroup';
@@ -129,7 +130,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm overflow-y-auto overscroll-contain">
-      <div className="min-h-full w-full px-2 sm:px-3 pt-10 pb-4 sm:pt-12 sm:pb-6">
+      <div className="min-h-full w-full px-2 sm:px-3 py-8 flex items-center justify-center">
         <div className="max-w-4xl mx-auto">
           <div className="relative bg-black/60 border border-slate-700/50 rounded-2xl p-5 sm:p-6 overflow-hidden backdrop-blur-md">
             <div className="absolute inset-0 pointer-events-none">
@@ -359,7 +360,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
                 <Upload className={`w-6 h-6 sm:w-8 sm:h-8 mb-3 ${canUploadCsv ? 'text-slate-500' : 'text-slate-600'}`} />
                 <p className={`font-medium text-center text-sm sm:text-base ${canUploadCsv ? 'text-slate-300' : 'text-slate-500'}`}>
                   {canUploadCsv
-                    ? `Drop your ${platform === 'strong' ? 'Strong' : 'Hevy'} CSV here`
+                    ? `Drop your ${platform === 'strong' ? 'Strong' : platform === 'lyfta' ? 'Lyfta' : 'Hevy'} CSV here`
                     : hideBodyTypeAndUnit
                     ? 'Go back to choose body type + unit first'
                     : 'Choose body type + unit first'}
@@ -380,18 +381,10 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
             </>
           )}
 
-          {variant === 'csv' ? (
+          {/* Export help section - toggled by bottom button */}
+          {variant === 'csv' && showExportHelp ? (
             <div className="w-full mb-4">
-              <button
-                type="button"
-                onClick={() => setShowExportHelp((v) => !v)}
-                className="w-full text-center text-sm font-semibold text-blue-400 hover:text-blue-300 underline underline-offset-4"
-              >
-                {showExportHelp ? 'Hide: See how to export .CSV' : 'See how to export .CSV'}
-              </button>
-
-              {showExportHelp ? (
-                platform === 'hevy' ? (
+              {platform === 'hevy' ? (
                   <div className="mt-3 space-y-3">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <img src="/Step1.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Hevy export step 1" loading="lazy" decoding="async" />
@@ -414,7 +407,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
                       Support is English-only right now. Make sure your Hevy app language is set to English before exporting.
                     </div>
                   </div>
-                ) : (
+                ) : platform === 'strong' ? (
                   <div className="mt-3 space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <img src="/StrongStep1.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Strong export step 1" loading="lazy" decoding="async" />
@@ -422,8 +415,13 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
                       <img src="/StrongStep3.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Strong export step 3" loading="lazy" decoding="async" />
                     </div>
                   </div>
-                )
-              ) : null}
+                ) : (
+                  <div className="mt-3">
+                    <p className="text-xs text-slate-400 text-center">
+                      Support is English-only right now. Make sure your Lyfta app language is set to English before exporting.
+                    </p>
+                  </div>
+                )}
             </div>
           ) : null}
 
@@ -433,7 +431,31 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
             </p>
           )}
 
-          {onClearCache ? (
+          {/* Action buttons row - See how to export CSV + Clear cache */}
+          {variant === 'csv' ? (
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowExportHelp((v) => !v)}
+                className={`${UNIFORM_HEADER_BUTTON_CLASS} h-10 text-sm font-semibold gap-2`}
+              >
+                <Upload className="w-4 h-4" />
+                <span className="hidden sm:inline">{showExportHelp ? 'Hide export guide' : 'How to export CSV'}</span>
+                <span className="sm:hidden">{showExportHelp ? 'Hide' : 'Export guide'}</span>
+              </button>
+              {onClearCache ? (
+                <button
+                  type="button"
+                  onClick={onClearCache}
+                  disabled={isLoading}
+                  className={`${UNIFORM_HEADER_BUTTON_CLASS} h-10 text-sm font-semibold disabled:opacity-60 gap-2`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Clear cache</span>
+                </button>
+              ) : null}
+            </div>
+          ) : onClearCache ? (
             <div className="mt-4 flex justify-center">
               <button
                 type="button"

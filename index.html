@@ -3,6 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0, user-scalable=yes" />
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="LiftShift is a free, privacy-focused workout analytics dashboard. Import your training data from Hevy, Strong, or Lyfta and unlock detailed visualizations of your progress, muscle development, and personal records.">
+    <meta name="keywords" content="workout analytics, fitness tracker, Hevy analytics, Strong app, workout data visualization, personal records, gym progress, muscle heatmap, training volume, exercise history">
+    <meta name="author" content="LiftShift">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="LiftShift - Free Workout Analytics Dashboard">
+    <meta property="og:description" content="Transform your workout data into powerful insights. Track progress, visualize muscle development, and discover personal records with our free analytics tool.">
+    <meta property="og:site_name" content="LiftShift">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="LiftShift - Free Workout Analytics Dashboard">
+    <meta name="twitter:description" content="Transform your workout data into powerful insights. Track progress, visualize muscle development, and discover personal records.">
+    
     <meta name="google-adsense-account" content="ca-pub-1028241234302201">
     <script>
       (function () {
@@ -20,8 +38,9 @@
         }
       })();
     </script>
-    <title>LiftShift - Workout Visualizer</title>
+    <title>LiftShift - Free Workout Analytics Dashboard | Hevy, Strong, Lyfta Data Visualizer</title>
     <link rel="icon" type="image/svg+xml" href="/UI/logo.svg">
+    <link rel="canonical" href="https://liftshift.app/">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -109,10 +128,63 @@
       [class*="bg-slate-900 border"]:hover {
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
       }
+      
+      /* Noscript fallback styling */
+      .noscript-content {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 40px 20px;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        line-height: 1.6;
+      }
+      .noscript-content h1 { font-size: 2rem; margin-bottom: 1rem; }
+      .noscript-content h2 { font-size: 1.5rem; margin: 1.5rem 0 0.75rem; }
+      .noscript-content p { margin-bottom: 1rem; color: #94a3b8; }
+      .noscript-content ul { margin-left: 1.5rem; margin-bottom: 1rem; }
+      .noscript-content li { margin-bottom: 0.5rem; color: #94a3b8; }
     </style>
 </head>
   <body class="antialiased h-screen overflow-hidden">
     <div id="root" class="h-full w-full"></div>
+    
+    <!-- SEO-friendly noscript content for crawlers -->
+    <noscript>
+      <div class="noscript-content" style="background: #0f172a;">
+        <h1>LiftShift - Free Workout Analytics Dashboard</h1>
+        <p>Transform your workout data into powerful insights. LiftShift is a free, privacy-focused workout analytics dashboard that helps you visualize your training progress.</p>
+        
+        <h2>Supported Workout Apps</h2>
+        <ul>
+          <li><strong>Hevy</strong> - Direct API sync or CSV import</li>
+          <li><strong>Strong</strong> - CSV data import</li>
+          <li><strong>Lyfta</strong> - CSV data import</li>
+        </ul>
+        
+        <h2>Features</h2>
+        <ul>
+          <li><strong>Volume Analysis</strong> - Track your weekly and monthly training volume across all exercises</li>
+          <li><strong>Personal Records</strong> - Automatic PR detection for every exercise</li>
+          <li><strong>Muscle Heatmaps</strong> - Visualize which muscle groups you're training most</li>
+          <li><strong>Strength Trends</strong> - See your strength progression with detailed charts</li>
+          <li><strong>Activity Calendar</strong> - GitHub-style contribution heatmap showing training consistency</li>
+          <li><strong>Exercise Breakdown</strong> - Deep dive into individual exercises with set-by-set history</li>
+        </ul>
+        
+        <h2>Privacy First</h2>
+        <p>All workout data is processed locally in your browser. We don't store your training history on any server. Your personal records, exercise data, and workout patterns remain completely private.</p>
+        
+        <h2>How It Works</h2>
+        <ol>
+          <li>Choose your workout app (Hevy, Strong, or Lyfta)</li>
+          <li>Import your data via API or CSV file</li>
+          <li>Explore your personalized analytics dashboard</li>
+        </ol>
+        
+        <p>Please enable JavaScript to use LiftShift.</p>
+      </div>
+    </noscript>
+    
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>

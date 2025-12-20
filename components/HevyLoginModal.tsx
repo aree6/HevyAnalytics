@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, HelpCircle, LogIn, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { UNIFORM_HEADER_BUTTON_CLASS, UNIFORM_HEADER_ICON_BUTTON_CLASS } from '../utils/ui/uiConstants';
 
@@ -37,7 +38,7 @@ export const HevyLoginModal: React.FC<HevyLoginModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm overflow-y-auto overscroll-contain">
-      <div className="min-h-full w-full px-2 sm:px-3 pt-10 pb-6 sm:pt-12 sm:pb-6">
+      <div className="min-h-full w-full px-2 sm:px-3 py-8 flex items-center justify-center">
         <div className="max-w-xl mx-auto">
           <div className="relative bg-black/60 border border-slate-700/50 rounded-2xl p-5 sm:p-6 slide-in-from-top-2 overflow-hidden backdrop-blur-md">
             <div className="absolute inset-0 pointer-events-none">
@@ -76,11 +77,7 @@ export const HevyLoginModal: React.FC<HevyLoginModalProps> = ({
                   >
                     Close
                   </button>
-                ) : (
-                  <div className="relative w-10 h-10 rounded-2xl bg-black/20 border border-slate-700/50 flex items-center justify-center">
-                    <img src="/hevy.png" alt="Hevy" className="w-8 h-8 object-contain" loading="lazy" decoding="async" />
-                  </div>
-                )}
+                ) : null}
               </div>
             </div>
 
