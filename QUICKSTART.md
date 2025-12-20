@@ -140,7 +140,21 @@ npm run build
 - Check file format is `.csv`
 - Try with smaller file first
 
-### Works on Mac but "Load failed" on phone
+### "Load failed" error on deployed site
+
+If a user gets "Load failed" or "Failed to fetch" on the **deployed** site (not local dev), this is typically caused by:
+
+1. **Content blockers / Ad blockers** - Safari and browser extensions can block API requests
+2. **VPNs** - Can block or modify network requests
+3. **Corporate/school firewalls** - May block external API calls
+
+**Solutions for users:**
+- Disable content blockers for the site (Safari → Settings → Extensions)
+- Try a different network (switch WiFi ↔ cellular)
+- Try an incognito/private window
+- Use a different browser (Chrome, Firefox)
+
+### Works on Mac but "Load failed" on phone (local dev)
 
 If you open the dev server from your phone (for example `http://192.168.x.x:3000`) and actions like Hevy login fail with a network error, it usually means the frontend is trying to call the backend at `http://localhost:...`.
 

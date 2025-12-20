@@ -134,7 +134,14 @@ const App: React.FC = () => {
   };
 
   const getHevyErrorMessage = (err: unknown): string => {
-    if (err instanceof Error && err.message) return err.message;
+    if (err instanceof Error && err.message) {
+      const msg = err.message;
+      // "Load failed" is a Safari-specific error, often caused by content blockers, VPNs, or network issues
+      if (msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('failed to fetch')) {
+        return `Network error: ${msg}. This is often caused by content blockers, VPNs,  or network issues. Try disabling ad blockers or switching browsers.`;
+      }
+      return msg;
+    }
     return 'Failed to fetch Hevy data. Please try again.';
   };
 
