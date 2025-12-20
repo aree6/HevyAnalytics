@@ -69,7 +69,7 @@ enum Tab {
 }
 
 type OnboardingIntent = 'initial' | 'update';
-type OnboardingStep = 'platform' | 'strong_csv' | 'hevy_prefs' | 'hevy_login' | 'hevy_csv';
+type OnboardingStep = 'platform' | 'strong_csv' | 'lyfta_csv' | 'hevy_prefs' | 'hevy_login' | 'hevy_csv';
 
 type OnboardingFlow = {
   intent: OnboardingIntent;
@@ -271,6 +271,42 @@ const App: React.FC = () => {
       const storedCSV = getCSVData();
       const lastPlatform = getLastCsvPlatform();
       if (!storedCSV || lastPlatform !== 'strong') {
+        saveSetupComplete(false);
+        setOnboarding({ intent: 'initial', step: 'platform' });
+        return;
+      }
+
+      setLoadingKind('csv');
+      setIsAnalyzing(true);
+      setLoadingStep(0);
+      const startedAt = startProgress();
+      setTimeout(() => {
+        setLoadingStep(1);
+        parseWorkoutCSVAsyncWithUnit(storedCSV, { unit: getWeightUnit() })
+          .then((result: ParseWorkoutCsvResult) => {
+            setLoadingStep(2);
+            const enriched = identifyPersonalRecords(result.sets);
+            setParsedData(enriched);
+            setHevyLoginError(null);
+            setCsvImportError(null);
+          })
+          .catch((err) => {
+            clearCSVData();
+            saveSetupComplete(false);
+            setCsvImportError(getErrorMessage(err));
+            setOnboarding({ intent: 'initial', step: 'platform' });
+          })
+          .finally(() => {
+            finishProgress(startedAt);
+          });
+      }, 0);
+      return;
+    }
+
+    if (storedChoice === 'lyfta') {
+      const storedCSV = getCSVData();
+      const lastPlatform = getLastCsvPlatform();
+      if (!storedCSV || lastPlatform !== 'lyfta') {
         saveSetupComplete(false);
         setOnboarding({ intent: 'initial', step: 'platform' });
         return;
@@ -583,6 +619,10 @@ const App: React.FC = () => {
     setHevyLoginError(null);
     if (dataSource === 'strong') {
       setOnboarding({ intent: 'update', step: 'strong_csv', platform: 'strong' });
+      return;
+    }
+    if (dataSource === 'lyfta') {
+      setOnboarding({ intent: 'update', step: 'lyfta_csv', platform: 'lyfta' });
       return;
     }
     if (dataSource === 'hevy') {
@@ -987,6 +1027,10 @@ const App: React.FC = () => {
               setOnboarding({ intent: onboarding.intent, step: 'strong_csv', platform: 'strong' });
               return;
             }
+            if (source === 'lyfta') {
+              setOnboarding({ intent: onboarding.intent, step: 'lyfta_csv', platform: 'lyfta' });
+              return;
+            }
             setOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' });
           }}
           onClose={
@@ -1062,6 +1106,37 @@ const App: React.FC = () => {
             savePreferencesConfirmed(true);
             setCsvImportError(null);
             processFile(file, 'strong', unit);
+          }}
+          isLoading={isAnalyzing}
+          initialGender={bodyMapGender}
+          initialUnit={weightUnit}
+          onGenderChange={(g) => setBodyMapGender(g)}
+          onUnitChange={(u) => setWeightUnit(u)}
+          errorMessage={csvImportError}
+          onBack={
+            onboarding.intent === 'initial'
+              ? () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
+              : () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
+          }
+          onClose={
+            onboarding.intent === 'update'
+              ? () => setOnboarding(null)
+              : undefined
+          }
+        />
+      ) : null}
+
+      {onboarding?.step === 'lyfta_csv' ? (
+        <CSVImportModal
+          intent={onboarding.intent}
+          platform="lyfta"
+          onClearCache={clearCacheAndRestart}
+          onFileSelect={(file, gender, unit) => {
+            setBodyMapGender(gender);
+            setWeightUnit(unit);
+            savePreferencesConfirmed(true);
+            setCsvImportError(null);
+            processFile(file, 'lyfta', unit);
           }}
           isLoading={isAnalyzing}
           initialGender={bodyMapGender}

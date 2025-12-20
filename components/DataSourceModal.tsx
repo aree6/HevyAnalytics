@@ -54,7 +54,7 @@ export const DataSourceModal: React.FC<DataSourceModalProps> = ({ intent, onSele
                     BETA
                   </span>
                   <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[30px] bg-black/20 border border-slate-700/50 flex items-center justify-center group-hover:border-slate-500/60 transition-colors">
-                    <img src="/hevy.png" alt="Hevy" className="w-14 h-14 sm:w-16 sm:h-16 object-contain" loading="lazy" decoding="async" />
+                    <img src="/hevy_small.webp" alt="Hevy" className="w-14 h-14 sm:w-16 sm:h-16 object-contain" loading="lazy" decoding="async" />
                   </div>
                   <div className="mt-2 text-white font-semibold">Hevy</div>
                 </button>
@@ -68,23 +68,23 @@ export const DataSourceModal: React.FC<DataSourceModalProps> = ({ intent, onSele
                     EXP
                   </span>
                   <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[30px] bg-black/20 border border-slate-700/50 flex items-center justify-center group-hover:border-slate-500/60 transition-colors">
-                    <img src="/strong.png" alt="Strong" className="w-14 h-14 sm:w-16 sm:h-16 object-contain" loading="lazy" decoding="async" />
+                    <img src="/Strong_small.webp" alt="Strong" className="w-14 h-14 sm:w-16 sm:h-16 object-contain" loading="lazy" decoding="async" />
                   </div>
                   <div className="mt-2 text-white font-semibold">Strong</div>
                 </button>
 
                 <button
                   type="button"
-                  disabled
-                  className="relative group flex flex-col items-center justify-center w-28 sm:w-32 h-28 sm:h-32 rounded-2xl opacity-60 cursor-not-allowed"
+                  onClick={() => onSelect('lyfta')}
+                  className="relative group flex flex-col items-center justify-center w-28 sm:w-32 h-28 sm:h-32 rounded-2xl transition-colors"
                 >
-                  <span className="absolute top-0.5 right-0.5 rounded-full border border-slate-600/30 bg-slate-600/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
-                    SOON
+                  <span className="absolute top-0.5 right-0.5 rounded-full border border-rose-500/30 bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">
+                    EXP
                   </span>
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[20px] bg-black/20 border border-slate-700/50 flex items-center justify-center">
-                    <img src="/fitbod.png" alt="Fitbod" className="w-9 h-9 sm:w-10 sm:h-10 object-contain" loading="lazy" decoding="async" />
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[20px] bg-black/20 border border-slate-700/50 flex items-center justify-center group-hover:border-slate-500/60 transition-colors">
+                    <img src="/lyfta_small.webp" alt="Lyfta" className="w-9 h-9 sm:w-10 sm:h-10 object-contain" loading="lazy" decoding="async" />
                   </div>
-                  <div className="mt-2 text-white font-semibold text-sm">Fitbod</div>
+                  <div className="mt-2 text-white font-semibold text-sm">Lyfta</div>
                 </button>
 
                 <button
@@ -96,7 +96,7 @@ export const DataSourceModal: React.FC<DataSourceModalProps> = ({ intent, onSele
                     SOON
                   </span>
                   <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-[20px] bg-black/20 border border-slate-700/50 flex items-center justify-center">
-                    <img src="/Jefit.png" alt="Jefit" className="w-9 h-9 sm:w-10 sm:h-10 object-contain" loading="lazy" decoding="async" />
+                    <img src="/Jefit_small.webp" alt="Jefit" className="w-9 h-9 sm:w-10 sm:h-10 object-contain" loading="lazy" decoding="async" />
                   </div>
                   <div className="mt-2 text-white font-semibold text-sm">Jefit</div>
                 </button>

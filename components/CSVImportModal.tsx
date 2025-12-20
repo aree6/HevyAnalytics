@@ -13,7 +13,7 @@ type CSVImportVariant = 'csv' | 'preferences';
 
 interface CSVImportModalProps {
   intent: Intent;
-  platform: 'hevy' | 'strong';
+  platform: 'hevy' | 'strong' | 'lyfta';
   variant?: CSVImportVariant;
   /** Hide the body type + weight unit selectors (used when preferences were already collected earlier in onboarding). */
   hideBodyTypeAndUnit?: boolean;
@@ -170,13 +170,16 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
             </div>
 
           <p className="text-slate-400 mb-6 text-center text-xs sm:text-sm">
-            {variant === 'preferences'
-              ? 'Let’s get set up. Choose your body type and unit, then continue.'
-              : showBodyTypeAndUnitSelectors
-              ? platform === 'strong'
-                ? 'Let’s get set up. Choose your body type and unit, then upload your Strong CSV export.'
-                : 'Let’s get set up. Choose your body type and unit, then upload your Hevy CSV export.'
-              : `Drop your ${platform === 'strong' ? 'Strong' : 'Hevy'} CSV export below.`}
+            {(() => {
+              const platformName = platform === 'strong' ? 'Strong' : platform === 'lyfta' ? 'Lyfta' : 'Hevy';
+              if (variant === 'preferences') {
+                return "Let's get set up. Choose your body type and unit, then continue.";
+              }
+              if (showBodyTypeAndUnitSelectors) {
+                return `Let's get set up. Choose your body type and unit, then upload your ${platformName} CSV export.`;
+              }
+              return `Drop your ${platformName} CSV export below.`;
+            })()}
           </p>
 
           {errorMessage ? (

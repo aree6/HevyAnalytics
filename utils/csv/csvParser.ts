@@ -5,6 +5,7 @@ import { toNumber, toInteger, toString } from '../format/formatters';
 import { DATE_FORMAT_HEVY } from '../date/dateUtils';
 import type { WeightUnit } from '../storage/localStorage';
 import { parseStrongRows, isStrongCSV } from './strongCsvParser';
+import { parseLyftaRows, isLyftaCSV } from './lyftaCsvParser';
 import { createExerciseNameResolver } from '../exercise/exerciseNameResolver';
 import { getExerciseAssets } from '../data/exerciseAssets';
 
@@ -20,7 +21,7 @@ const REQUIRED_HEADERS = [
 const WEIGHT_HEADERS = ['weight_kg', 'weight_lb', 'weight_lbs'] as const;
 const LBS_TO_KG = 0.45359237;
 
-type CsvFormat = 'hevy' | 'strong';
+type CsvFormat = 'hevy' | 'strong' | 'lyfta';
 
 type HeaderMode = 'fast' | 'robust';
 
@@ -73,10 +74,13 @@ const detectCsvFormat = (fields: string[] | undefined): CsvFormat => {
     if (robust.missing.length === 0 && robust.hasWeightHeader) return 'hevy';
   }
 
+  // Check for Lyfta CSV before Strong (Lyfta has more specific header requirements)
+  if (isLyftaCSV(fields)) return 'lyfta';
+
   if (isStrongCSV(fields)) return 'strong';
 
   throw new Error(
-    'Unsupported CSV format. Please upload a workout export from the Hevy app, or a Strong CSV export (BETA).'
+    'Unsupported CSV format. Please upload a workout export from the Hevy app, Strong app, or Lyfta app.'
   );
 };
 
@@ -344,6 +348,19 @@ export const parseWorkoutCSVWithUnit = (
           return undefined;
         })();
 
+  if (format === 'lyfta') {
+    const lyfta = parseLyftaRows(rawRows, { unit, resolver });
+    return {
+      sets: sortByDateDescStrong(lyfta.sets),
+      meta: {
+        format,
+        unmatchedExercises: lyfta.unmatchedExercises,
+        fuzzyMatches: lyfta.fuzzyMatches,
+        representativeMatches: lyfta.representativeMatches,
+      },
+    };
+  }
+
   const strong = parseStrongRows(rawRows, { unit, resolver });
   return {
     sets: sortByDateDescStrong(strong.sets),
@@ -384,6 +401,20 @@ export const parseWorkoutCSVAsyncWithUnit = async (
   const parsed = await parseStrongWithPapa(csvContent, delimiter, true);
   const assetsMap = await getExerciseAssets();
   const resolver = createExerciseNameResolver(assetsMap.keys(), { mode: 'relaxed' });
+
+  if (format === 'lyfta') {
+    const lyfta = parseLyftaRows(parsed, { unit, resolver });
+    return {
+      sets: sortByDateDescStrong(lyfta.sets),
+      meta: {
+        format,
+        unmatchedExercises: lyfta.unmatchedExercises,
+        fuzzyMatches: lyfta.fuzzyMatches,
+        representativeMatches: lyfta.representativeMatches,
+      },
+    };
+  }
+
   const strong = parseStrongRows(parsed, { unit, resolver });
   return {
     sets: sortByDateDescStrong(strong.sets),
