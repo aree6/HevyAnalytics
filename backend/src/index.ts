@@ -48,7 +48,8 @@ app.use(
       if (!origin) return cb(null, true);
       if (allowedOrigins.length === 0) return cb(null, true);
       if (allowedOrigins.includes(origin)) return cb(null, true);
-      if (!isProd && isPrivateLanOrigin(origin)) return cb(null, true);
+      // Allow private LAN origins in both dev and prod for local development against hosted backend
+      if (isPrivateLanOrigin(origin)) return cb(null, true);
       return cb(new Error('CORS blocked'), false);
     },
     methods: ['GET', 'POST', 'OPTIONS'],
