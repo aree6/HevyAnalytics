@@ -32,7 +32,13 @@ export const LyfataLoginModal: React.FC<LyfataLoginModalProps> = ({
   onBack,
   onClose,
 }) => {
-  const [apiKey, setApiKey] = useState('');
+  // Try to load API key from localStorage on mount
+  const [apiKey, setApiKey] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lyfta_api_key') || '';
+    }
+    return '';
+  });
   const [showLoginHelp, setShowLoginHelp] = useState(false);
 
   return (
@@ -84,7 +90,12 @@ export const LyfataLoginModal: React.FC<LyfataLoginModalProps> = ({
               className="mt-5 space-y-3"
               onSubmit={(e) => {
                 e.preventDefault();
-                onLogin(apiKey.trim());
+                const trimmedKey = apiKey.trim();
+                // Save API key to localStorage
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('lyfta_api_key', trimmedKey);
+                }
+                onLogin(trimmedKey);
               }}
             >
               {hasSavedSession && onSyncSaved ? (
