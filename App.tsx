@@ -75,7 +75,7 @@ enum Tab {
 }
 
 type OnboardingIntent = 'initial' | 'update';
-type OnboardingStep = 'platform' | 'strong_csv' | 'lyfta_csv' | 'lyfta_prefs' | 'lyfta_login' | 'hevy_prefs' | 'hevy_login' | 'hevy_csv';
+type OnboardingStep = 'platform' | 'strong_csv' | 'lyfta_csv' | 'other_csv' | 'lyfta_prefs' | 'lyfta_login' | 'hevy_prefs' | 'hevy_login' | 'hevy_csv';
 
 type OnboardingFlow = {
   intent: OnboardingIntent;
@@ -1163,6 +1163,10 @@ const App: React.FC = () => {
               setOnboarding({ intent: onboarding.intent, step: 'lyfta_prefs', platform: 'lyfta' });
               return;
             }
+            if (source === 'other') {
+              setOnboarding({ intent: onboarding.intent, step: 'other_csv', platform: 'other' });
+              return;
+            }
             setOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' });
           }}
         />
@@ -1170,24 +1174,54 @@ const App: React.FC = () => {
 
       {/* Modal for update flow only */}
       {onboarding?.intent === 'update' && onboarding?.step === 'platform' ? (
-        <DataSourceModal
-          intent={onboarding.intent}
-          onSelect={(source) => {
-            setCsvImportError(null);
-            setHevyLoginError(null);
-            setLyfatLoginError(null);
-            if (source === 'strong') {
-              setOnboarding({ intent: onboarding.intent, step: 'strong_csv', platform: 'strong' });
-              return;
-            }
-            if (source === 'lyfta') {
-              setOnboarding({ intent: onboarding.intent, step: 'lyfta_prefs', platform: 'lyfta' });
-              return;
-            }
-            setOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' });
-          }}
-          onClose={() => setOnboarding(null)}
-        />
+        // If user's saved data source is 'other', skip the choose-platform modal
+        // and open the CSV import modal directly so they return to their CSV upload
+        // screen (no platform-specific copy).
+        dataSource === 'other' ? (
+          <CSVImportModal
+            intent={onboarding.intent}
+            platform="other"
+            onClearCache={clearCacheAndRestart}
+            onFileSelect={(file, gender, unit) => {
+              setBodyMapGender(gender);
+              setWeightUnit(unit);
+              savePreferencesConfirmed(true);
+              setCsvImportError(null);
+              processFile(file, 'other', unit);
+            }}
+            isLoading={isAnalyzing}
+            initialGender={bodyMapGender}
+            initialUnit={weightUnit}
+            onGenderChange={(g) => setBodyMapGender(g)}
+            onUnitChange={(u) => setWeightUnit(u)}
+            errorMessage={csvImportError}
+            onBack={() => setOnboarding(null)}
+            onClose={() => setOnboarding(null)}
+          />
+        ) : (
+          <DataSourceModal
+            intent={onboarding.intent}
+            onSelect={(source) => {
+              setCsvImportError(null);
+              setHevyLoginError(null);
+              setLyfatLoginError(null);
+              if (source === 'strong') {
+                setOnboarding({ intent: onboarding.intent, step: 'strong_csv', platform: 'strong' });
+                return;
+              }
+              if (source === 'lyfta') {
+                setOnboarding({ intent: onboarding.intent, step: 'lyfta_prefs', platform: 'lyfta' });
+                return;
+              }
+              if (source === 'other') {
+                setOnboarding({ intent: onboarding.intent, step: 'other_csv', platform: 'other' });
+                return;
+              }
+              setOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' });
+            }}
+            onClose={() => setOnboarding(null)}
+          />
+        )
       ) : null}
 
       {onboarding?.step === 'hevy_prefs' ? (
@@ -1264,7 +1298,7 @@ const App: React.FC = () => {
           onBack={
             onboarding.intent === 'initial'
               ? () => setOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' })
-              : () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
+              : () => setOnboarding({ intent: 'initial', step: 'platform' })
           }
           onClose={
             onboarding.intent === 'update'
@@ -1288,7 +1322,7 @@ const App: React.FC = () => {
           onBack={
             onboarding.intent === 'initial'
               ? () => setOnboarding({ intent: onboarding.intent, step: 'lyfta_prefs', platform: 'lyfta' })
-              : () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
+              : () => setOnboarding({ intent: 'initial', step: 'platform' })
           }
           onClose={
             onboarding.intent === 'update'
@@ -1319,7 +1353,38 @@ const App: React.FC = () => {
           onBack={
             onboarding.intent === 'initial'
               ? () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
-              : () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
+              : () => setOnboarding({ intent: 'initial', step: 'platform' })
+          }
+          onClose={
+            onboarding.intent === 'update'
+              ? () => setOnboarding(null)
+              : undefined
+          }
+        />
+      ) : null}
+
+      {onboarding?.step === 'other_csv' ? (
+        <CSVImportModal
+          intent={onboarding.intent}
+          platform="other"
+          onClearCache={clearCacheAndRestart}
+          onFileSelect={(file, gender, unit) => {
+            setBodyMapGender(gender);
+            setWeightUnit(unit);
+            savePreferencesConfirmed(true);
+            setCsvImportError(null);
+            processFile(file, 'other', unit);
+          }}
+          isLoading={isAnalyzing}
+          initialGender={bodyMapGender}
+          initialUnit={weightUnit}
+          onGenderChange={(g) => setBodyMapGender(g)}
+          onUnitChange={(u) => setWeightUnit(u)}
+          errorMessage={csvImportError}
+          onBack={
+            onboarding.intent === 'initial'
+              ? () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
+              : () => setOnboarding(null)
           }
           onClose={
             onboarding.intent === 'update'
@@ -1349,8 +1414,12 @@ const App: React.FC = () => {
           onUnitChange={(u) => setWeightUnit(u)}
           errorMessage={csvImportError}
           onBack={() => {
-            const backStep = onboarding.backStep ?? 'lyfta_prefs';
-            setOnboarding({ intent: onboarding.intent, step: backStep, platform: 'lyfta' });
+            if (onboarding.intent === 'initial') {
+              const backStep = onboarding.backStep ?? 'lyfta_prefs';
+              setOnboarding({ intent: onboarding.intent, step: backStep, platform: 'lyfta' });
+              return;
+            }
+            setOnboarding({ intent: 'initial', step: 'platform' });
           }}
           onClose={
             onboarding.intent === 'update'
@@ -1379,8 +1448,12 @@ const App: React.FC = () => {
           onUnitChange={(u) => setWeightUnit(u)}
           errorMessage={csvImportError}
           onBack={() => {
-            const backStep = onboarding.backStep ?? 'hevy_login';
-            setOnboarding({ intent: onboarding.intent, step: backStep, platform: 'hevy' });
+            if (onboarding.intent === 'initial') {
+              const backStep = onboarding.backStep ?? 'hevy_login';
+              setOnboarding({ intent: onboarding.intent, step: backStep, platform: 'hevy' });
+              return;
+            }
+            setOnboarding({ intent: 'initial', step: 'platform' });
           }}
           onClose={
             onboarding.intent === 'update'

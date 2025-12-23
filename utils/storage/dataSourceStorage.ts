@@ -16,7 +16,7 @@ export const saveDataSourceChoice = (choice: DataSourceChoice): void => {
 export const getDataSourceChoice = (): DataSourceChoice | null => {
   try {
     const v = localStorage.getItem(DATA_SOURCE_KEY);
-    return v === 'strong' || v === 'hevy' || v === 'lyfta' ? v : null;
+    return v === 'strong' || v === 'hevy' || v === 'lyfta' || v === 'other' ? v : null;
   } catch {
     return null;
   }
@@ -61,7 +61,7 @@ export const saveLastCsvPlatform = (platform: DataSourceChoice): void => {
 export const getLastCsvPlatform = (): DataSourceChoice | null => {
   try {
     const v = localStorage.getItem(LAST_CSV_PLATFORM_KEY);
-    return v === 'strong' || v === 'hevy' || v === 'lyfta' ? v : null;
+    return v === 'strong' || v === 'hevy' || v === 'lyfta' || v === 'other' ? v : null;
   } catch {
     return null;
   }

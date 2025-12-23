@@ -1161,7 +1161,7 @@ const VolumeComparisonCard: React.FC<{
 export const FlexView: React.FC<FlexViewProps> = ({
   data,
   filtersSlot,
-  weightUnit = 'kg',
+  weightUnit = 'kg' as WeightUnit,
   dailySummaries: dailySummariesProp,
   exerciseStats: exerciseStatsProp,
   stickyHeader = false,

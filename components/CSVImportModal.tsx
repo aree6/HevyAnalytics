@@ -14,7 +14,7 @@ type CSVImportVariant = 'csv' | 'preferences';
 
 interface CSVImportModalProps {
   intent: Intent;
-  platform: 'hevy' | 'strong' | 'lyfta';
+  platform: 'hevy' | 'strong' | 'lyfta' | 'other';
   variant?: CSVImportVariant;
   /** Hide the body type + weight unit selectors (used when preferences were already collected earlier in onboarding). */
   hideBodyTypeAndUnit?: boolean;
@@ -172,10 +172,19 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
 
           <p className="text-slate-400 mb-6 text-center text-xs sm:text-sm">
             {(() => {
-              const platformName = platform === 'strong' ? 'Strong' : platform === 'lyfta' ? 'Lyfta' : 'Hevy';
               if (variant === 'preferences') {
                 return "Let's get set up. Choose your body type and unit, then continue.";
               }
+
+              // For 'other' platform we should be generic and avoid platform-specific copy
+              if (platform === 'other') {
+                if (showBodyTypeAndUnitSelectors) {
+                  return "Let's get set up. Choose your body type and unit, then upload your CSV.";
+                }
+                return "Drop your CSV below.";
+              }
+
+              const platformName = platform === 'strong' ? 'Strong' : platform === 'lyfta' ? 'Lyfta' : 'Hevy';
               if (showBodyTypeAndUnitSelectors) {
                 return `Let's get set up. Choose your body type and unit, then upload your ${platformName} CSV export.`;
               }
@@ -360,7 +369,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
                 <Upload className={`w-6 h-6 sm:w-8 sm:h-8 mb-3 ${canUploadCsv ? 'text-slate-500' : 'text-slate-600'}`} />
                 <p className={`font-medium text-center text-sm sm:text-base ${canUploadCsv ? 'text-slate-300' : 'text-slate-500'}`}>
                   {canUploadCsv
-                    ? `Drop your ${platform === 'strong' ? 'Strong' : platform === 'lyfta' ? 'Lyfta' : 'Hevy'} CSV here`
+                    ? (platform === 'other' ? 'Drop your CSV here' : `Drop your ${platform === 'strong' ? 'Strong' : platform === 'lyfta' ? 'Lyfta' : 'Hevy'} CSV here`)
                     : hideBodyTypeAndUnit
                     ? 'Go back to choose body type + unit first'
                     : 'Choose body type + unit first'}
@@ -381,8 +390,8 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
             </>
           )}
 
-          {/* Export help section - toggled by bottom button */}
-          {variant === 'csv' && showExportHelp ? (
+          {/* Export help section - toggled by bottom button (hidden for unknown platforms) */}
+          {variant === 'csv' && platform !== 'other' && showExportHelp ? (
             <div className="w-full mb-4">
               {platform === 'hevy' ? (
                   <div className="mt-3 space-y-3">
@@ -434,15 +443,18 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
           {/* Action buttons row - See how to export CSV + Clear cache */}
           {variant === 'csv' ? (
             <div className="mt-4 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setShowExportHelp((v) => !v)}
-                className={`${UNIFORM_HEADER_BUTTON_CLASS} h-10 text-sm font-semibold gap-2`}
-              >
-                <Upload className="w-4 h-4" />
-                <span className="hidden sm:inline">{showExportHelp ? 'Hide export guide' : 'How to export CSV'}</span>
-                <span className="sm:hidden">{showExportHelp ? 'Hide' : 'Export guide'}</span>
-              </button>
+              {platform !== 'other' ? (
+                <button
+                  type="button"
+                  onClick={() => setShowExportHelp((v) => !v)}
+                  className={`${UNIFORM_HEADER_BUTTON_CLASS} h-10 text-sm font-semibold gap-2`}
+                >
+                  <Upload className="w-4 h-4" />
+                  <span className="hidden sm:inline">{showExportHelp ? 'Hide export guide' : 'How to export CSV'}</span>
+                  <span className="sm:hidden">{showExportHelp ? 'Hide' : 'Export guide'}</span>
+                </button>
+              ) : null}
+
               {onClearCache ? (
                 <button
                   type="button"

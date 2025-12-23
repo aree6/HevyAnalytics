@@ -968,111 +968,113 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       
       {/* 
           TOP SECTION: GRID LAYOUT 
-          We use lg:h-[380px] to enforce equal height for Sidebar and Metrics on Desktop.
-          On mobile, it falls back to auto (stacked).
+          Grid items default to stretch, so columns will be equal height.
       */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 ">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 items-stretch">
         
         {/* --- LEFT: SIDEBAR --- */}
-    {/* Sidebar height is limited to ~1/3 of the viewport for a compact list on mobile */}
-    <div className="lg:col-span-1 flex flex-col gap-1 h-[30vh] ">
-      {/* Search Header */}
-      <div className="relative shrink-0">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-        <input
-          type="text"
-          placeholder="Filter..."
-          className="w-full bg-black/70 border border-slate-700/50 rounded-lg pl-9 pr-3 py-1 sm:py-2 text-[11px] sm:text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+        {/* 
+            Height logic:
+            Mobile: h-[40.5vh]
+            Desktop (lg): h-0 + min-h-full. 
+            This forces the grid row height to be determined by the RIGHT panel (the bottleneck),
+            and the left panel stretches to match it, then scrolls internally.
+        */}
+        <div className="lg:col-span-1 flex flex-col gap-1 h-[25vh] lg:h-0 lg:min-h-full">
+          {/* Search Header */}
+          <div className="relative shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Filter..."
+              className="w-full bg-black/70 border border-slate-700/50 rounded-lg pl-9 pr-3 py-1 sm:py-2 text-[11px] sm:text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
 
-      {/* LIST WRAPPER
-         flex-1 ensures it takes remaining space within the 25vh
-      */}
-      <div className="flex-1 bg-black/70 border border-slate-700/50 rounded-lg overflow-hidden flex flex-col min-h-0">
-        <div className="overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar flex-1">
-          {filteredExercises.map((ex) => {
-            const status = statusMap[ex.name];
-            const isSelected = selectedExerciseName === ex.name;
-            // Use fuzzy asset lookup to handle exercise name variations
-            const asset = assetLookup?.getAsset(ex.name);
-            const isEligible = trainingStructure.eligibilityByName.get(ex.name)?.isEligible ?? false;
-            const subLabel = isEligible
-              ? status.label
-              : (trainingStructure.eligibilityByName.get(ex.name)?.inactiveLabel ?? 'inactive');
+          {/* LIST WRAPPER */}
+          <div className="flex-1 bg-black/70 border border-slate-700/50 rounded-lg overflow-hidden flex flex-col min-h-0">
+            <div className="overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar flex-1">
+              {filteredExercises.map((ex) => {
+                const status = statusMap[ex.name];
+                const isSelected = selectedExerciseName === ex.name;
+                const asset = assetLookup?.getAsset(ex.name);
+                const isEligible = trainingStructure.eligibilityByName.get(ex.name)?.isEligible ?? false;
+                const subLabel = isEligible
+                  ? status.label
+                  : (trainingStructure.eligibilityByName.get(ex.name)?.inactiveLabel ?? 'inactive');
 
-            const lastDone = lastSessionByName.get(ex.name) ?? null;
-            const lastDoneLabel = lastDone
-              ? formatRelativeDay(lastDone, effectiveNow)
-              : '—';
+                const lastDone = lastSessionByName.get(ex.name) ?? null;
+                const lastDoneLabel = lastDone
+                  ? formatRelativeDay(lastDone, effectiveNow)
+                  : '—';
 
-            const selectedHighlight = getSelectedHighlightClasses(status.status, !isEligible ? 'soft' : 'strong');
-            const RowStatusIcon = status.icon;
-            const displayLabel = capitalizeLabel(subLabel);
-            const IneligibleStatusIcon = displayLabel === 'Baseline' ? Hourglass : null;
+                const selectedHighlight = getSelectedHighlightClasses(status.status, !isEligible ? 'soft' : 'strong');
+                const RowStatusIcon = status.icon;
+                const displayLabel = capitalizeLabel(subLabel);
+                const IneligibleStatusIcon = displayLabel === 'Baseline' ? Hourglass : null;
 
-            return (
-              <button
-                key={ex.name}
-                ref={(el) => {
-                  exerciseButtonRefs.current[ex.name] = el;
-                }}
-                onClick={() => setSelectedExerciseName(ex.name)}
-                className={`w-full text-left px-2 py-1.5 rounded-md transition-all duration-200 flex items-center justify-between group border ${
-                  isSelected
-                    ? selectedHighlight.button
-                    : 'border-transparent hover:bg-black/60 hover:border-slate-600/50'
-                } ${!isEligible ? 'opacity-60' : ''}`}
-              >
-                <div className="flex items-center gap-2 min-w-0 pr-2">
-                  {(() => {
-                    if (!asset) return (
-                      <div className="w-6 h-6 rounded bg-black/50 flex items-center justify-center text-slate-500 flex-shrink-0">
-                        <Dumbbell className="w-3.5 h-3.5" />
+                return (
+                  <button
+                    key={ex.name}
+                    ref={(el) => {
+                      exerciseButtonRefs.current[ex.name] = el;
+                    }}
+                    onClick={() => setSelectedExerciseName(ex.name)}
+                    className={`w-full text-left px-2 py-1.5 rounded-md transition-all duration-200 flex items-center justify-between group border ${
+                      isSelected
+                        ? selectedHighlight.button
+                        : 'border-transparent hover:bg-black/60 hover:border-slate-600/50'
+                    } ${!isEligible ? 'opacity-60' : ''}`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                      {(() => {
+                        if (!asset) return (
+                          <div className="w-6 h-6 rounded bg-black/50 flex items-center justify-center text-slate-500 flex-shrink-0">
+                            <Dumbbell className="w-3.5 h-3.5" />
+                          </div>
+                        );
+                        const imgUrl = asset.sourceType === 'video' ? asset.thumbnail : (asset.thumbnail || asset.source);
+                        return imgUrl ? (
+                          <img src={imgUrl} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0 bg-white" loading="lazy" decoding="async" />
+                        ) : (
+                          <div className="w-6 h-6 rounded bg-black/50 flex items-center justify-center text-slate-500 flex-shrink-0">
+                            <Dumbbell className="w-3.5 h-3.5" />
+                          </div>
+                        );
+                      })()}
+                      <div className="flex flex-col min-w-0">
+                        <span className={`truncate text-xs ${isSelected ? 'text-slate-200 font-semibold' : 'text-slate-300 group-hover:text-white'}`}>
+                          {ex.name}
+                        </span>
+                        <span className={`truncate text-[10px] ${isSelected ? 'text-slate-400' : 'text-slate-500 group-hover:text-slate-400'}`}>
+                          {lastDoneLabel}
+                        </span>
                       </div>
-                    );
-                    const imgUrl = asset.sourceType === 'video' ? asset.thumbnail : (asset.thumbnail || asset.source);
-                    return imgUrl ? (
-                      <img src={imgUrl} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0 bg-white" loading="lazy" decoding="async" />
-                    ) : (
-                      <div className="w-6 h-6 rounded bg-black/50 flex items-center justify-center text-slate-500 flex-shrink-0">
-                        <Dumbbell className="w-3.5 h-3.5" />
-                      </div>
-                    );
-                  })()}
-                  <div className="flex flex-col min-w-0">
-                    <span className={`truncate text-xs ${isSelected ? 'text-slate-200 font-semibold' : 'text-slate-300 group-hover:text-white'}`}>
-                      {ex.name}
-                    </span>
-                    <span className={`truncate text-[10px] ${isSelected ? 'text-slate-400' : 'text-slate-500 group-hover:text-slate-400'}`}>
-                      {lastDoneLabel}
-                    </span>
-                  </div>
-                </div>
+                    </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {isEligible ? (
-                    <div className={`px-1.5 py-1 rounded-md ${status.bgColor} ${isSelected ? 'animate-in zoom-in-50 duration-200' : ''} flex items-center gap-1`}>
-                      <RowStatusIcon className={`w-3 h-3 ${status.color}`} />
-                      <span className={`text-[10px] font-bold ${status.color}`}>{displayLabel}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isEligible ? (
+                        <div className={`px-1.5 py-1 rounded-md ${status.bgColor} ${isSelected ? 'animate-in zoom-in-50 duration-200' : ''} flex items-center gap-1`}>
+                          <RowStatusIcon className={`w-3 h-3 ${status.color}`} />
+                          <span className={`text-[10px] font-bold ${status.color}`}>{displayLabel}</span>
+                        </div>
+                      ) : (
+                        <div className={`px-1.5 py-1 rounded-md bg-slate-700/20 border border-slate-700/30 ${isSelected ? 'animate-in zoom-in-50 duration-200' : ''} flex items-center gap-1`}>
+                          {IneligibleStatusIcon ? (
+                            <IneligibleStatusIcon className="w-3 h-3 text-slate-400" />
+                          ) : null}
+                          <span className="text-[10px] font-bold text-slate-400">{displayLabel}</span>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className={`px-1.5 py-1 rounded-md bg-slate-700/20 border border-slate-700/30 ${isSelected ? 'animate-in zoom-in-50 duration-200' : ''} flex items-center gap-1`}>
-                      {IneligibleStatusIcon ? (
-                        <IneligibleStatusIcon className="w-3 h-3 text-slate-400" />
-                      ) : null}
-                      <span className="text-[10px] font-bold text-slate-400">{displayLabel}</span>
-                    </div>
-                  )}
-                </div>
-              </button>
-            );
-          })}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
 
         {/* --- RIGHT: HEADER & METRICS --- */}
         <div className="lg:col-span-2 flex flex-col gap-2 h-full min-h-0">
@@ -1140,7 +1142,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                 </div>
 
                 {assetLookup && selectedStats && (() => {
-                  // Use fuzzy asset lookup to handle exercise name variations
                   const a = assetLookup.getAsset(selectedStats.name);
                   if (!a) return null;
 

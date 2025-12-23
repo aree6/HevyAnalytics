@@ -583,7 +583,7 @@ const useExerciseVolumePrHistory = (data: WorkoutSet[]) => {
   }, [data]);
 };
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, weightUnit = 'kg', bodyMapGender = 'male', stickyHeader = false, onExerciseClick, onDayTitleClick }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, weightUnit = 'kg' as import('../utils/storage/localStorage').WeightUnit, bodyMapGender = 'male', stickyHeader = false, onExerciseClick, onDayTitleClick }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);

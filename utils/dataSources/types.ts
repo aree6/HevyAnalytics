@@ -1,1 +1,1 @@
-export type DataSourceChoice = 'strong' | 'hevy' | 'lyfta';
+export type DataSourceChoice = 'strong' | 'hevy' | 'lyfta' | 'other';

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Renderer, Program, Triangle, Mesh } from 'ogl';
 
 export type RaysOrigin =
@@ -82,7 +82,7 @@ interface Uniforms {
 }
 
 const LightRays: React.FC<LightRaysProps> = ({
-  raysOrigin = 'top-center',
+  raysOrigin = 'top-center' as RaysOrigin,
   raysColor = DEFAULT_COLOR,
   raysSpeed = 1,
   lightSpread = 1,

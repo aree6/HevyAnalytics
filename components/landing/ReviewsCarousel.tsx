@@ -61,7 +61,7 @@ export const ReviewsCarousel: React.FC<ReviewsCarouselProps> = ({ className = ''
   return (
     <div className={`relative ${className}`}>
       {/* Section Header */}
-      <div className="text-center mb-12">
+      <div className="text-center mb-9">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-6">
           <Quote className="w-4 h-4 text-emerald-400" />
           <span className="text-sm font-medium text-emerald-300">Community Feedback</span>
@@ -145,7 +145,7 @@ export const ReviewsCarousel: React.FC<ReviewsCarouselProps> = ({ className = ''
       </div>
 
       {/* Reddit Attribution */}
-      <div className="text-center mt-6 mb-4 ">
+      <div className="text-center mt-6 mb-20 ">
         <a 
           href="https://reddit.com/r/hevy" 
           target="_blank" 
