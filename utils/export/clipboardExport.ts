@@ -1,8 +1,44 @@
 import { WorkoutSet, DailySummary, ExerciseStats } from '../../types';
-import { subMonths, format } from 'date-fns';
+import { subMonths, format, differenceInMonths, min } from 'date-fns';
 import { getDailySummaries, getExerciseStats, getIntensityEvolution, getTopExercisesOverTime, getPrsOverTime, HeatmapEntry } from '../analysis/analytics';
 import { getSessionKey } from '../date/dateUtils';
 import { isWarmupSet } from '../analysis/setClassification';
+
+export type ExperienceLevel = 'Newbie' | 'Beginner' | 'Early Intermediate' | 'Intermediate' | 'Advanced' | 'Elite';
+
+export const calculateTrainingExperience = (sets: WorkoutSet[], now = new Date()): { monthsTraining: number; level: ExperienceLevel } => {
+  if (!sets || sets.length === 0) {
+    return { monthsTraining: 0, level: 'Newbie' };
+  }
+
+  // Find the earliest workout date
+  const dates = sets
+    .filter(s => s.parsedDate)
+    .map(s => s.parsedDate!);
+  
+  if (dates.length === 0) {
+    return { monthsTraining: 0, level: 'Newbie' };
+  }
+
+  const earliestDate = min(dates);
+  const monthsTraining = differenceInMonths(now, earliestDate);
+
+  // Determine experience level based on the provided logic
+  let level: ExperienceLevel;
+  if (monthsTraining < 1) {
+    level = 'Newbie';
+  } else if (monthsTraining < 6) {
+    level = 'Beginner';
+  } else if (monthsTraining < 18) {
+    level = 'Early Intermediate';
+  } else if (monthsTraining < 36) {
+    level = 'Intermediate';
+  } else {
+    level = 'Advanced'; // Note: Elite logic would need competition_level data
+  }
+
+  return { monthsTraining, level };
+};
 
 export interface ExportPackage {
   meta: {
@@ -133,10 +169,13 @@ interface ExportMeta {
   countSets: number;
 }
 
-const AI_PROMPT = `<mention your specific request here> Here are my workout logs. Analyze them deeply, beyond surface-level stats. Identify hidden patterns, habits, and blind spots that standard analysis misses. Give clear, actionable suggestions to improve them, with a balanced and practical approach. Don't limit yourself to my ask, go beyond it, try to solve the problem, not this prompt.`;
+const AI_PROMPT = `<mention your specific request here> I am a {} in gym. Here are my workout logs. Analyze them deeply, beyond surface-level stats. Identify hidden patterns, habits, and blind spots that standard analysis misses. Give clear, actionable suggestions to improve them, with a balanced and practical approach. Don't limit yourself to my ask, go beyond it, try to solve the problem, not this prompt.`;
 
-const formatSetsAsText = (sets: WorkoutSet[], meta?: ExportMeta): string => {
+const formatSetsAsText = (sets: WorkoutSet[], meta?: ExportMeta, fullDatasetForExperience?: WorkoutSet[]): string => {
   if (!sets || sets.length === 0) return '';
+
+  // Calculate training experience using full dataset if available, otherwise use filtered sets
+  const experience = calculateTrainingExperience(fullDatasetForExperience || sets);
 
   // Group sets by session key
   const sessions = new Map<string, WorkoutSet[]>();
@@ -149,14 +188,16 @@ const formatSetsAsText = (sets: WorkoutSet[], meta?: ExportMeta): string => {
   // Build text
   const parts: string[] = [];
 
-  // Prompt first
-  parts.push(AI_PROMPT);
+  // Prompt first with experience level
+  const promptWithExperience = AI_PROMPT.replace('I am a {}', `I am a ${experience.level}`);
+  parts.push(promptWithExperience);
   parts.push('');
 
   if (meta) {
     parts.push(`GeneratedAt: ${meta.generatedAt}`);
     parts.push(`Scope: ${meta.scope}`);
     parts.push(`CountSets: ${meta.countSets}`);
+    parts.push(`Experience: ${experience.level} (${experience.monthsTraining} months training)`);
     parts.push('');
   }
 
@@ -223,7 +264,7 @@ export const exportPackageAndCopyText = async (
 ): Promise<void> => {
   const pkg = gatherLastNMonthsPackage(fullData, dailyData, exerciseStats, months, now);
   const meta: ExportMeta = { generatedAt: pkg.meta.generatedAt, scope: months === 'all' ? 'all' : `${pkg.meta.months}m`, countSets: pkg.meta.countSets };
-  const text = formatSetsAsText(pkg.rawSets, meta);
+  const text = formatSetsAsText(pkg.rawSets, meta, fullData);
   try {
     if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(text);
