@@ -34,7 +34,6 @@ import { format, isSameDay, isWithinInterval, startOfDay, endOfDay } from 'date-
 import { CalendarSelector } from './components/CalendarSelector';
 import { formatDayYearContraction, formatHumanReadableDate } from './utils/date/dateUtils';
 import { trackPageView } from './utils/integrations/ga';
-import { initAdSense } from './utils/integrations/adsense';
 import { SupportLinks } from './components/SupportLinks';
 import { ThemedBackground } from './components/ThemedBackground';
 import { ThemeToggleButton } from './components/ThemeToggleButton';
@@ -84,7 +83,6 @@ type OnboardingFlow = {
   backStep?: OnboardingStep;
 };
 
-const ADSENSE_CLIENT = 'ca-pub-1028241234302201';
 
 const App: React.FC = () => {
   const { mode } = useTheme();
@@ -116,12 +114,6 @@ const App: React.FC = () => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
 
-  useEffect(() => {
-    if (onboarding) return;
-    if (isAnalyzing) return;
-    if (parsedData.length === 0) return;
-    initAdSense(ADSENSE_CLIENT);
-  }, [onboarding, isAnalyzing, parsedData.length]);
 
   useEffect(() => {
     const el = mainRef.current;

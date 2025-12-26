@@ -166,7 +166,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   const performCopyForTimeline = async (k: string) => {
     const months: number | 'all' = k === 'all' ? 'all' : Number(k);
     try {
-      await exportPackageAndCopyText(fullData, dailyData, exerciseStats, months, new Date());
+      await exportPackageAndCopyText(fullData, dailyData, exerciseStats, months, new Date(), effectiveNow);
       setExportCopied(true);
       setExportWindow(k as any);
       setTimelineSelected(k);
@@ -841,7 +841,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                         onClick={async () => {
                           try {
                             const months: number | 'all' = timelineSelected === 'all' ? 'all' : Number(timelineSelected);
-                            await exportPackageAndCopyText(fullData, dailyData, exerciseStats, months, new Date());
+                            await exportPackageAndCopyText(fullData, dailyData, exerciseStats, months, new Date(), effectiveNow);
                             setReCopyCopied(true);
                             if (reCopyTimerRef.current) window.clearTimeout(reCopyTimerRef.current);
                             reCopyTimerRef.current = window.setTimeout(() => setReCopyCopied(false), 2000);

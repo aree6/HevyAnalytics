@@ -60,9 +60,11 @@ export const gatherLastNMonthsPackage = (
   dailyData: DailySummary[],
   exerciseStats: ExerciseStats[],
   months: number | 'all' = 1,
-  now = new Date()
+  now = new Date(),
+  effectiveNow?: Date
 ): ExportPackage => {
-  const filtered = months === 'all' ? fullData : fullData.filter(s => !!s.parsedDate && s.parsedDate.getTime() >= subMonths(now, months).getTime());
+  const referenceDate = effectiveNow || now;
+  const filtered = months === 'all' ? fullData : fullData.filter(s => !!s.parsedDate && s.parsedDate.getTime() >= subMonths(referenceDate, months).getTime());
 
   const daily = getDailySummaries(filtered);
   const exercises = getExerciseStats(filtered);
@@ -130,9 +132,10 @@ export const exportAndCopyPackage = async (
   dailyData: DailySummary[],
   exerciseStats: ExerciseStats[],
   months: number | 'all' = 1,
-  now = new Date()
+  now = new Date(),
+  effectiveNow?: Date
 ): Promise<void> => {
-  const pkg = gatherLastNMonthsPackage(fullData, dailyData, exerciseStats, months, now);
+  const pkg = gatherLastNMonthsPackage(fullData, dailyData, exerciseStats, months, now, effectiveNow);
   const text = JSON.stringify(pkg, null, 2);
   try {
     if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
@@ -169,7 +172,7 @@ interface ExportMeta {
   countSets: number;
 }
 
-const AI_PROMPT = `<mention your specific request here> I am a {} in gym. Here are my workout logs. Analyze them deeply, beyond surface-level stats. Identify hidden patterns, habits, and blind spots that standard analysis misses. Give clear, actionable suggestions to improve them, with a balanced and practical approach. Don't limit yourself to my ask, go beyond it, try to solve the problem, not this prompt.`;
+const AI_PROMPT = `I am a {} in gym. Here are my workout logs. Analyze them deeply, beyond surface-level stats. Identify hidden patterns, habits, and blind spots that standard analysis misses. Give clear, actionable suggestions to improve them, with a balanced and practical approach. Don't limit yourself to my ask, go beyond it, try to solve the problem, not this prompt.`;
 
 const formatSetsAsText = (sets: WorkoutSet[], meta?: ExportMeta, fullDatasetForExperience?: WorkoutSet[]): string => {
   if (!sets || sets.length === 0) return '';
@@ -260,9 +263,10 @@ export const exportPackageAndCopyText = async (
   dailyData: DailySummary[],
   exerciseStats: ExerciseStats[],
   months: number | 'all' = 1,
-  now = new Date()
+  now = new Date(),
+  effectiveNow?: Date
 ): Promise<void> => {
-  const pkg = gatherLastNMonthsPackage(fullData, dailyData, exerciseStats, months, now);
+  const pkg = gatherLastNMonthsPackage(fullData, dailyData, exerciseStats, months, now, effectiveNow);
   const meta: ExportMeta = { generatedAt: pkg.meta.generatedAt, scope: months === 'all' ? 'all' : `${pkg.meta.months}m`, countSets: pkg.meta.countSets };
   const text = formatSetsAsText(pkg.rawSets, meta, fullData);
   try {
