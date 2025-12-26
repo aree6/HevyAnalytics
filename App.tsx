@@ -1133,7 +1133,7 @@ const App: React.FC = () => {
               <SupportLinks variant="secondary" layout="footer" />
             </div>
 
-            <div className="sm:hidden">
+            <div className="sm:hidden pb-10">
               <SupportLinks variant="all" layout="footer" />
             </div>
           </main>

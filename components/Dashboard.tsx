@@ -805,7 +805,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
                       {showTimelineChips && (
                         <div className="absolute right-0 mt-2 w-40 bg-black/90 border border-slate-700/50 rounded-xl shadow-xl z-50 p-2">
-                          {['1','2','3','6','all'].map((k) => {
+                          {['1','3','6','all'].map((k) => {
                             const label = k === 'all' ? 'All' : `${k} month${k === '1' ? '' : 's'}`;
                             return (
                               <button
@@ -869,6 +869,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         totalWorkouts={totalWorkouts}
         totalSets={totalSets}
         totalPRs={totalPrs}
+        onExportAction={handleExportAction}
+        exportCopied={exportCopied}
+        showTimelineChips={showTimelineChips}
+        setShowTimelineChips={setShowTimelineChips}
+        exportWindow={exportWindow}
+        performCopyForTimeline={performCopyForTimeline}
+        timelineSelected={timelineSelected}
+        onGeminiAnalyze={() => {
+          const instruction = 'Paste the clipboard contents.';
+          const url = `https://aistudio.google.com/prompts/new_chat?model=gemini-3-pro-preview&prompt=${encodeURIComponent(instruction)}`;
+          window.open(url, '_blank');
+        }}
+        onReCopy={async () => {
+          try {
+            const months: number | 'all' = timelineSelected === 'all' ? 'all' : Number(timelineSelected);
+            await exportPackageAndCopyText(fullData, dailyData, exerciseStats, months, new Date(), effectiveNow);
+            setReCopyCopied(true);
+            if (reCopyTimerRef.current) window.clearTimeout(reCopyTimerRef.current);
+            reCopyTimerRef.current = window.setTimeout(() => setReCopyCopied(false), 2000);
+          } catch (e) {
+            console.error('recopy failed', e);
+          }
+        }}
+        reCopyCopied={reCopyCopied}
       />
 
       {/* RECENT PRs TIMELINE */}
