@@ -3,6 +3,8 @@ import { subMonths, format, differenceInMonths, min } from 'date-fns';
 import { getDailySummaries, getExerciseStats, getIntensityEvolution, getTopExercisesOverTime, getPrsOverTime, HeatmapEntry } from '../analysis/analytics';
 import { getSessionKey } from '../date/dateUtils';
 import { isWarmupSet } from '../analysis/setClassification';
+import { getWeightUnit, WeightUnit } from '../storage/localStorage';
+import { convertWeight } from '../format/units';
 
 export type ExperienceLevel = 'Newbie' | 'Beginner' | 'Early Intermediate' | 'Intermediate' | 'Advanced' | 'Elite';
 
@@ -172,10 +174,13 @@ interface ExportMeta {
   countSets: number;
 }
 
-const AI_PROMPT = `I am a {} in gym. Here are my workout logs. Analyze them deeply, beyond surface-level stats. Identify hidden patterns, habits, and blind spots that standard analysis misses. Give clear, actionable suggestions to improve them, with a balanced and practical approach. Don't limit yourself to my ask, go beyond it, try to solve the problem, not this prompt.`;
+const AI_PROMPT = `I am a {} in gym. Here are my workout logs. Analyze them deeply, beyond surface-level stats. Identify hidden patterns, habits, and blind spots that standard analysis misses. Give clear, actionable suggestions to improve them, with a balanced and practical approach. Don't limit yourself to my ask, go beyond it.`;
 
 const formatSetsAsText = (sets: WorkoutSet[], meta?: ExportMeta, fullDatasetForExperience?: WorkoutSet[]): string => {
   if (!sets || sets.length === 0) return '';
+
+  // Get the user's preferred weight unit
+  const weightUnit = getWeightUnit();
 
   // Calculate training experience using full dataset if available, otherwise use filtered sets
   const experience = calculateTrainingExperience(fullDatasetForExperience || sets);
@@ -231,10 +236,10 @@ const formatSetsAsText = (sets: WorkoutSet[], meta?: ExportMeta, fullDatasetForE
     for (const name of exOrder) {
       const exSets = exMap.get(name)!.filter(s => !isWarmupSet(s));
       if (exSets.length === 0) continue;
-      const reps = exSets.map(s => (s.reps ?? 0).toString());
+      const repsWithWeight = exSets.map(s => `${s.reps ?? 0}x${convertWeight(s.weight_kg ?? 0, weightUnit)}${weightUnit}`);
       parts.push(name);
       parts.push(`Sets: ${exSets.length}`);
-      parts.push(`Reps: ${reps.join(',')}`);
+      parts.push(`Reps: ${repsWithWeight.join(',')}`);
       parts.push('');
     }
 
