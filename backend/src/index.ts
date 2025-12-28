@@ -95,7 +95,7 @@ app.post('/api/hevy/login', loginLimiter, async (req, res) => {
     const message = (err as Error).message || 'Login failed';
     if (status === 401) {
       return res.status(401).json({
-        error: `${message}. If this happens in production, verify the backend has HEVY_X_API_KEY configured correctly.`,
+        error: `${message}.`,
       });
     }
     res.status(status).json({ error: message });
