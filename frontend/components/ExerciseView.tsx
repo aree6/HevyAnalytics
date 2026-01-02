@@ -922,13 +922,32 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
     const isSelected = (s: ExerciseTrendStatus) => trendFilter === s;
     const chipCls = (s: ExerciseTrendStatus, tone: 'good' | 'warn' | 'bad' | 'neutral' | 'info') => {
-      const base = 'text-[10px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors';
-      const selected = isSelected(s) ? ' ring-2 ring-white/25 border-white/30 shadow-sm' : '';
-      if (tone === 'good') return `${base} bg-emerald-500/10 text-emerald-300 border-emerald-500/20 hover:border-emerald-400/40${selected}`;
-      if (tone === 'warn') return `${base} bg-amber-500/10 text-amber-300 border-amber-500/20 hover:border-amber-400/40${selected}`;
-      if (tone === 'bad') return `${base} bg-rose-500/10 text-rose-300 border-rose-500/20 hover:border-rose-400/40${selected}`;
-      if (tone === 'neutral') return `${base} bg-indigo-500/10 text-indigo-300 border-indigo-500/20 hover:border-indigo-400/40${selected}`;
-      return `${base} bg-blue-500/10 text-blue-300 border-blue-500/20 hover:border-blue-400/40${selected}`;
+      const base = 'text-[10px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200';
+      const selected = isSelected(s);
+      const hasAnyFilter = trendFilter !== null;
+      
+      if (selected) {
+        // Highlighted state - full opacity and enhanced styling
+        if (tone === 'good') return `${base} bg-emerald-500/20 text-emerald-200 border-emerald-400/50 ring-2 ring-emerald-500/30 shadow-lg shadow-emerald-500/20`;
+        if (tone === 'warn') return `${base} bg-amber-500/20 text-amber-200 border-amber-400/50 ring-2 ring-amber-500/30 shadow-lg shadow-amber-500/20`;
+        if (tone === 'bad') return `${base} bg-rose-500/20 text-rose-200 border-rose-400/50 ring-2 ring-rose-500/30 shadow-lg shadow-rose-500/20`;
+        if (tone === 'neutral') return `${base} bg-indigo-500/20 text-indigo-200 border-indigo-400/50 ring-2 ring-indigo-500/30 shadow-lg shadow-indigo-500/20`;
+        return `${base} bg-blue-500/20 text-blue-200 border-blue-400/50 ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/20`;
+      } else if (hasAnyFilter) {
+        // Dimmed state - reduced opacity when another filter is selected
+        if (tone === 'good') return `${base} bg-emerald-500/5 text-emerald-400/50 border-emerald-500/15 hover:bg-emerald-500/10 hover:text-emerald-300/70 hover:border-emerald-400/30`;
+        if (tone === 'warn') return `${base} bg-amber-500/5 text-amber-400/50 border-amber-500/15 hover:bg-amber-500/10 hover:text-amber-300/70 hover:border-amber-400/30`;
+        if (tone === 'bad') return `${base} bg-rose-500/5 text-rose-400/50 border-rose-500/15 hover:bg-rose-500/10 hover:text-rose-300/70 hover:border-rose-400/30`;
+        if (tone === 'neutral') return `${base} bg-indigo-500/5 text-indigo-400/50 border-indigo-500/15 hover:bg-indigo-500/10 hover:text-indigo-300/70 hover:border-indigo-400/30`;
+        return `${base} bg-blue-500/5 text-blue-400/50 border-blue-500/15 hover:bg-blue-500/10 hover:text-blue-300/70 hover:border-blue-400/30`;
+      } else {
+        // Normal state - full opacity when no filter is selected
+        if (tone === 'good') return `${base} bg-emerald-500/10 text-emerald-300 border-emerald-500/20 hover:border-emerald-400/40`;
+        if (tone === 'warn') return `${base} bg-amber-500/10 text-amber-300 border-amber-500/20 hover:border-amber-400/40`;
+        if (tone === 'bad') return `${base} bg-rose-500/10 text-rose-300 border-rose-500/20 hover:border-rose-400/40`;
+        if (tone === 'neutral') return `${base} bg-indigo-500/10 text-indigo-300 border-indigo-500/20 hover:border-indigo-400/40`;
+        return `${base} bg-blue-500/10 text-blue-300 border-blue-500/20 hover:border-blue-400/40`;
+      }
     };
 
     const toggle = (s: ExerciseTrendStatus) => {
@@ -1068,25 +1087,25 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
         <div className="bg-black/70 p-2 rounded-xl">
           {trainingStructure.activeCount > 0 ? (
             <div className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap custom-scrollbar">
-              <button type="button" onClick={() => setTrendFilter(null)} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-slate-700/30 text-slate-200 border-slate-600/30 ${trendFilter === null ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
+              <button type="button" onClick={() => setTrendFilter(null)} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === null ? 'bg-slate-500/20 text-slate-200 border-slate-400/50 ring-2 ring-slate-500/30 shadow-lg shadow-slate-500/20' : trendFilter !== null ? 'bg-slate-500/5 text-slate-400/50 border-slate-500/15 hover:bg-slate-500/10 hover:text-slate-300/70 hover:border-slate-400/30' : 'bg-slate-500/10 text-slate-300 border-slate-500/20 hover:border-slate-400/40'}`}>
                 {trainingStructure.activeCount} active
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'overload' ? null : 'overload'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-emerald-500/10 text-emerald-300 border-emerald-500/20 ${trendFilter === 'overload' ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
+              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'overload' ? null : 'overload'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'overload' ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/50 ring-2 ring-emerald-500/30 shadow-lg shadow-emerald-500/20' : trendFilter !== null ? 'bg-emerald-500/5 text-emerald-400/50 border-emerald-500/15 hover:bg-emerald-500/10 hover:text-emerald-300/70 hover:border-emerald-400/30' : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 hover:border-emerald-400/40'}`}>
                 {trainingStructure.overloadCount} Gaining
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'stagnant' ? null : 'stagnant'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-amber-500/10 text-amber-300 border-amber-500/20 ${trendFilter === 'stagnant' ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
+              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'stagnant' ? null : 'stagnant'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'stagnant' ? 'bg-amber-500/20 text-amber-200 border-amber-400/50 ring-2 ring-amber-500/30 shadow-lg shadow-amber-500/20' : trendFilter !== null ? 'bg-amber-500/5 text-amber-400/50 border-amber-500/15 hover:bg-amber-500/10 hover:text-amber-300/70 hover:border-amber-400/30' : 'bg-amber-500/10 text-amber-300 border-amber-500/20 hover:border-amber-400/40'}`}>
                 {trainingStructure.plateauCount} Plateauing
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'regression' ? null : 'regression'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-rose-500/10 text-rose-300 border-rose-500/20 ${trendFilter === 'regression' ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
+              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'regression' ? null : 'regression'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'regression' ? 'bg-rose-500/20 text-rose-200 border-rose-400/50 ring-2 ring-rose-500/30 shadow-lg shadow-rose-500/20' : trendFilter !== null ? 'bg-rose-500/5 text-rose-400/50 border-rose-500/15 hover:bg-rose-500/10 hover:text-rose-300/70 hover:border-rose-400/30' : 'bg-rose-500/10 text-rose-300 border-rose-500/20 hover:border-rose-400/40'}`}>
                 {trainingStructure.regressionCount} Losing
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'fake_pr' ? null : 'fake_pr'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-orange-500/10 text-orange-300 border-orange-500/20 ${trendFilter === 'fake_pr' ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
+              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'fake_pr' ? null : 'fake_pr'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'fake_pr' ? 'bg-orange-500/20 text-orange-200 border-orange-400/50 ring-2 ring-orange-500/30 shadow-lg shadow-orange-500/20' : trendFilter !== null ? 'bg-orange-500/5 text-orange-400/50 border-orange-500/15 hover:bg-orange-500/10 hover:text-orange-300/70 hover:border-orange-400/30' : 'bg-orange-500/10 text-orange-300 border-orange-500/20 hover:border-orange-400/40'}`}>
                 {trainingStructure.fakePrCount} Premature PR
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'neutral' ? null : 'neutral'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-indigo-500/10 text-indigo-300 border-indigo-500/20 ${trendFilter === 'neutral' ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
+              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'neutral' ? null : 'neutral'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'neutral' ? 'bg-indigo-500/20 text-indigo-200 border-indigo-400/50 ring-2 ring-indigo-500/30 shadow-lg shadow-indigo-500/20' : trendFilter !== null ? 'bg-indigo-500/5 text-indigo-400/50 border-indigo-500/15 hover:bg-indigo-500/10 hover:text-indigo-300/70 hover:border-indigo-400/30' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20 hover:border-indigo-400/40'}`}>
                 {trainingStructure.neutralCount} Maintaining
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'new' ? null : 'new'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-colors bg-blue-500/10 text-blue-300 border-blue-500/20 ${trendFilter === 'new' ? 'ring-2 ring-white/25 border-white/30 shadow-sm' : ''}`}>
+              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'new' ? null : 'new'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'new' ? 'bg-blue-500/20 text-blue-200 border-blue-400/50 ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/20' : trendFilter !== null ? 'bg-blue-500/5 text-blue-400/50 border-blue-500/15 hover:bg-blue-500/10 hover:text-blue-300/70 hover:border-blue-400/30' : 'bg-blue-500/10 text-blue-300 border-blue-500/20 hover:border-blue-400/40'}`}>
                 {trainingStructure.newCount} Baseline
               </button>
             </div>
