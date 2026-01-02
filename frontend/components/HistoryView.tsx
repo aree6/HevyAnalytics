@@ -874,13 +874,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                         {session.totalPRs} PR{session.totalPRs > 1 ? 's' : ''}
                       </span>
                     )}
-
-                    <div className="ml-auto flex items-center gap-1.5 pl-2 flex-shrink-0 text-black dark:text-slate-300">
-                      <ChevronRight
-                        className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
-                        aria-hidden
-                      />
-                    </div>
                   </div>
 
                   <div className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 pl-1">
@@ -916,6 +909,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                       )}
                     </span>
                   </div>
+                </div>
+
+                {/* Chevron icon positioned before the vertical separator */}
+                <div className="flex items-center justify-center px-2 text-black dark:text-slate-300">
+                  <ChevronRight
+                    className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
+                    aria-hidden
+                  />
                 </div>
 
                 {sessionHeatmap.volumes.size > 0 && (
