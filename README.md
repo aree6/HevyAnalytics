@@ -1,20 +1,21 @@
 <table align="center">
   <tr>
     <td align="center" style="padding-right: 20px;">
-      <img src="frontend/public/UI/logo.svg" alt="LiftShift Logo" width="300" height="300" />
+      <img src="frontend/public/UI/logo.svg" alt="LiftShift Logo" width="200" height="200" />
     </td>
     <td align="center">
       <a href="https://www.star-history.com/#aree6/LiftShift&type=date&legend=top-left&theme=dark">
-        <img src="https://api.star-history.com/svg?repos=aree6/LiftShift&type=date&legend=top-left&theme=dark" alt="Star History Chart" width="400" />
+        <img src="https://api.star-history.com/svg?repos=aree6/LiftShift&type=date&legend=top-left&theme=dark" alt="Star History Chart" width="500" />
       </a>
     </td>
   </tr>
 </table>
 
 
+
 ## Official Website
 
-- https://liftshift.app
+https://liftshift.app
 
 
 ## UI Screenshots
@@ -70,15 +71,6 @@ LiftShift has one canonical hosted instance:
 
 Deployments on any other domain are **unofficial**. Unofficial deployments may be modified and may not follow the same security practices. Do not assume an unofficial deployment is trustworthy with any credentials.
 
-## License (AGPL-3.0)
-
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
-
-- **Local license file:** `./LICENSE`
-- **Full license text (online):** https://www.gnu.org/licenses/agpl-3.0.txt
-
-If you run a modified version for users to interact with over a network, the AGPL requires making the **Corresponding Source** for the running version available to those users (see AGPL §13).
-
 
 ## Attribution Requirement
 
@@ -91,14 +83,6 @@ Minimum acceptable attribution:
 
 Attribution must be reasonably discoverable during normal use (for example: footer, About modal, or Settings). Removing, hiding, or obscuring attribution is treated as non-compliance.
 
-
-
-## Contributing & CLA
-
-By submitting a contribution (code, documentation, or any other material) to this repository, you agree that:
-
-- Your contribution is provided under **AGPL-3.0** terms for inclusion in this project.
-- You have the right to submit the contribution and it does not contain confidential information.
 
 ---
 
