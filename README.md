@@ -1,20 +1,21 @@
-<div align="center">
-  <img src="frontend/public/UI/logo.svg" alt="LiftShift Logo" width="200" height="200" />
-</div>
+<table align="center">
+  <tr>
+    <td align="center" style="padding-right: 20px;">
+      <img src="frontend/public/UI/logo.svg" alt="LiftShift Logo" width="300" height="300" />
+    </td>
+    <td align="center">
+      <a href="https://www.star-history.com/#aree6/LiftShift&type=date&legend=top-left&theme=dark">
+        <img src="https://api.star-history.com/svg?repos=aree6/LiftShift&type=date&legend=top-left&theme=dark" alt="Star History Chart" width="400" />
+      </a>
+    </td>
+  </tr>
+</table>
 
-
-# LiftShift
-
-LiftShift turns workout exports into structured analytics and insights.
 
 ## Official Website
 
 - https://liftshift.app
 
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=aree6/LiftShift&type=date&legend=top-left&theme=dark)](https://www.star-history.com/#aree6/LiftShift&type=date&legend=top-left&theme=dark)
 
 ## UI Screenshots
 <div align="center">
