@@ -46,7 +46,7 @@ interface DashboardProps {
   exerciseStats: ExerciseStats[];
   fullData: WorkoutSet[]; // The raw set data
   onDayClick?: (date: Date) => void;
-  onMuscleClick?: (muscleId: string, viewMode: 'muscle' | 'group') => void;
+  onMuscleClick?: (muscleId: string, viewMode: 'muscle' | 'group', weeklySetsWindow: 'all' | '7d' | '30d' | '365d') => void;
   onExerciseClick?: (exerciseName: string) => void;
   filtersSlot?: React.ReactNode;
   stickyHeader?: boolean;
@@ -961,7 +961,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             compositionQuickData={compositionQuickData}
             heatmap={weeklySetsDashboard.heatmap}
             tooltipStyle={TooltipStyle as any}
-            onMuscleClick={onMuscleClick}
+            onMuscleClick={(muscleId, viewMode) => onMuscleClick?.(muscleId, viewMode, muscleCompQuick)}
             bodyMapGender={bodyMapGender}
           />
         </Suspense>

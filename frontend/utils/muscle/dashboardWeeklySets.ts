@@ -24,6 +24,7 @@ export interface WeeklySetsHeatmapResult {
 export interface WeeklySetsDashboardResult {
   composition: WeeklySetsCompositionEntry[];
   heatmap: WeeklySetsHeatmapResult;
+  weeklyRatesBySubject: Map<string, number>;
   weeks: number;
   windowStart: Date;
 }
@@ -54,6 +55,7 @@ export const computeWeeklySetsDashboardData = (
     return {
       composition: [],
       heatmap: { volumes: new Map(), maxVolume: 1 },
+      weeklyRatesBySubject: new Map(),
       weeks: 1,
       windowStart: now,
     };
@@ -152,6 +154,7 @@ export const computeWeeklySetsDashboardData = (
   return {
     composition,
     heatmap: { volumes, maxVolume: Math.max(maxVolume, 1) },
+    weeklyRatesBySubject: weeklyRates,
     weeks,
     windowStart,
   };

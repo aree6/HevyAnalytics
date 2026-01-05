@@ -23,8 +23,11 @@ import type { ExerciseAsset } from '../data/exerciseAssets';
 import { startOfDay, differenceInDays, startOfMonth, startOfYear, format, subDays } from 'date-fns';
 import { roundTo } from '../format/formatters';
 import { getMuscleContributionsFromAsset } from './muscleContributions';
+import { getSvgIdsForCsvMuscleName } from './muscleMapping';
 import { isWarmupSet } from '../analysis/setClassification';
 import { createExerciseNameResolver, type ExerciseNameResolver } from '../exercise/exerciseNameResolver';
+import { normalizeMuscleGroup } from './muscleNormalization';
+import { MUSCLE_GROUP_TO_SVG_IDS } from './muscleMappingConstants';
 
 // ============================================================================
 // Constants
@@ -82,6 +85,11 @@ export interface VolumeTimeSeriesResult {
 }
 
 type MuscleVolumeMap = Map<string, number>;
+
+export interface KeyedContribution {
+  readonly key: string;
+  readonly sets: number;
+}
 
 // ============================================================================
 // Muscle Contribution Extraction
@@ -158,6 +166,58 @@ function lookupExerciseAsset(
  * exactly how much volume was done on each individual training day.
  * 
  * @param data - All workout sets
+ * @param getContributions - Function to get contributions for each set
+ * @returns Sorted array of daily volumes (ascending by date)
+ */
+export function computeDailyKeyedVolumes(
+  data: readonly WorkoutSet[],
+  getContributions: (set: WorkoutSet) => ReadonlyArray<KeyedContribution> | null | undefined
+): DailyMuscleVolume[] {
+  const dailyMap = new Map<string, { date: Date; muscles: MuscleVolumeMap }>();
+
+  for (const set of data) {
+    if (!set.parsedDate) continue;
+    if (isWarmupSet(set)) continue;
+
+    const contributions = getContributions(set);
+    if (!contributions || contributions.length === 0) continue;
+
+    // Normalize to start of day for grouping
+    const dayStart = startOfDay(set.parsedDate);
+    const dateKey = format(dayStart, 'yyyy-MM-dd');
+
+    let dayEntry = dailyMap.get(dateKey);
+    if (!dayEntry) {
+      dayEntry = { date: dayStart, muscles: new Map() };
+      dailyMap.set(dateKey, dayEntry);
+    }
+
+    // Accumulate set contributions
+    for (const { key, sets } of contributions) {
+      const current = dayEntry.muscles.get(key) ?? 0;
+      dayEntry.muscles.set(key, current + sets);
+    }
+  }
+
+  // Convert to sorted array (ascending by date)
+  const dailyVolumes: DailyMuscleVolume[] = Array.from(dailyMap.entries())
+    .map(([dateKey, entry]) => ({
+      date: entry.date,
+      dateKey,
+      muscles: entry.muscles as ReadonlyMap<string, number>,
+    }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  return dailyVolumes;
+}
+
+/**
+ * Groups workout sets by day and computes muscle volume for each day.
+ * 
+ * This is the foundation for all rolling calculations - we first need to know
+ * exactly how much volume was done on each individual training day.
+ * 
+ * @param data - All workout sets
  * @param assetsMap - Exercise asset data for muscle lookups
  * @param useGroups - Whether to group into muscle groups or use detailed muscles
  * @returns Sorted array of daily volumes (ascending by date)
@@ -168,46 +228,62 @@ export function computeDailyMuscleVolumes(
   useGroups: boolean
 ): DailyMuscleVolume[] {
   const lowerMap = getAssetLowerMap(assetsMap);
-  const dailyMap = new Map<string, { date: Date; muscles: MuscleVolumeMap }>();
-  
-  for (const set of data) {
-    if (!set.parsedDate) continue;
-    if (isWarmupSet(set)) continue;
-    
+
+  return computeDailyKeyedVolumes(data, (set) => {
     const exerciseName = set.exercise_title || '';
     const asset = lookupExerciseAsset(exerciseName, assetsMap, lowerMap);
-    if (!asset) continue;
-    
+    if (!asset) return null;
+
     const contributions = getMuscleContributionsFromAsset(asset, useGroups);
-    if (contributions.length === 0) continue;
-    
-    // Normalize to start of day for grouping
-    const dayStart = startOfDay(set.parsedDate);
-    const dateKey = format(dayStart, 'yyyy-MM-dd');
-    
-    let dayEntry = dailyMap.get(dateKey);
-    if (!dayEntry) {
-      dayEntry = { date: dayStart, muscles: new Map() };
-      dailyMap.set(dateKey, dayEntry);
+    if (contributions.length === 0) return null;
+
+    return contributions.map((c) => ({ key: c.muscle, sets: c.sets }));
+  });
+}
+
+/**
+ * Groups workout sets by day and computes volumes keyed by SVG muscle IDs.
+ * 
+ * This matches how the Muscle View selects muscles (SVG IDs like "upper-pectoralis")
+ * while still using the asset-based contribution rules:
+ * - Primary: 1 set
+ * - Secondary: 0.5 sets
+ * - Cardio: ignored
+ * - Full Body: contributes 1 set to each major muscle group (then mapped to SVG IDs)
+ */
+export function computeDailySvgMuscleVolumes(
+  data: readonly WorkoutSet[],
+  assetsMap: Map<string, ExerciseAsset>
+): DailyMuscleVolume[] {
+  const lowerMap = getAssetLowerMap(assetsMap);
+
+  return computeDailyKeyedVolumes(data, (set) => {
+    const exerciseName = set.exercise_title || '';
+    const asset = lookupExerciseAsset(exerciseName, assetsMap, lowerMap);
+    if (!asset) return null;
+
+    const primaryGroup = normalizeMuscleGroup(asset.primary_muscle);
+    const useGroupsForContributions = primaryGroup === 'Full Body';
+
+    const contributions = getMuscleContributionsFromAsset(asset, useGroupsForContributions);
+    if (contributions.length === 0) return null;
+
+    const out: KeyedContribution[] = [];
+    for (const c of contributions) {
+      let svgIds = getSvgIdsForCsvMuscleName(c.muscle);
+      if (svgIds.length === 0) {
+        const group = normalizeMuscleGroup(c.muscle);
+        const groupSvgIds = (MUSCLE_GROUP_TO_SVG_IDS as any)[group] as readonly string[] | undefined;
+        svgIds = groupSvgIds ? [...groupSvgIds] : [];
+      }
+      if (svgIds.length === 0) continue;
+      for (const svgId of svgIds) {
+        out.push({ key: svgId, sets: c.sets });
+      }
     }
-    
-    // Accumulate set contributions
-    for (const { muscle, sets } of contributions) {
-      const current = dayEntry.muscles.get(muscle) ?? 0;
-      dayEntry.muscles.set(muscle, current + sets);
-    }
-  }
-  
-  // Convert to sorted array (ascending by date)
-  const dailyVolumes: DailyMuscleVolume[] = Array.from(dailyMap.entries())
-    .map(([dateKey, entry]) => ({
-      date: entry.date,
-      dateKey,
-      muscles: entry.muscles as ReadonlyMap<string, number>,
-    }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
-  
-  return dailyVolumes;
+
+    return out;
+  });
 }
 
 // ============================================================================
@@ -525,6 +601,95 @@ export function buildPeriodAverageTimeSeries(
   return { data: seriesData, keys };
 }
 
+/**
+ * Builds a time series of rolling weekly volumes for charting, keyed by SVG muscle IDs.
+ * Each point represents the rolling 7-day volume as of that training day.
+ * 
+ * @param data - All workout sets
+ * @param assetsMap - Exercise asset data
+ * @returns Time series data and keys for charting
+ */
+export function buildRollingWeeklySvgMuscleTimeSeries(
+  data: readonly WorkoutSet[],
+  assetsMap: Map<string, ExerciseAsset>
+): VolumeTimeSeriesResult {
+  const dailyVolumes = computeDailySvgMuscleVolumes(data, assetsMap);
+  const breakDates = identifyBreakPeriods(dailyVolumes);
+  const rollingVolumes = computeRollingWeeklyVolumes(dailyVolumes, breakDates);
+  
+  // Collect all muscle keys
+  const keysSet = new Set<string>();
+  for (const rv of rollingVolumes) {
+    for (const muscle of rv.muscles.keys()) {
+      keysSet.add(muscle);
+    }
+  }
+  const keys = Array.from(keysSet);
+  
+  // Build time series entries
+  const seriesData: VolumeTimeSeriesEntry[] = rollingVolumes
+    .filter(rv => !rv.isInBreak) // Exclude break recovery days from display
+    .map(rv => {
+      const entry: Record<string, number | string> = {
+        timestamp: rv.date.getTime(),
+        dateFormatted: format(rv.date, 'MMM d'),
+      };
+      
+      for (const k of keys) {
+        entry[k] = rv.muscles.get(k) ?? 0;
+      }
+      
+      return entry as VolumeTimeSeriesEntry;
+    });
+  
+  return { data: seriesData, keys };
+}
+
+/**
+ * Builds a time series of period-averaged volumes for charting, keyed by SVG muscle IDs.
+ * Monthly/yearly views show average weekly sets per muscle.
+ * 
+ * @param data - All workout sets
+ * @param assetsMap - Exercise asset data
+ * @param periodType - 'monthly' or 'yearly'
+ * @returns Time series data and keys for charting
+ */
+export function buildPeriodAverageSvgMuscleTimeSeries(
+  data: readonly WorkoutSet[],
+  assetsMap: Map<string, ExerciseAsset>,
+  periodType: 'monthly' | 'yearly'
+): VolumeTimeSeriesResult {
+  const dailyVolumes = computeDailySvgMuscleVolumes(data, assetsMap);
+  const breakDates = identifyBreakPeriods(dailyVolumes);
+  const rollingVolumes = computeRollingWeeklyVolumes(dailyVolumes, breakDates);
+  const periodAverages = computePeriodAverageVolumes(rollingVolumes, periodType);
+  
+  // Collect all muscle keys
+  const keysSet = new Set<string>();
+  for (const pa of periodAverages) {
+    for (const muscle of pa.avgWeeklySets.keys()) {
+      keysSet.add(muscle);
+    }
+  }
+  const keys = Array.from(keysSet);
+  
+  // Build time series entries
+  const seriesData: VolumeTimeSeriesEntry[] = periodAverages.map(pa => {
+    const entry: Record<string, number | string> = {
+      timestamp: pa.startDate.getTime(),
+      dateFormatted: pa.periodLabel,
+    };
+    
+    for (const k of keys) {
+      entry[k] = pa.avgWeeklySets.get(k) ?? 0;
+    }
+    
+    return entry as VolumeTimeSeriesEntry;
+  });
+  
+  return { data: seriesData, keys };
+}
+
 // ============================================================================
 // Public API - Main Entry Points
 // ============================================================================
@@ -561,6 +726,33 @@ export function getMuscleVolumeTimeSeriesRolling(
 }
 
 /**
+ * Gets SVG-muscle volume time series for the specified period.
+ * 
+ * This is the main entry point for volume calculations:
+ * - Weekly: Rolling 7-day sums (true weekly volume per muscle)
+ * - Monthly: Average weekly sets per muscle for each month
+ * - Yearly: Average weekly sets per muscle for each year
+ * 
+ * All calculations exclude break periods (>7 consecutive days without training).
+ * 
+ * @param data - All workout sets
+ * @param assetsMap - Exercise asset data
+ * @param period - 'weekly', 'monthly', or 'yearly'
+ * @returns Time series data suitable for charting
+ */
+export function getSvgMuscleVolumeTimeSeriesRolling(
+  data: readonly WorkoutSet[],
+  assetsMap: Map<string, ExerciseAsset>,
+  period: VolumePeriod = 'weekly'
+): VolumeTimeSeriesResult {
+  if (period === 'weekly') {
+    return buildRollingWeeklySvgMuscleTimeSeries(data, assetsMap);
+  }
+  
+  return buildPeriodAverageSvgMuscleTimeSeries(data, assetsMap, period);
+}
+
+/**
  * Gets the latest rolling weekly volume (most recent training day).
  * Useful for displaying current weekly muscle volume status.
  * 
@@ -588,5 +780,31 @@ export function getLatestRollingWeeklyVolume(
   }
   
   // If all are in breaks, return the most recent anyway
+  return rollingVolumes[rollingVolumes.length - 1] ?? null;
+}
+
+/**
+ * Gets the latest rolling weekly volume keyed by SVG muscle IDs.
+ * 
+ * @param data - All workout sets
+ * @param assetsMap - Exercise asset data
+ * @returns Latest rolling weekly volume, or null if no data
+ */
+export function getLatestRollingWeeklySvgMuscleVolume(
+  data: readonly WorkoutSet[],
+  assetsMap: Map<string, ExerciseAsset>
+): RollingWeeklyVolume | null {
+  const dailyVolumes = computeDailySvgMuscleVolumes(data, assetsMap);
+  if (dailyVolumes.length === 0) return null;
+
+  const breakDates = identifyBreakPeriods(dailyVolumes);
+  const rollingVolumes = computeRollingWeeklyVolumes(dailyVolumes, breakDates);
+
+  for (let i = rollingVolumes.length - 1; i >= 0; i--) {
+    if (!rollingVolumes[i].isInBreak) {
+      return rollingVolumes[i];
+    }
+  }
+
   return rollingVolumes[rollingVolumes.length - 1] ?? null;
 }

@@ -181,9 +181,10 @@ export const IntensityEvolutionCard = ({
                   <Tooltip
                     contentStyle={tooltipStyle as any}
                     formatter={(val: number, name) => {
-                      if (name === 'Strength') return [formatNumber(Number(val), { maxDecimals: 1 }), 'Strength'];
-                      if (name === 'Hypertrophy') return [formatNumber(Number(val), { maxDecimals: 1 }), 'Hypertrophy'];
-                      if (name === 'Endurance') return [formatNumber(Number(val), { maxDecimals: 1 }), 'Endurance'];
+                      if (name.includes('EMA')) return null; // Don't show EMA in tooltip
+                      if (name === 'Strength (1-5)') return [formatNumber(Number(val), { maxDecimals: 1 }), 'Strength'];
+                      if (name === 'Hypertrophy (6-12)') return [formatNumber(Number(val), { maxDecimals: 1 }), 'Hypertrophy'];
+                      if (name === 'Endurance (13+)') return [formatNumber(Number(val), { maxDecimals: 1 }), 'Endurance'];
                       return [formatNumber(Number(val), { maxDecimals: 0 }), name];
                     }}
                   />
@@ -214,7 +215,7 @@ export const IntensityEvolutionCard = ({
                   <Line
                     type="monotone"
                     dataKey="emaStrength"
-                    name="Strength"
+                    name="EMA Strength"
                     legendType="none"
                     stroke="#3b82f6"
                     strokeOpacity={0.95}
@@ -228,7 +229,7 @@ export const IntensityEvolutionCard = ({
                   <Line
                     type="monotone"
                     dataKey="emaHypertrophy"
-                    name="Hypertrophy"
+                    name="EMA Hypertrophy"
                     legendType="none"
                     stroke="#10b981"
                     strokeOpacity={0.95}
@@ -242,7 +243,7 @@ export const IntensityEvolutionCard = ({
                   <Line
                     type="monotone"
                     dataKey="emaEndurance"
-                    name="Endurance"
+                    name="EMA Endurance"
                     legendType="none"
                     stroke="#a855f7"
                     strokeOpacity={0.95}

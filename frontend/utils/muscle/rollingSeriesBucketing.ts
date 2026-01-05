@@ -1,14 +1,24 @@
 import { format, startOfWeek } from 'date-fns';
 import { formatWeekContraction } from '../date/dateUtils';
-import type { MuscleTimeSeriesEntry, MuscleTimeSeriesResult } from './muscleAnalytics';
+
+type RollingWeeklySeriesEntry = {
+  timestamp: number;
+  dateFormatted: string;
+  [k: string]: number | string;
+};
+
+export type RollingWeeklySeriesResult = {
+  data: RollingWeeklySeriesEntry[];
+  keys: string[];
+};
 
 export const bucketRollingWeeklySeriesToWeeks = (
-  series: MuscleTimeSeriesResult
-): MuscleTimeSeriesResult => {
+  series: RollingWeeklySeriesResult
+): RollingWeeklySeriesResult => {
   const { data, keys } = series;
   if (!data || data.length === 0) return series;
 
-  const byWeek = new Map<string, MuscleTimeSeriesEntry>();
+  const byWeek = new Map<string, RollingWeeklySeriesEntry>();
 
   for (const row of data) {
     const ts = typeof row.timestamp === 'number' ? row.timestamp : 0;
@@ -17,7 +27,7 @@ export const bucketRollingWeeklySeriesToWeeks = (
     const weekStart = startOfWeek(new Date(ts), { weekStartsOn: 1 });
     const weekKey = `wk-${format(weekStart, 'yyyy-MM-dd')}`;
 
-    const next: MuscleTimeSeriesEntry = {
+    const next: RollingWeeklySeriesEntry = {
       timestamp: weekStart.getTime(),
       dateFormatted: formatWeekContraction(weekStart),
     };

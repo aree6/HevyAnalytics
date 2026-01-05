@@ -37,6 +37,8 @@ interface HistoryViewProps {
   stickyHeader?: boolean;
   onExerciseClick?: (exerciseName: string) => void;
   onDayTitleClick?: (date: Date) => void;
+  targetDate?: Date | null;
+  onTargetDateConsumed?: () => void;
 }
 
 interface GroupedExercise {
@@ -587,7 +589,7 @@ const useExerciseVolumePrHistory = (data: WorkoutSet[]) => {
   }, [data]);
 };
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, weightUnit = 'kg' as import('../utils/storage/localStorage').WeightUnit, bodyMapGender = 'male', stickyHeader = false, onExerciseClick, onDayTitleClick }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, weightUnit = 'kg' as import('../utils/storage/localStorage').WeightUnit, bodyMapGender = 'male', stickyHeader = false, onExerciseClick, onDayTitleClick, targetDate, onTargetDateConsumed }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
@@ -685,6 +687,44 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
 
   const totalPages = Math.ceil(sessions.length / ITEMS_PER_PAGE);
   const currentSessions = sessions.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Handle target date navigation
+  useEffect(() => {
+    if (!targetDate || sessions.length === 0) return;
+
+    // Find the session that matches the target date
+    const targetSessionIndex = sessions.findIndex(session => 
+      session.date && isSameCalendarDay(session.date, targetDate)
+    );
+
+    if (targetSessionIndex !== -1) {
+      // Calculate which page the target session is on
+      const targetPage = Math.floor(targetSessionIndex / ITEMS_PER_PAGE) + 1;
+      
+      // Navigate to the target page if different from current
+      if (targetPage !== currentPage) {
+        setCurrentPage(targetPage);
+      }
+
+      // Scroll to the target session after a short delay to allow for render
+      setTimeout(() => {
+        const sessionElement = document.getElementById(`session-${sessions[targetSessionIndex].key}`);
+        if (sessionElement) {
+          sessionElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // Add a brief highlight effect
+          sessionElement.classList.add('ring-2', 'ring-emerald-400/50', 'ring-offset-2', 'ring-offset-black');
+          setTimeout(() => {
+            sessionElement.classList.remove('ring-2', 'ring-emerald-400/50', 'ring-offset-2', 'ring-offset-black');
+          }, 2000);
+        }
+        // Clear the target date after navigation
+        onTargetDateConsumed?.();
+      }, 100);
+    } else {
+      // Clear target date if session not found
+      onTargetDateConsumed?.();
+    }
+  }, [targetDate, sessions, currentPage]);
 
   // Tooltip Logic
   const buildTooltipState = (rect: DOMRect, data: any, variant: 'set' | 'macro'): TooltipState => {
@@ -827,6 +867,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
               
               {/* --- Session Header Card --- */}
               <div
+                id={`session-${session.key}`}
                 role="button"
                 tabIndex={0}
                 aria-expanded={!isCollapsed}

@@ -146,33 +146,22 @@ export const PrTrendCard = ({
                 labelFormatter={(l, p) => (p as any)?.[0]?.payload?.tooltipLabel || l}
                 formatter={(val: number, name) => {
                   if (name === 'EMA') return [Math.round(val), 'EMA'];
+                  if (name === 'PRs') return [Math.round(val), 'PRs'];
                   return [Math.round(val), name];
                 }}
               />
               {view === 'area' ? (
-                <>
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    name="PRs"
-                    stroke="#eab308"
-                    strokeWidth={3}
-                    fill="url(#gPRs)"
-                    dot={false}
-                    activeDot={{ r: 5, strokeWidth: 0 }}
-                    animationDuration={1500}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="count"
-                    stroke="#eab308"
-                    strokeWidth={0}
-                    dot={<ValueDot valueKey="count" unit="" data={chartData} color="#eab308" />}
-                    activeDot={{ r: 5, strokeWidth: 0 }}
-                    isAnimationActive={true}
-                    animationDuration={1500}
-                  />
-                </>
+                <Area
+                  type="monotone"
+                  dataKey="count"
+                  name="PRs"
+                  stroke="#eab308"
+                  strokeWidth={3}
+                  fill="url(#gPRs)"
+                  dot={<ValueDot valueKey="count" unit="" data={chartData} color="#eab308" />}
+                  activeDot={{ r: 5, strokeWidth: 0 }}
+                  animationDuration={1500}
+                />
               ) : (
                 <Bar dataKey="count" name="PRs" fill="#eab308" radius={[8, 8, 0, 0]} animationDuration={1500} />
               )}

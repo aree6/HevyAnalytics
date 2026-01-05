@@ -2,11 +2,11 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { WorkoutSet } from '../types';
 import { BodyMap, BodyMapGender } from './BodyMap';
 import { ViewHeader } from './ViewHeader';
+import { differenceInCalendarDays, subDays } from 'date-fns';
 import {
   loadExerciseMuscleData,
   calculateMuscleVolume,
   SVG_MUSCLE_NAMES,
-  CSV_TO_SVG_MUSCLE_MAP,
   ExerciseMuscleData,
   MuscleVolumeEntry,
   getExerciseMuscleVolumes,
@@ -14,9 +14,15 @@ import {
   lookupExerciseMuscleData,
 } from '../utils/muscle/muscleMapping';
 import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
-import { format, startOfWeek, startOfMonth, subWeeks, subMonths, isWithinInterval } from 'date-fns';
-import { formatDayContraction, formatWeekContraction, formatMonthYearContraction } from '../utils/date/dateUtils';
-import { getSmartFilterMode, TimeFilterMode } from '../utils/storage/localStorage';
+import { computeDailyMuscleVolumes, computeDailySvgMuscleVolumes, getSvgMuscleVolumeTimeSeriesRolling, getMuscleVolumeTimeSeriesRolling } from '../utils/muscle/rollingVolumeCalculator';
+import { bucketRollingWeeklySeriesToWeeks } from '../utils/muscle/rollingSeriesBucketing';
+import { getEffectiveNowFromWorkoutData } from '../utils/date/dateUtils';
+import { isWarmupSet } from '../utils/analysis/setClassification';
+import {
+  computeWeeklySetsDashboardData,
+  WeeklySetsWindow,
+  WeeklySetsGrouping,
+} from '../utils/muscle/dashboardWeeklySets';
 import {
   AreaChart,
   Area,
@@ -25,7 +31,7 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Dumbbell, X, Activity, Layers, PersonStanding, BicepsFlexed } from 'lucide-react';
+import { TrendingUp, TrendingDown, Dumbbell, X, Activity } from 'lucide-react';
 import { normalizeMuscleGroup, type NormalizedMuscleGroup } from '../utils/muscle/muscleNormalization';
 import { LazyRender } from './LazyRender';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../utils/format/deltaFormat';
@@ -50,52 +56,47 @@ interface MuscleAnalysisProps {
   filtersSlot?: React.ReactNode;
   onExerciseClick?: (exerciseName: string) => void;
   initialMuscle?: { muscleId: string; viewMode: 'muscle' | 'group' } | null;
+  initialWeeklySetsWindow?: WeeklySetsWindow | null;
   onInitialMuscleConsumed?: () => void;
   stickyHeader?: boolean;
   bodyMapGender?: BodyMapGender;
 }
 
-type TrendPeriod = 'all' | 'weekly' | 'monthly';
 type ViewMode = 'muscle' | 'group';
 
 /** Alias to centralized constant for backward compatibility within this file */
 const MUSCLE_GROUP_DISPLAY = SVG_TO_MUSCLE_GROUP;
 
-export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlot, onExerciseClick, initialMuscle, onInitialMuscleConsumed, stickyHeader = false, bodyMapGender = 'male' }) => {
+export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlot, onExerciseClick, initialMuscle, initialWeeklySetsWindow, onInitialMuscleConsumed, stickyHeader = false, bodyMapGender = 'male' }) => {
   const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredMuscle, setHoveredMuscle] = useState<string | null>(null);
   const [muscleVolume, setMuscleVolume] = useState<Map<string, MuscleVolumeEntry>>(new Map());
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
-  const [trendPeriodOverride, setTrendPeriodOverride] = useState<TrendPeriod | null>(null);
+  const [weeklySetsWindow, setWeeklySetsWindow] = useState<WeeklySetsWindow>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('group');
   const [activeQuickFilter, setActiveQuickFilter] = useState<QuickFilterCategory | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<TooltipData | null>(null);
 
-  // Calculate date range span for smart filter
-  const spanDays = useMemo(() => {
-    const dates: number[] = [];
+  const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(data, new Date(0)), [data]);
+
+  const allTimeWindowStart = useMemo(() => {
+    let start: Date | null = null;
     for (const s of data) {
-      if (s.parsedDate) dates.push(s.parsedDate.getTime());
+      const d = s.parsedDate;
+      if (!d) continue;
+      if (!start || d < start) start = d;
     }
-    if (dates.length === 0) return 0;
-    const min = Math.min(...dates);
-    const max = Math.max(...dates);
-    return Math.max(1, Math.round((max - min) / (1000 * 60 * 60 * 24)) + 1);
+    return start;
   }, [data]);
 
-  // Smart mode based on date range span
-  const smartMode = useMemo(() => getSmartFilterMode(spanDays), [spanDays]);
-
-  // Reset override when smart mode changes (new filter applied)
-  useEffect(() => {
-    setTrendPeriodOverride(null);
-  }, [smartMode]);
-
-  // Effective trend period: override if set, otherwise smart mode
-  const trendPeriod = trendPeriodOverride ?? smartMode;
-  const setTrendPeriod = setTrendPeriodOverride;
+  const windowStart = useMemo(() => {
+    if (weeklySetsWindow === '7d') return subDays(effectiveNow, 7);
+    if (weeklySetsWindow === '30d') return subDays(effectiveNow, 30);
+    if (weeklySetsWindow === '365d') return subDays(effectiveNow, 365);
+    return allTimeWindowStart;
+  }, [weeklySetsWindow, effectiveNow, allTimeWindowStart]);
 
   const getChipTextColor = useCallback((sets: number, maxSets: number): string => {
     const ratio = sets / Math.max(maxSets, 1);
@@ -139,21 +140,76 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     }
   }, [initialMuscle, isLoading, onInitialMuscleConsumed]);
 
-  // Get volumes for heatmap - stable reference
+  // Apply initial weekly sets window from dashboard navigation
+  useEffect(() => {
+    if (initialWeeklySetsWindow && !isLoading) {
+      setWeeklySetsWindow(initialWeeklySetsWindow);
+    }
+  }, [initialWeeklySetsWindow, isLoading]);
+
+  // Window-based heatmap volumes that update based on selected time filter
+  const windowedHeatmapData = useMemo(() => {
+    if (!assetsMap || !windowStart) return { volumes: new Map<string, number>(), maxVolume: 1 };
+
+    const grouping: WeeklySetsGrouping = viewMode === 'group' ? 'groups' : 'muscles';
+    const window: WeeklySetsWindow = weeklySetsWindow === 'all' ? 'all' : weeklySetsWindow;
+    
+    const result = computeWeeklySetsDashboardData(
+      data,
+      assetsMap,
+      effectiveNow,
+      window,
+      grouping
+    );
+    
+    return result.heatmap;
+  }, [assetsMap, windowStart, viewMode, weeklySetsWindow, data, effectiveNow]);
+
+  // Get volumes for heatmap - now uses windowed data
   const muscleVolumes = useMemo(() => {
+    return windowedHeatmapData.volumes;
+  }, [windowedHeatmapData]);
+
+  // Max volume for scaling - now uses windowed data
+  const maxVolume = useMemo(() => {
+    return Math.max(windowedHeatmapData.maxVolume, 1);
+  }, [windowedHeatmapData]);
+
+  // Window-based group volumes for group view - calculated from the same windowed data
+  const windowedGroupVolumes = useMemo(() => {
+    const groupVolumes = new Map<NormalizedMuscleGroup, number>();
+    MUSCLE_GROUP_ORDER.forEach(g => groupVolumes.set(g, 0));
+
+    if (!assetsMap || !windowStart) return groupVolumes;
+
+    // Use the same windowed calculation as the heatmap
+    const result = computeWeeklySetsDashboardData(
+      data,
+      assetsMap,
+      effectiveNow,
+      weeklySetsWindow === 'all' ? 'all' : weeklySetsWindow,
+      'groups'
+    );
+
+    // Use the unsliced per-subject weekly rates for accuracy and consistency with dashboard hover.
+    for (const [subject, value] of result.weeklyRatesBySubject.entries()) {
+      const group = subject as NormalizedMuscleGroup;
+      if (MUSCLE_GROUP_ORDER.includes(group)) groupVolumes.set(group, value);
+    }
+
+    return groupVolumes;
+  }, [assetsMap, windowStart, weeklySetsWindow, data, effectiveNow]);
+
+  // Body map volumes for group view - now uses windowed data
+  const groupedBodyMapVolumes = useMemo(() => {
     const volumes = new Map<string, number>();
-    muscleVolume.forEach((entry, muscleId) => {
-      volumes.set(muscleId, entry.sets);
+    Object.entries(MUSCLE_GROUP_DISPLAY).forEach(([svgId, group]) => {
+      if (group !== 'Other') {
+        volumes.set(svgId, windowedGroupVolumes.get(group) || 0);
+      }
     });
     return volumes;
-  }, [muscleVolume]);
-
-  // Max volume for scaling
-  const maxVolume = useMemo(() => {
-    let max = 0;
-    muscleVolumes.forEach(v => { if (v > max) max = v; });
-    return Math.max(max, 1);
-  }, [muscleVolumes]);
+  }, [windowedGroupVolumes]);
 
   // Aggregated muscle group volumes
   const muscleGroupVolumes = useMemo(() => {
@@ -195,23 +251,12 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     return groupVolumes;
   }, [data, exerciseMuscleData]);
 
-  // Max group volume for scaling
+  // Max group volume for scaling - now uses windowed data
   const maxGroupVolume = useMemo(() => {
     let max = 0;
-    muscleGroupVolumes.forEach(v => { if (v > max) max = v; });
+    windowedGroupVolumes.forEach(v => { if (v > max) max = v; });
     return Math.max(max, 1);
-  }, [muscleGroupVolumes]);
-
-  // Body map volumes for group view - each muscle gets its group's total volume
-  const groupedBodyMapVolumes = useMemo(() => {
-    const volumes = new Map<string, number>();
-    Object.entries(MUSCLE_GROUP_DISPLAY).forEach(([svgId, group]) => {
-      if (group !== 'Other') {
-        volumes.set(svgId, muscleGroupVolumes.get(group) || 0);
-      }
-    });
-    return volumes;
-  }, [muscleGroupVolumes]);
+  }, [windowedGroupVolumes]);
 
   // Selected group data (when in group view mode)
   const selectedGroupData = useMemo(() => {
@@ -219,7 +264,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     const group = selectedMuscle as NormalizedMuscleGroup;
     if (!MUSCLE_GROUP_ORDER.includes(group)) return null;
     
-    const sets = muscleGroupVolumes.get(group) || 0;
+    const sets = windowedGroupVolumes.get(group) || 0;
     const exerciseMap = new Map<string, { sets: number; primarySets: number; secondarySets: number }>();
 
     if (exerciseMuscleData.size === 0 || data.length === 0) {
@@ -266,7 +311,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     }
 
     return { sets, exercises: exerciseMap };
-  }, [viewMode, selectedMuscle, muscleGroupVolumes, exerciseMuscleData, data]);
+  }, [viewMode, selectedMuscle, windowedGroupVolumes, exerciseMuscleData, data]);
 
   // Selected muscle data
   const selectedMuscleData = useMemo(() => {
@@ -340,140 +385,269 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     return { sets: totalSets, exercises: exerciseMap };
   }, [activeQuickFilter, exerciseMuscleData, data]);
 
-  // Helper to check if SVG IDs match the target (handles both muscle and group mode)
-  const matchesTarget = useCallback((svgIds: string[], target: string | null, isGroupMode: boolean): boolean => {
-    if (!target) return true;
-    if (isGroupMode) {
-      // In group mode, check if any SVG ID belongs to the target group
-      return svgIds.some(svgId => MUSCLE_GROUP_DISPLAY[svgId] === target);
+  const selectedSubjectKeys = useMemo(() => {
+    if (viewMode === 'group') {
+      if (activeQuickFilter) {
+        const svgIds = getSvgIdsForQuickFilter(activeQuickFilter);
+        const groups = new Set<string>();
+        for (const id of svgIds) {
+          const g = getGroupForSvgId(id);
+          if (g && g !== 'Other') groups.add(g);
+        }
+        return Array.from(groups);
+      }
+      return selectedMuscle ? [selectedMuscle] : [];
     }
-    // In muscle mode, check if target SVG ID is in the list
-    return svgIds.includes(target);
-  }, []);
 
-  // Trend data based on selected period (for specific muscle OR all muscles)
-  const trendData = useMemo(() => {
-    if (exerciseMuscleData.size === 0 || data.length === 0) return [];
-    
-    const targetMuscle = selectedMuscle;
-    const isGroupMode = viewMode === 'group';
-    const quickFilterSvgIds = activeQuickFilter ? new Set(getSvgIdsForQuickFilter(activeQuickFilter)) : null;
-    const matchesQuickFilter = (svgIds: string[]) => {
-      if (!quickFilterSvgIds) return true;
-      return svgIds.some(id => quickFilterSvgIds.has(id));
+    if (activeQuickFilter) return [...getSvgIdsForQuickFilter(activeQuickFilter)];
+    return selectedMuscle ? [selectedMuscle] : [];
+  }, [viewMode, selectedMuscle, activeQuickFilter]);
+
+  const groupWeeklyRatesBySubject = useMemo(() => {
+    if (!assetsMap || !windowStart) return null;
+    const result = computeWeeklySetsDashboardData(
+      data,
+      assetsMap,
+      effectiveNow,
+      weeklySetsWindow === 'all' ? 'all' : weeklySetsWindow,
+      'groups'
+    );
+    return result.weeklyRatesBySubject;
+  }, [assetsMap, windowStart, data, effectiveNow, weeklySetsWindow]);
+
+  const weeklySetsSummary = useMemo(() => {
+    if (!assetsMap) return null;
+    if (!windowStart) return null;
+
+    // In group view, reuse the same windowed weekly-rate totals as the dashboard.
+    if (viewMode === 'group' && groupWeeklyRatesBySubject) {
+      if (selectedSubjectKeys.length > 0) {
+        let sum = 0;
+        for (const k of selectedSubjectKeys) sum += groupWeeklyRatesBySubject.get(k) ?? 0;
+        return Math.round(sum * 10) / 10;
+      }
+
+      let sum = 0;
+      for (const v of groupWeeklyRatesBySubject.values()) sum += v;
+      return Math.round(sum * 10) / 10;
+    }
+
+    const daily = viewMode === 'group'
+      ? computeDailyMuscleVolumes(data, assetsMap, true)
+      : computeDailySvgMuscleVolumes(data, assetsMap);
+
+    const getDaySum = (day: { muscles: ReadonlyMap<string, number> }) => {
+      if (selectedSubjectKeys.length > 0) {
+        let sum = 0;
+        for (const k of selectedSubjectKeys) sum += (day.muscles.get(k) ?? 0) as number;
+        return sum;
+      }
+
+      let sum = 0;
+      for (const v of day.muscles.values()) sum += v;
+      return sum;
     };
 
-    // For 'all' mode, show each day's data
-    if (trendPeriod === 'all') {
-      const dayMap = new Map<string, { label: string; ts: number; sets: number }>();
-      
-      for (const set of data) {
-        if (!set.parsedDate || !set.exercise_title) continue;
-        const exData = lookupExerciseMuscleData(set.exercise_title, exerciseMuscleData);
-        if (!exData) continue;
-        
-        const primaryMuscle = exData.primary_muscle;
-        if (primaryMuscle === 'Cardio') continue;
-        
-        const dayKey = format(set.parsedDate, 'yyyy-MM-dd');
-        if (!dayMap.has(dayKey)) {
-          dayMap.set(dayKey, { 
-            label: formatDayContraction(set.parsedDate), 
-            ts: set.parsedDate.getTime(),
-            sets: 0 
-          });
+    const total = daily.reduce((acc, day) => {
+      if (day.date < windowStart || day.date > effectiveNow) return acc;
+      return acc + getDaySum(day);
+    }, 0);
+
+    const days = Math.max(1, differenceInCalendarDays(effectiveNow, windowStart) + 1);
+    const weeks = Math.max(1, days / 7);
+    return Math.round((total / weeks) * 10) / 10;
+  }, [assetsMap, windowStart, selectedSubjectKeys, viewMode, data, effectiveNow, groupWeeklyRatesBySubject]);
+
+  const windowedExerciseBreakdown = useMemo(() => {
+    if (!windowStart) return null;
+
+    // Choose which groups we're targeting (group mode only). If none selected, treat as no breakdown.
+    if (viewMode !== 'group') return null;
+    if (!selectedMuscle && !activeQuickFilter) return null;
+
+    const filterGroups = new Set<NormalizedMuscleGroup>();
+    if (activeQuickFilter) {
+      for (const svgId of getSvgIdsForQuickFilter(activeQuickFilter)) {
+        const g = getGroupForSvgId(svgId);
+        if (MUSCLE_GROUP_ORDER.includes(g)) filterGroups.add(g);
+      }
+    } else if (selectedMuscle) {
+      const g = selectedMuscle as NormalizedMuscleGroup;
+      if (MUSCLE_GROUP_ORDER.includes(g)) filterGroups.add(g);
+    }
+
+    if (filterGroups.size === 0) return null;
+
+    let totalSetsInWindow = 0;
+    const exerciseMap = new Map<string, { sets: number; primarySets: number; secondarySets: number }>();
+
+    for (const setRow of data) {
+      if (isWarmupSet(setRow)) continue;
+      const d = setRow.parsedDate;
+      if (!d) continue;
+      if (d < windowStart || d > effectiveNow) continue;
+      if (!setRow.exercise_title) continue;
+
+      const exData = lookupExerciseMuscleData(setRow.exercise_title, exerciseMuscleData);
+      if (!exData) continue;
+
+      const primaryGroup = normalizeMuscleGroup(exData.primary_muscle);
+      if (primaryGroup === 'Cardio') continue;
+
+      let inc = 0;
+      let pInc = 0;
+      let sInc = 0;
+
+      if (primaryGroup === 'Full Body') {
+        for (const g of filterGroups) {
+          inc += 1;
+          pInc += 1;
         }
-        
-        const day = dayMap.get(dayKey)!;
-        const primarySvgIds = CSV_TO_SVG_MUSCLE_MAP[primaryMuscle] || [];
-        
-        // If no muscle selected, count all sets; otherwise filter by selected muscle/group
-        if (quickFilterSvgIds) {
-          if (matchesQuickFilter(primarySvgIds)) day.sets += 1;
-        } else if (!targetMuscle) {
-          day.sets += 1;
-        } else if (matchesTarget(primarySvgIds, targetMuscle, isGroupMode)) {
-          day.sets += 1;
+      } else {
+        if (filterGroups.has(primaryGroup)) {
+          inc += 1;
+          pInc += 1;
         }
-        
-        const secondaryMuscles = exData.secondary_muscle.split(',').map(m => m.trim()).filter(m => m && m !== 'None');
-        for (const secondary of secondaryMuscles) {
-          const secondarySvgIds = CSV_TO_SVG_MUSCLE_MAP[secondary] || [];
-          if (quickFilterSvgIds) {
-            if (matchesQuickFilter(secondarySvgIds)) day.sets += 0.5;
-          } else if (!targetMuscle) {
-            day.sets += 0.5;
-          } else if (matchesTarget(secondarySvgIds, targetMuscle, isGroupMode)) {
-            day.sets += 0.5;
+
+        const secRaw = String(exData.secondary_muscle ?? '').trim();
+        if (secRaw && !/none/i.test(secRaw)) {
+          for (const s2 of secRaw.split(',')) {
+            const m = normalizeMuscleGroup(s2);
+            if (m === 'Cardio' || m === 'Full Body') continue;
+            if (filterGroups.has(m)) {
+              inc += 0.5;
+              sInc += 0.5;
+            }
           }
         }
       }
-      
-      return Array.from(dayMap.values())
-        .sort((a, b) => a.ts - b.ts)
-        .map(d => ({ period: d.label, timestamp: d.ts, sets: Math.round(d.sets * 10) / 10 }));
+
+      if (inc <= 0) continue;
+
+      totalSetsInWindow += inc;
+      const entry = exerciseMap.get(setRow.exercise_title) || { sets: 0, primarySets: 0, secondarySets: 0 };
+      entry.sets += inc;
+      entry.primarySets += pInc;
+      entry.secondarySets += sInc;
+      exerciseMap.set(setRow.exercise_title, entry);
     }
-    
-    // For weekly/monthly, aggregate by period
-    const periodMap = new Map<string, { label: string; ts: number; sets: number }>();
-    
-    for (const set of data) {
-      if (!set.parsedDate || !set.exercise_title) continue;
-      const exData = lookupExerciseMuscleData(set.exercise_title, exerciseMuscleData);
-      if (!exData) continue;
-      
-      const primaryMuscle = exData.primary_muscle;
-      if (primaryMuscle === 'Cardio') continue;
-      
-      let periodKey: string;
-      let periodLabel: string;
-      let periodTs: number;
-      
-      if (trendPeriod === 'weekly') {
-        const weekStart = startOfWeek(set.parsedDate, { weekStartsOn: 1 });
-        periodKey = `wk-${format(weekStart, 'yyyy-MM-dd')}`;
-        periodLabel = formatWeekContraction(weekStart);
-        periodTs = weekStart.getTime();
+
+    return { totalSetsInWindow, exercises: exerciseMap };
+  }, [windowStart, viewMode, selectedMuscle, activeQuickFilter, data, effectiveNow, exerciseMuscleData]);
+
+  const weeklySetsDelta = useMemo(() => {
+    if (!assetsMap) return null;
+    if (!windowStart) return null;
+    if (weeklySetsWindow === 'all') return null;
+
+    const previousNow = windowStart;
+    const previousStart =
+      weeklySetsWindow === '7d'
+        ? subDays(previousNow, 7)
+        : weeklySetsWindow === '30d'
+          ? subDays(previousNow, 30)
+          : subDays(previousNow, 365);
+
+    const daily = viewMode === 'group'
+      ? computeDailyMuscleVolumes(data, assetsMap, true)
+      : computeDailySvgMuscleVolumes(data, assetsMap);
+
+    const sumInRange = (start: Date, end: Date) => {
+      const total = daily.reduce((acc, day) => {
+        if (day.date < start || day.date > end) return acc;
+if (selectedSubjectKeys.length > 0) {
+  let sum = 0;
+  for (const k of selectedSubjectKeys) sum += (day.muscles.get(k) ?? 0) as number;
+  return acc + sum;
+}
+
+let sum = 0;
+for (const v of day.muscles.values()) sum += v;
+return acc + sum;
+      }, 0);
+
+      const days = Math.max(1, differenceInCalendarDays(end, start) + 1);
+      const weeks = Math.max(1, days / 7);
+      return total / weeks;
+    };
+
+    const current = sumInRange(windowStart, effectiveNow);
+    const previous = sumInRange(previousStart, previousNow);
+
+    if (previous <= 0) return null;
+
+    const delta = current - previous;
+    const deltaPercent = Math.round((delta / previous) * 100);
+    const formattedPercent = formatDeltaPercentage(deltaPercent, getDeltaFormatPreset('badge'));
+
+    return {
+      current: Math.round(current * 10) / 10,
+      previous: Math.round(previous * 10) / 10,
+      delta: Math.round(delta * 10) / 10,
+      deltaPercent,
+      formattedPercent,
+      direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'same' as 'up' | 'down' | 'same',
+    };
+  }, [assetsMap, windowStart, weeklySetsWindow, selectedSubjectKeys, viewMode, data, effectiveNow]);
+
+  // Trend chart: constrained to selected window; resolution depends on window size.
+  const trendData = useMemo(() => {
+    if (!assetsMap || data.length === 0) return [];
+    if (!windowStart) return [];
+
+    const isGroupMode = viewMode === 'group';
+    const isAll = weeklySetsWindow === 'all';
+
+    // Choose chart period/bucketing
+    let chartPeriod: 'weekly' | 'monthly' = 'weekly';
+    let shouldBucketToWeeks = false;
+
+    if (isAll) {
+      const spanDays = Math.max(1, differenceInCalendarDays(effectiveNow, windowStart) + 1);
+      if (spanDays < 35) {
+        chartPeriod = 'weekly';
+      } else if (spanDays < 150) {
+        chartPeriod = 'weekly';
+        shouldBucketToWeeks = true;
       } else {
-        const monthStart = startOfMonth(set.parsedDate);
-        periodKey = format(monthStart, 'yyyy-MM');
-        periodLabel = formatMonthYearContraction(monthStart);
-        periodTs = monthStart.getTime();
+        chartPeriod = 'monthly';
       }
-      
-      if (!periodMap.has(periodKey)) {
-        periodMap.set(periodKey, { label: periodLabel, ts: periodTs, sets: 0 });
-      }
-      
-      const period = periodMap.get(periodKey)!;
-      const primarySvgIds = CSV_TO_SVG_MUSCLE_MAP[primaryMuscle] || [];
-      
-      // If no muscle selected, count all sets; otherwise filter by selected muscle/group
-      if (quickFilterSvgIds) {
-        if (matchesQuickFilter(primarySvgIds)) period.sets += 1;
-      } else if (!targetMuscle) {
-        period.sets += 1;
-      } else if (matchesTarget(primarySvgIds, targetMuscle, isGroupMode)) {
-        period.sets += 1;
-      }
-      
-      const secondaryMuscles = exData.secondary_muscle.split(',').map(m => m.trim()).filter(m => m && m !== 'None');
-      for (const secondary of secondaryMuscles) {
-        const secondarySvgIds = CSV_TO_SVG_MUSCLE_MAP[secondary] || [];
-        if (quickFilterSvgIds) {
-          if (matchesQuickFilter(secondarySvgIds)) period.sets += 0.5;
-        } else if (!targetMuscle) {
-          period.sets += 0.5;
-        } else if (matchesTarget(secondarySvgIds, targetMuscle, isGroupMode)) {
-          period.sets += 0.5;
-        }
-      }
+    } else if (weeklySetsWindow === '365d') {
+      chartPeriod = 'weekly';
+      shouldBucketToWeeks = true;
+    } else {
+      chartPeriod = 'weekly';
     }
-    
-    return Array.from(periodMap.values())
-      .sort((a, b) => a.ts - b.ts)
-      .map(p => ({ period: p.label, timestamp: p.ts, sets: Math.round(p.sets * 10) / 10 }));
-  }, [exerciseMuscleData, data, selectedMuscle, viewMode, activeQuickFilter, trendPeriod, matchesTarget]);
+
+    const baseSeries = isGroupMode
+      ? getMuscleVolumeTimeSeriesRolling(data, assetsMap, chartPeriod, true)
+      : getSvgMuscleVolumeTimeSeriesRolling(data, assetsMap, chartPeriod);
+
+    const series = shouldBucketToWeeks
+      ? bucketRollingWeeklySeriesToWeeks(baseSeries as any)
+      : baseSeries;
+
+    if (!series.data || series.data.length === 0) return [];
+
+    const filtered = series.data.filter((row: any) => {
+      const ts = typeof row.timestamp === 'number' ? row.timestamp : 0;
+      if (!ts) return false;
+      return ts >= windowStart.getTime() && ts <= effectiveNow.getTime();
+    });
+
+    const keys = selectedSubjectKeys;
+
+    return filtered.map((row: any) => {
+      const v = keys.length > 0
+        ? keys.reduce((acc, k) => acc + (typeof row[k] === 'number' ? row[k] : 0), 0)
+        : (baseSeries.keys || []).reduce((acc, k) => acc + (typeof row[k] === 'number' ? row[k] : 0), 0);
+      return {
+        period: row.dateFormatted,
+        timestamp: row.timestamp,
+        sets: Math.round(Number(v) * 10) / 10,
+      };
+    });
+  }, [assetsMap, data, windowStart, effectiveNow, weeklySetsWindow, viewMode, selectedSubjectKeys]);
 
   const trendDataWithEma = useMemo(() => {
     return addEmaSeries(trendData as any[], 'sets', 'emaSets', {
@@ -482,33 +656,19 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     });
   }, [trendData]);
 
-  // Volume delta calculation - compare current vs previous period
-  const volumeDelta = useMemo(() => {
-    if (trendData.length < 2) return null;
-    
-    const current = Number((trendData[trendData.length - 1]?.sets || 0).toFixed(1));
-    const previous = Number((trendData[trendData.length - 2]?.sets || 0).toFixed(1));
-    
-    if (previous === 0) return null;
-    
-    const delta = Number((current - previous).toFixed(1));
-    const deltaPercent = Math.round((delta / previous) * 100);
-    
-    // Use centralized formatting for better UX with large percentages
-    const formattedPercent = formatDeltaPercentage(deltaPercent, getDeltaFormatPreset('badge'));
-    
-    return {
-      current,
-      previous,
-      delta,
-      deltaPercent,
-      formattedPercent,
-      direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'same' as 'up' | 'down' | 'same',
-    };
-  }, [trendData]);
+  const volumeDelta = weeklySetsDelta;
 
   // Contributing exercises (works for muscle, group, and quick filter views)
   const contributingExercises = useMemo(() => {
+    // In group view, use windowed exercise breakdown so percentages are consistent with the selected time filter.
+    if (viewMode === 'group' && windowedExerciseBreakdown) {
+      const exercises: Array<{ name: string; sets: number; primarySets: number; secondarySets: number }> = [];
+      windowedExerciseBreakdown.exercises.forEach((exData, name) => {
+        exercises.push({ name, ...exData });
+      });
+      return exercises.sort((a, b) => b.sets - a.sets).slice(0, 8);
+    }
+
     // Quick filter takes precedence
     if (quickFilterData) {
       const exercises: Array<{ name: string; sets: number; primarySets: number; secondarySets: number }> = [];
@@ -530,7 +690,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       exercises.push({ name, ...exData });
     });
     return exercises.sort((a, b) => b.sets - a.sets).slice(0, 8);
-  }, [selectedMuscleData, selectedGroupData, viewMode, quickFilterData]);
+  }, [selectedMuscleData, selectedGroupData, viewMode, quickFilterData, windowedExerciseBreakdown]);
 
   // Total sets for the period
   const totalSets = useMemo(() => {
@@ -547,10 +707,10 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
 
     let count = 0;
     for (const g of MUSCLE_GROUP_ORDER) {
-      if ((muscleGroupVolumes.get(g) ?? 0) > 0) count += 1;
+      if ((windowedGroupVolumes.get(g) ?? 0) > 0) count += 1;
     }
     return count;
-  }, [viewMode, muscleVolume, muscleGroupVolumes]);
+  }, [viewMode, windowedGroupVolumes]);
 
   // Stable callbacks
   const handleMuscleClick = useCallback((muscleId: string) => {
@@ -588,7 +748,8 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
         setHoverTooltip(null);
         return;
       }
-      const sets = muscleGroupVolumes.get(groupName as any) || 0;
+
+      const sets = windowedGroupVolumes.get(groupName as any) || 0;
       setHoverTooltip({
         rect,
         title: groupName,
@@ -605,7 +766,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       body: `${Math.round(sets * 10) / 10} sets`,
       status: sets > 0 ? 'success' : 'default',
     });
-  }, [muscleGroupVolumes, muscleVolumes, viewMode]);
+  }, [windowedGroupVolumes, muscleVolumes, viewMode]);
 
   const selectedBodyMapIds = useMemo(() => {
     // Quick filter takes precedence for highlighting (works in both view modes)
@@ -631,12 +792,12 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     return [...getSvgIdsForGroup(group)];
   }, [hoveredMuscle, viewMode]);
 
-  const hoveredTooltipMeta = useMemo(() => {
+  const hoveredMuscleData = useMemo(() => {
     if (!hoveredMuscle) return null;
 
     if (viewMode === 'group') {
       const groupName = MUSCLE_GROUP_DISPLAY[hoveredMuscle];
-      const sets = muscleGroupVolumes.get(groupName as any) || 0;
+      const sets = windowedGroupVolumes.get(groupName as any) || 0;
       const accent = getVolumeColor(sets, maxGroupVolume);
       return {
         name: groupName,
@@ -652,7 +813,30 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
       sets,
       accent,
     };
-  }, [hoveredMuscle, viewMode, muscleGroupVolumes, muscleVolumes, maxGroupVolume, maxVolume]);
+  }, [hoveredMuscle, viewMode, windowedGroupVolumes, muscleVolumes, maxGroupVolume, maxVolume]);
+
+  const hoveredTooltipMeta = useMemo(() => {
+    if (!hoveredMuscle) return null;
+
+    if (viewMode === 'group') {
+      const groupName = MUSCLE_GROUP_DISPLAY[hoveredMuscle];
+      const sets = windowedGroupVolumes.get(groupName as any) || 0;
+      const accent = getVolumeColor(sets, maxGroupVolume);
+      return {
+        name: groupName,
+        sets,
+        accent,
+      };
+    }
+
+    const sets = muscleVolumes.get(hoveredMuscle) || 0;
+    const accent = getVolumeColor(sets, maxVolume);
+    return {
+      name: SVG_MUSCLE_NAMES[hoveredMuscle],
+      sets,
+      accent,
+    };
+  }, [hoveredMuscle, viewMode, windowedGroupVolumes, muscleVolumes, maxGroupVolume, maxVolume]);
 
   const closePanel = useCallback(() => {
     setSelectedMuscle(null);
@@ -835,18 +1019,25 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
               </h2>
               <span
                 className="text-red-400 text-sm font-semibold whitespace-nowrap"
-                title={activeQuickFilter || selectedMuscle ? 'sets in current filter' : 'total sets across all muscles'}
+                title={activeQuickFilter || selectedMuscle ? 'sets in current filter' : ''}
               >
                 {activeQuickFilter
-                  ? (quickFilterData ? Math.round(quickFilterData.sets * 10) / 10 : 0)
+                  ? (viewMode === 'group'
+                      ? `${Math.round((windowedExerciseBreakdown?.totalSetsInWindow ?? 0) * 10) / 10} sets`
+                      : (quickFilterData ? `${Math.round(quickFilterData.sets * 10) / 10} sets` : '0 sets'))
                   : selectedMuscle
                     ? (viewMode === 'group' && selectedGroupData
-                        ? Math.round(selectedGroupData.sets * 10) / 10
+                        ? `${Math.round((windowedExerciseBreakdown?.totalSetsInWindow ?? 0) * 10) / 10} sets`
                         : selectedMuscleData
-                          ? Math.round(selectedMuscleData.sets * 10) / 10
-                          : 0)
-                    : totalSets}{' '}
-                <span className="text-slate-400 text-xs font-normal">sets</span>
+                          ? `${Math.round(selectedMuscleData.sets * 10) / 10} sets`
+                          : '0 sets')
+                    : null}
+              </span>
+              <span
+                className="text-cyan-400 text-sm font-semibold whitespace-nowrap"
+                title="avg weekly sets in selected window"
+              >
+                {weeklySetsSummary !== null && `${weeklySetsSummary.toFixed(1)} sets/wk`}
               </span>
               {/* Volume Delta Badge */}
               {volumeDelta && volumeDelta.direction !== 'same' && (
@@ -856,7 +1047,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                     : 'bg-rose-500/10 text-rose-400'
                 }`}>
                   {volumeDelta.direction === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {volumeDelta.formattedPercent} vs prev {trendPeriod === 'weekly' ? 'wk' : trendPeriod === 'monthly' ? 'mo' : 'day'}
+                  {volumeDelta.formattedPercent} vs prev {weeklySetsWindow === '7d' ? 'wk' : weeklySetsWindow === '30d' ? 'mo' : 'yr'}
                 </span>
               )}
             </div>
@@ -877,21 +1068,22 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-slate-400" />
-                  <h3 className="text-sm font-semibold text-white">Total sets</h3>
+                  <h3 className="text-sm font-semibold text-white">Weekly sets</h3>
                 </div>
-                {/* Period Toggle */}
+                {/* Time Window Toggle */}
                 <div className="inline-flex bg-black/70 rounded-lg p-0.5 border border-slate-700/50">
-                  {(['all', 'weekly', 'monthly'] as const).map(period => (
+                  {(['all', '7d', '30d', '365d'] as const).map(w => (
                     <button
-                      key={period}
-                      onClick={() => setTrendPeriod(period)}
-                      className={`px-2 py-1 rounded text-[10px] font-medium transition-all capitalize ${
-                        trendPeriod === period
+                      key={w}
+                      onClick={() => setWeeklySetsWindow(w)}
+                      className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                        weeklySetsWindow === w
                           ? 'bg-red-600 text-white'
                           : 'text-slate-400 hover:text-white'
                       }`}
+                      title={w === 'all' ? 'All time' : w === '7d' ? 'Last week' : w === '30d' ? 'Last month' : 'Last year'}
                     >
-                      {period === 'all' ? 'all' : period === 'weekly' ? 'wk' : 'mo'}
+                      {w === 'all' ? 'all' : w === '7d' ? 'lst wk' : w === '30d' ? 'lst mo' : 'lst yr'}
                     </button>
                   ))}
                 </div>
@@ -920,7 +1112,8 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                           labelStyle={{ color: 'var(--text-primary)' }}
                           formatter={(value: number, name: string) => {
                             const v = formatNumber(Number(value), { maxDecimals: 1 });
-                            return [`${v} sets`, ''];
+                            if (name === 'EMA') return [v, 'EMA'];
+                            return [v, 'Sets'];
                           }}
                         />
                         <Area
@@ -966,9 +1159,11 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
                     const exData = lookupExerciseMuscleData(ex.name, exerciseMuscleData);
                     const { volumes: exVolumes, maxVolume: exMaxVol } = getExerciseMuscleVolumes(exData);
                     const totalSetsForCalc = quickFilterData
-                      ? (quickFilterData.sets || 1)
+                      ? (viewMode === 'group'
+                          ? (windowedExerciseBreakdown?.totalSetsInWindow || 1)
+                          : (quickFilterData.sets || 1))
                       : viewMode === 'group' 
-                        ? (selectedGroupData?.sets || 1) 
+                        ? (windowedExerciseBreakdown?.totalSetsInWindow || 1)
                         : (selectedMuscleData?.sets || 1);
                     const pct = totalSetsForCalc > 0 ? Math.round((ex.sets / totalSetsForCalc) * 100) : 0;
 
