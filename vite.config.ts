@@ -112,10 +112,10 @@ export default defineConfig(({ mode }) => {
           // Code splitting for better caching (Vike requires manualChunks to be a function)
           manualChunks: (id: string) => {
             if (!id.includes('node_modules')) return;
-            if (id.includes('/react/') || id.includes('/react-dom/')) return 'vendor-react';
             if (id.includes('/recharts/')) return 'vendor-charts';
             if (id.includes('/date-fns/') || id.includes('/lucide-react/')) return 'vendor-utils';
-            return 'vendor';
+            // Let Vite/Rollup decide chunking for React core packages to avoid circular chunk imports.
+            return;
           }
         }
       }
