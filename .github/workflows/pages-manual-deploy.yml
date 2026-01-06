@@ -9,8 +9,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: "pages-deploy"
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: '20'
@@ -44,6 +44,13 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
+
+      - name: Cleanup old artifacts
+        run: |
+          echo "Cleaning up old github-pages artifacts..."
+          gh api repos/${{ github.repository }}/actions/artifacts --jq '.artifacts[] | select(.name == "github-pages") | .id' | xargs -I {} gh api --method DELETE repos/${{ github.repository }}/actions/artifacts/{} || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
