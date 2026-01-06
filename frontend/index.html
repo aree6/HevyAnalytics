@@ -5,6 +5,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0, user-scalable=yes" />
     <meta name="theme-color" content="#0b1220" />
     
+    <script>
+      (function () {
+        try {
+          var key = 'hevy_analytics_theme_mode';
+          var stored = localStorage.getItem(key);
+          var mode =
+            stored === 'light' || stored === 'medium-dark' || stored === 'midnight-dark' || stored === 'svg'
+              ? stored
+              : 'svg';
+          document.documentElement.dataset.theme = mode;
+          document.documentElement.style.colorScheme = mode === 'light' ? 'light' : 'dark';
+        } catch (e) {
+          // ignore
+        }
+      })();
+    </script>
+    
+    <script>
+      (function () {
+        // GitHub Pages SPA deep-linking support.
+        // If we were redirected via /404.html, restore the original URL so the app can load normally.
+        try {
+          var params = new URLSearchParams(window.location.search || '');
+          var p = params.get('p');
+          var q = params.get('q');
+          var h = params.get('h');
+          if (!p) return;
+
+          params.delete('p');
+          params.delete('q');
+          params.delete('h');
+
+          var rest = params.toString();
+          var search = (q ? decodeURIComponent(q) : '') || (rest ? '?' + rest : '');
+          var hash = (h ? decodeURIComponent(h) : '');
+          var path = decodeURIComponent(p);
+
+          window.history.replaceState(null, '', path + search + hash);
+        } catch (e) {
+          // ignore
+        }
+      })();
+    </script>
+    
     <!-- SEO Meta Tags -->
     <meta name="description" content="LiftShift is the best free workout analytics dashboard add-on for fitness tracking apps. Transform Hevy, Strong, Lyfta data into powerful insights with advanced visualization tools. Compare features with Strava, Garmin, Apple Health dashboards.">
     <meta name="keywords" content="workout analytics dashboard, fitness tracking app add-on, Hevy analytics dashboard, Strong app analytics, workout data visualization, fitness dashboard tools, workout logging dashboard, fitness app analytics, training volume dashboard, muscle heatmap analytics, personal records dashboard, exercise history visualization, fitness tracking comparison, Strava dashboard alternative, Garmin analytics, Apple Health dashboard, fitness BI tools, workout app dashboard plugins, free fitness analytics, workout data dashboard tools">
@@ -24,23 +68,6 @@
     <meta name="twitter:title" content="LiftShift - Free Workout Analytics Dashboard">
     <meta name="twitter:description" content="The ultimate workout analytics dashboard add-on for fitness apps. Transform Hevy, Strong, Lyfta data into powerful insights with advanced visualization tools and free analytics features.">
     <meta name="twitter:image" content="https://liftshift.app/UI/logo.svg">
-    
-    <script>
-      (function () {
-        try {
-          var key = 'hevy_analytics_theme_mode';
-          var stored = localStorage.getItem(key);
-          var mode =
-            stored === 'light' || stored === 'medium-dark' || stored === 'midnight-dark' || stored === 'svg'
-              ? stored
-              : 'svg';
-          document.documentElement.dataset.theme = mode;
-          document.documentElement.style.colorScheme = mode === 'light' ? 'light' : 'dark';
-        } catch (e) {
-          // ignore
-        }
-      })();
-    </script>
     <title>LiftShift - Best Free Workout Analytics Dashboard Add-On | Hevy, Strong, Fitness App Analytics</title>
       <link rel="icon" type="image/svg+xml" href="/UI/logo.svg">
       <link rel="icon" type="image/png" href="/UI/logo.png">

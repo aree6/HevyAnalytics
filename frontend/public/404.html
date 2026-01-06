@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LiftShift</title>
+    <script>
+      (function () {
+        // GitHub Pages serves 404.html for unknown paths.
+        // For a SPA, we rewrite to / with the original path preserved in the query.
+        // index.html should restore it.
+        var l = window.location;
+        var path = l.pathname || '/';
+        var search = l.search || '';
+        var hash = l.hash || '';
+        var redirect = '/?p=' + encodeURIComponent(path) + '&q=' + encodeURIComponent(search) + '&h=' + encodeURIComponent(hash);
+        l.replace(redirect);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
