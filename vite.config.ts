@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const backendUrl = stripTrailingApiPath(env.VITE_BACKEND_URL || 'http://localhost:5000');
   return {
+    base: '/LiftShift/',
     root: path.resolve(__dirname, 'frontend'),
     envDir: __dirname,
     server: {
