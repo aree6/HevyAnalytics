@@ -45,4 +45,10 @@
   <url>
     <loc>https://liftshift.app/ai/</loc>
   </url>
+  <url>
+    <loc>https://liftshift.app/dashboard-analytics/</loc>
+  </url>
+  <url>
+    <loc>https://liftshift.app/free-workout-dashboard/</loc>
+  </url>
 </urlset>
