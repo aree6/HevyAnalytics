@@ -29,6 +29,7 @@ import {
 } from './ChartBits';
 import { SVG_MUSCLE_NAMES } from '../../utils/muscle/muscleMapping';
 import { SVG_TO_MUSCLE_GROUP, getGroupHighlightIds } from '../../utils/muscle/muscleMappingConstants';
+import { differenceInCalendarDays } from 'date-fns';
 
 type WeeklySetsView = 'radar' | 'heatmap';
 type WeeklySetsWindow = 'all' | '7d' | '30d' | '365d';
@@ -39,6 +40,14 @@ type WeeklySetsPoint = { subject: string; value: number };
 type HeatmapData = {
   volumes: Map<string, number>;
   maxVolume: number;
+};
+
+// Helper to format a human‑readable duration for the insight label
+const formatWindowDuration = (days: number): string => {
+  if (days <= 7) return `${days} wk`;
+  if (days <= 30) return `${Math.round(days / 7)} wk`;
+  if (days <= 365) return `${Math.round(days / 30)} mo`;
+  return `${Math.round(days / 365)} yr`;
 };
 
 const safePct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
@@ -56,6 +65,7 @@ export const WeeklySetsCard = ({
   tooltipStyle,
   onMuscleClick,
   bodyMapGender,
+  windowStart,
 }: {
   isMounted: boolean;
   weeklySetsView: WeeklySetsView;
@@ -69,6 +79,7 @@ export const WeeklySetsCard = ({
   tooltipStyle: Record<string, unknown>;
   onMuscleClick?: (muscleId: string, viewMode: 'muscle' | 'group') => void;
   bodyMapGender?: BodyMapGender;
+  windowStart?: Date | null;
 }) => {
   const [heatmapHoveredMuscle, setHeatmapHoveredMuscle] = useState<string | null>(null);
 
@@ -80,13 +91,22 @@ export const WeeklySetsCard = ({
     const topShare = total > 0 ? safePct(top.value || 0, total) : 0;
     const top3 = sorted.slice(0, 3).reduce((acc, d) => acc + (d.value || 0), 0);
     const top3Share = total > 0 ? safePct(top3, total) : 0;
+
+    // Compute effective window duration for the label
+    let durationLabel = '';
+    if (windowStart) {
+      const days = differenceInCalendarDays(new Date(), windowStart) + 1;
+      durationLabel = ` (${formatWindowDuration(days)})`;
+    }
+
     return {
       total,
       top,
       topShare,
       top3Share,
+      durationLabel,
     };
-  }, [compositionQuickData]);
+  }, [compositionQuickData, windowStart]);
 
   const heatmapHoveredMuscleIds = useMemo(() => {
     if (!heatmapHoveredMuscle) return undefined;
@@ -323,7 +343,7 @@ export const WeeklySetsCard = ({
         <InsightLine>
           {weeklySetsInsight ? (
             <>
-              <TrendBadge label={<BadgeLabel main={`~${weeklySetsInsight.total.toFixed(1)}/wk`} />} tone="info" />
+              <TrendBadge label={<BadgeLabel main={`~${weeklySetsInsight.total.toFixed(1)}/wk${weeklySetsInsight.durationLabel}`} />} tone="info" />
               <TrendBadge
                 label={`Top: ${weeklySetsInsight.top.subject} ${weeklySetsInsight.top.value.toFixed(1)}/wk`}
                 tone="neutral"

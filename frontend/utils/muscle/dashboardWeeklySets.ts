@@ -30,17 +30,27 @@ export interface WeeklySetsDashboardResult {
 }
 
 const getWindowStart = (data: WorkoutSet[], now: Date, window: WeeklySetsWindow): Date | null => {
-  if (window === '7d') return subDays(now, 7);
-  if (window === '30d') return subDays(now, 30);
-  if (window === '365d') return subDays(now, 365);
-
-  let start: Date | null = null;
+  // Earliest known workout date across all sets.
+  // We use this to avoid diluting averages for users with <1y history.
+  let earliest: Date | null = null;
   for (const s of data) {
     const d = s.parsedDate;
     if (!d) continue;
-    if (!start || d < start) start = d;
+    if (!earliest || d < earliest) earliest = d;
   }
-  return start;
+  if (!earliest) return null;
+
+  if (window === 'all') return earliest;
+
+  const candidate =
+    window === '7d'
+      ? subDays(now, 7)
+      : window === '30d'
+        ? subDays(now, 30)
+        : subDays(now, 365);
+
+  // Clamp to the user's first workout date so we don't include pre-history empty time.
+  return earliest > candidate ? earliest : candidate;
 };
 
 export const computeWeeklySetsDashboardData = (

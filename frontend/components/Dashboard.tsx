@@ -735,6 +735,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
       return {
         composition: [] as { subject: string; value: number }[],
         heatmap: { volumes: new Map<string, number>(), maxVolume: 1 },
+        windowStart: null as Date | null,
       };
     }
     const cacheKey = `weeklySetsDashboard:${muscleCompQuick}:${compositionGrouping}`;
@@ -749,7 +750,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
           muscleCompQuick,
           compositionGrouping
         );
-        return { composition: computed.composition, heatmap: computed.heatmap };
+        return { 
+          composition: computed.composition, 
+          heatmap: computed.heatmap,
+          windowStart: computed.windowStart,
+        };
       },
       { ttl: 10 * 60 * 1000 }
     );
@@ -963,6 +968,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             tooltipStyle={TooltipStyle as any}
             onMuscleClick={(muscleId, viewMode) => onMuscleClick?.(muscleId, viewMode, muscleCompQuick)}
             bodyMapGender={bodyMapGender}
+            windowStart={weeklySetsDashboard.windowStart}
           />
         </Suspense>
       </div>

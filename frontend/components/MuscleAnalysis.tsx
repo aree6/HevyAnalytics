@@ -114,10 +114,18 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
   }, [data]);
 
   const windowStart = useMemo(() => {
-    if (weeklySetsWindow === '7d') return subDays(effectiveNow, 7);
-    if (weeklySetsWindow === '30d') return subDays(effectiveNow, 30);
-    if (weeklySetsWindow === '365d') return subDays(effectiveNow, 365);
-    return allTimeWindowStart;
+    if (!allTimeWindowStart) return null;
+    if (weeklySetsWindow === 'all') return allTimeWindowStart;
+
+    const candidate =
+      weeklySetsWindow === '7d'
+        ? subDays(effectiveNow, 7)
+        : weeklySetsWindow === '30d'
+          ? subDays(effectiveNow, 30)
+          : subDays(effectiveNow, 365);
+
+    // Clamp to the user's first workout date so we don't include pre-history empty time.
+    return allTimeWindowStart > candidate ? allTimeWindowStart : candidate;
   }, [weeklySetsWindow, effectiveNow, allTimeWindowStart]);
 
   const getChipTextColor = useCallback((sets: number, maxSets: number): string => {
@@ -393,6 +401,10 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
           ? subDays(previousNow, 30)
           : subDays(previousNow, 365);
 
+    const clampedPreviousStart = allTimeWindowStart && allTimeWindowStart > previousStart
+      ? allTimeWindowStart
+      : previousStart;
+
     const daily = viewMode === 'group'
       ? computeDailyMuscleVolumes(data, assetsMap, true)
       : computeDailySvgMuscleVolumes(data, assetsMap);
@@ -417,7 +429,7 @@ return acc + sum;
     };
 
     const current = sumInRange(windowStart, effectiveNow);
-    const previous = sumInRange(previousStart, previousNow);
+    const previous = sumInRange(clampedPreviousStart, previousNow);
 
     if (previous <= 0) return null;
 
@@ -433,7 +445,7 @@ return acc + sum;
       formattedPercent,
       direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'same' as 'up' | 'down' | 'same',
     };
-  }, [assetsMap, windowStart, weeklySetsWindow, selectedSubjectKeys, viewMode, data, effectiveNow]);
+  }, [assetsMap, windowStart, weeklySetsWindow, selectedSubjectKeys, viewMode, data, effectiveNow, allTimeWindowStart]);
 
   // Trend chart: constrained to selected window; resolution depends on window size.
   const trendData = useMemo(() => {
