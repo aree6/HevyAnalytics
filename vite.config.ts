@@ -32,6 +32,32 @@ const stripTrailingApiPath = (url: string): string => {
   }
 };
 
+const serveFaviconIcoPlugin = () => {
+  const rewriteFaviconIco = (middlewares: any) => {
+    middlewares.use((req: any, _res: any, next: any) => {
+      const rawUrl = typeof req.url === 'string' ? req.url : '';
+      const url = rawUrl.split('?')[0]?.split('#')[0] ?? '';
+      if (url !== '/favicon.ico') return next();
+
+      // Browsers often request /favicon.ico regardless of <link rel="icon">.
+      // We don't keep a dedicated .ico asset, so we map it to an existing icon.
+      req.url = '/UI/logo.png';
+      return next();
+    });
+  };
+
+  return {
+    name: 'serve-favicon-ico',
+    apply: 'serve',
+    configureServer(server: any) {
+      rewriteFaviconIco(server.middlewares);
+    },
+    configurePreviewServer(server: any) {
+      rewriteFaviconIco(server.middlewares);
+    },
+  };
+};
+
 const servePublicIndexHtmlPlugin = () => {
   return {
     name: 'serve-public-index-html',
@@ -93,7 +119,7 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    plugins: [servePublicIndexHtmlPlugin(), react(), vike()],
+    plugins: [serveFaviconIcoPlugin(), servePublicIndexHtmlPlugin(), react(), vike()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'frontend'),
