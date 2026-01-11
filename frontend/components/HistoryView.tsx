@@ -2,7 +2,8 @@ import React, { useMemo, useState, useEffect, useId } from 'react';
 import { WorkoutSet, AnalysisResult, SetWisdom, StructuredTooltip, TooltipLine } from '../types';
 import { 
   ChevronLeft, ChevronRight, Trophy, Target, Hash, HelpCircle,
-  AlertTriangle, Info, TrendingUp, TrendingDown, Calendar, Clock, Dumbbell
+  AlertTriangle, Info, TrendingUp, TrendingDown, Calendar, Clock, Dumbbell,
+  Weight
 } from 'lucide-react';
 import { analyzeSetProgression, getStatusColor, analyzeProgression, getWisdomColor, isWarmupSet } from '../utils/analysis/masterAlgorithm';
 import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
@@ -926,7 +927,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                   </div>
 
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-x-4 text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 pl-1 min-w-0">
-                    <span className="whitespace-nowrap">{session.totalSets} Sets</span>
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                      <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400" aria-hidden />
+                      <span>{session.totalSets} Sets</span>
+                    </span>
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
                       <Dumbbell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400" aria-hidden />
                       <span>{exerciseCount} Exercise{exerciseCount === 1 ? '' : 's'}</span>
@@ -939,8 +943,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                     )}
 
                     <span className="flex items-baseline min-w-0">
-                      <span className="whitespace-nowrap min-w-0 truncate">
-                        {formatDisplayVolume(session.totalVolume, weightUnit, { round: 'int' })} {weightUnit}
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap min-w-0 truncate">
+                        <Weight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" aria-hidden />
+                        <span>{formatDisplayVolume(session.totalVolume, weightUnit, { round: 'int' })} {weightUnit}</span>
                       </span>
                       {prevSession && (
                         <span className="flex-none overflow-visible">

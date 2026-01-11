@@ -1242,7 +1242,7 @@ const App: React.FC = () => {
                   className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
                 >
                   <svg
-                    className="w-6 h-6"
+                    className="w-5 h-5"
                     viewBox="0 0 195.989 195.989"
                     fill="currentColor"
                     stroke="currentColor"

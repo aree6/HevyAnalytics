@@ -12,6 +12,7 @@ import { convertWeight } from '../utils/format/units';
 import { getDisplayVolume } from '../utils/format/volumeDisplay';
 import { FANCY_FONT, FANCY_FONT_NUMBERS } from '../utils/ui/uiConstants';
 import { calculateStreakInfo, calculatePRInsights, StreakInfo, PRInsights } from '../utils/analysis/insights';
+import { getDailySummaries, getExerciseStats } from '../utils/analysis/analytics';
 import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
 import { assetPath } from '../constants';
 import { isWarmupSet } from '../utils/analysis/setClassification';
@@ -355,9 +356,37 @@ const StreakCard: React.FC<{
           {/* Glow effect */}
           <div className="absolute inset-0 blur-2xl bg-gradient-to-t from-orange-500/40 to-red-500/30 scale-150" />
           
-          {/* Fire emoji container */}
+          {/* Fire SVG container */}
           <div className="relative">
-            <span className="text-[120px] sm:text-[150px] leading-none filter drop-shadow-lg">🔥</span>
+            <svg 
+              className="w-[120px] h-[120px] sm:w-[150px] sm:h-[150px] leading-none filter drop-shadow-lg" 
+              viewBox="0 0 64 64" 
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+              role="img"
+              preserveAspectRatio="xMidYMid meet"
+            >
+              <path 
+                d="M57.047 26.167s-3.049 2.77-8.145 6.074C47.512 24.159 43.656 14.182 36.02 2c0 0-2.497 13.067-10.813 25.435c-3.629-5.598-5.186-9.993-5.186-9.993C-6.145 43.521 15.545 62 29.167 62c17.484 0 32.87-8.361 27.88-35.833M30.063 60.332c-3.81 0-12.314-2.656-16.425-14.883c0 0 1.477.756 3.879 1.631c.098-4.227 1.797-9.636 6.144-16.46c0 0 1.09 2.93 3.63 6.662c5.821-8.246 7.569-16.961 7.569-16.961c5.346 8.125 8.045 14.778 9.019 20.167c3.566-2.204 5.701-4.052 5.701-4.052c-.243 5.423-1.29 9.673-2.805 12.995c2.385-.391 3.892-.807 3.892-.807C43.8 58.322 36.87 60.332 30.063 60.332" 
+                fill={isDark ? "#ff6b35" : "#ff4500"}
+              />
+              <path 
+                d="M21.897 43.854s2.805 3.826 4.938 2.902c0 0 4.055-6.301 9.874-9.804c0 0-1.195 9.606.179 11.304c1.822 2.258 6.759-2.504 6.759-2.504c0 5.676-6.231 12.828-11.806 12.828c-5.535 0-13.382-6.156-9.944-14.726" 
+                fill={isDark ? "#ff8c42" : "#ff6347"}
+              />
+              <path 
+                d="M49.84 18.118c2.101-3.041 3.529-6.156 3.529-6.156c3.523 5.775 1.444 9.287-.104 10.434c-2.077 1.542-5.85-.763-3.425-4.278" 
+                fill={isDark ? "#ffa500" : "#ff8c00"}
+              />
+              <path 
+                d="M11.497 17.131C9.441 13.606 9.21 9.213 9.21 9.213C4.187 16.76 6.149 20.87 7.82 22.114c2.242 1.67 6.05-.91 3.677-4.983" 
+                fill={isDark ? "#ffb347" : "#ffa500"}
+              />
+              <path 
+                d="M23.183 9.291c.256-2.369-.737-4.826-.737-4.826c4.764 3.064 4.707 5.733 4.086 6.772c-.837 1.394-3.646.791-3.349-1.946" 
+                fill={isDark ? "#ffd700" : "#ffb347"}
+              />
+            </svg>
             {/* Number overlay */}
             <div className="absolute inset-0 flex items-center justify-center pt-8">
               <span
@@ -1063,11 +1092,11 @@ const VolumeComparisonCard: React.FC<{
     return roundedToTenth.toFixed(1).replace(/\.0$/, '');
   }, [comparison]);
   
-  const textPrimary = isDark ? 'text-white' : 'text-slate-900';
-  const textSecondary = isDark ? 'text-slate-400' : 'text-slate-600';
-  const textMuted = isDark ? 'text-slate-500' : 'text-slate-400';
+  const textPrimary = isDark ? '!text-white' : '!text-slate-900';
+  const textSecondary = isDark ? '!text-slate-400' : '!text-slate-700';
+  const textMuted = isDark ? '!text-slate-500' : '!text-slate-600';
   const accentBg = isDark ? 'bg-blue-500/10' : 'bg-blue-100';
-  const accentText = isDark ? 'text-blue-400' : 'text-blue-600';
+  const accentText = isDark ? '!text-blue-400' : '!text-blue-600';
 
   return (
     <FlexCard theme={theme} className="min-h-[460px] sm:min-h-[500px]">
@@ -1075,20 +1104,25 @@ const VolumeComparisonCard: React.FC<{
       <div className={`absolute top-0 right-0 w-56 h-56 rounded-full blur-3xl pointer-events-none ${isDark ? 'bg-blue-500/5' : 'bg-blue-200/30'}`} />
       <div className={`absolute bottom-0 left-0 w-44 h-44 rounded-full blur-3xl pointer-events-none ${isDark ? 'bg-purple-500/5' : 'bg-purple-200/20'}`} />
       
-      {/* Theme toggle button - positioned inside card for screenshot */}
-      {showThemeToggle && onThemeToggle && (
+      {/* Theme toggle button - positioned at top-right */}
+      {showThemeToggle && (
         <button
-          onClick={onThemeToggle}
+          onClick={(e) => {
+            e.stopPropagation();
+            onThemeToggle?.();
+          }}
           className={`absolute top-3 right-3 z-10 p-2 rounded-xl border transition-all duration-300 ${
             isDark 
               ? 'bg-slate-800/80 border-slate-700 hover:bg-slate-700 text-yellow-400' 
               : 'bg-white/80 border-slate-300 hover:bg-slate-100 text-slate-700'
           }`}
           title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+          aria-label="Toggle theme"
         >
           {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </button>
       )}
+      
 
       {/* Card content */}
       <div className="relative z-[1] pt-5 px-5 pb-12 sm:pt-6 sm:px-6 sm:pb-14 flex flex-col items-center text-center h-full">
@@ -1096,7 +1130,7 @@ const VolumeComparisonCard: React.FC<{
           {/* Header */}
           <div className={`flex items-center gap-2 mb-1.5 ${textMuted}`}>
             <Sparkles className="w-4 h-4" />
-            <span className="text-xs font-semibold uppercase tracking-widest">Total Volume Lifted</span>
+            <span className={`text-xs font-semibold uppercase tracking-widest ${textMuted}`}>Total Volume Lifted</span>
             <Sparkles className="w-4 h-4" />
           </div>
 
@@ -1173,6 +1207,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
 
   const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
   const [showFocusedNav, setShowFocusedNav] = useState(false);
+  const [volumeCardTheme, setVolumeCardTheme] = useState<CardTheme>(cardTheme);
   const hideNavTimeoutRef = useRef<number | null>(null);
   const canHover = useMemo(
     () => (typeof window !== 'undefined' ? window.matchMedia?.('(hover: hover)')?.matches : true),
@@ -1436,8 +1471,9 @@ export const FlexView: React.FC<FlexViewProps> = ({
             totalVolume={stats.totalVolume}
             totalVolumeKg={stats.totalVolumeKg}
             weightUnit={weightUnit}
-            theme={cardTheme}
-            showThemeToggle={false}
+            theme={volumeCardTheme}
+            showThemeToggle={true}
+            onThemeToggle={() => setVolumeCardTheme(volumeCardTheme === 'dark' ? 'light' : 'dark')}
           />
         );
       case 'year-heatmap':
