@@ -17,7 +17,7 @@ import { bucketRollingWeeklySeriesToWeeks } from '../utils/muscle/rollingSeriesB
 import { getMuscleContributionsFromAsset } from '../utils/muscle/muscleContributions';
 import { ActivityHeatmap } from './dashboard/ActivityHeatmap';
 import { 
-  Clock, Dumbbell, Copy, Check, ExternalLink, Brain
+  Clock, Dumbbell, Copy, Check, ExternalLink, Brain, AlertTriangle
 } from 'lucide-react';
 
 // Simple monochrome SVG for Gemini (Google) that inherits color via currentColor
@@ -906,9 +906,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
       {/* PLATEAU ALERTS */}
       {activePlateauExercises.length > 0 && (
         <div className="bg-black/70 border border-amber-500/20 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm font-semibold text-amber-400">⚠️ Plateaus</span>
-           
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-amber-500/10">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+              </div>
+              <span className="text-sm font-semibold text-white">Plateaus</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-bold">
+                {activePlateauExercises.length} {activePlateauExercises.length === 1 ? 'exercise' : 'exercises'}
+              </span>
+            </div>
           </div>
           <div className="overflow-x-auto -mx-2 px-2 pb-2">
             <div className="flex gap-2" style={{ minWidth: 'min-content' }}>
@@ -917,7 +926,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                   <PlateauAlert 
                     exerciseName={p.exerciseName}
                     suggestion={p.suggestion}
+                    weeksAtSameWeight={p.weeksAtSameWeight}
+                    currentMaxWeight={p.currentMaxWeight}
+                    lastProgressDate={p.lastProgressDate}
+                    lastWeight={p.lastWeight}
+                    lastReps={p.lastReps}
+                    isBodyweightLike={p.isBodyweightLike}
                     asset={assetsMap?.get(p.exerciseName) || assetsLowerMap?.get(p.exerciseName.toLowerCase())}
+                    weightUnit={weightUnit}
+                    now={effectiveNow}
                     onClick={() => onExerciseClick?.(p.exerciseName)}
                   />
                 </div>

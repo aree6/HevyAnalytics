@@ -390,6 +390,9 @@ export interface ExercisePlateauInfo {
   lastProgressDate: Date | null;
   isPlateaued: boolean;
   suggestion: string;
+  lastWeight: number;
+  lastReps: number;
+  isBodyweightLike: boolean;
 }
 
 export interface PlateauAnalysis {
@@ -437,6 +440,11 @@ export const detectPlateaus = (
       : 1;
     const weeksStuck = Math.max(1, weeksStuckRaw);
 
+    // Get last set data
+    const lastHistoryEntry = stat.history[0]; // history is sorted by date descending
+    const lastWeight = lastHistoryEntry?.weight ?? 0;
+    const lastReps = lastHistoryEntry?.reps ?? 0;
+
     plateauedExercises.push({
       exerciseName: stat.name,
       weeksAtSameWeight: weeksStuck,
@@ -446,6 +454,9 @@ export const detectPlateaus = (
       suggestion: core.isBodyweightLike
         ? 'Try adding 1-2 reps or an extra set next session.'
         : `Try increasing weight to ${convertWeight(plateauWeight + getStandardWeightIncrementKg(weightUnit), weightUnit)}${weightUnit} next session.`,
+      lastWeight,
+      lastReps,
+      isBodyweightLike: core.isBodyweightLike,
     });
   }
 
