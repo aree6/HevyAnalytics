@@ -770,7 +770,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   return (
     <>
       <style>{ANIMATION_KEYFRAMES}</style>
-      <div className={`space-y-2 pb-12 transition-opacity duration-700 ease-out ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`space-y-2 pb-4 sm:pb-12 transition-opacity duration-700 ease-out ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
       
         <div className="hidden sm:contents">
           <ViewHeader

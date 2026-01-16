@@ -49,7 +49,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform }) =>
       initial={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-[#030712] text-white font-sans"
+      className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-black text-white font-sans"
     >
       <ThemedBackground />
       {/* Light Rays Effect */}
@@ -82,10 +82,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform }) =>
             </div>
             {/* Main Headline - Focus on transformation */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight mb-8 leading-[1.2]">
-              <span className="block text-yellow-600 font-medium text-2xl sm:text-3xl lg:text-4xl mb-10" style={FANCY_FONT}>
+              <span className="block text-yellow-600 font-medium text-2xl sm:text-3xl lg:text-4xl mb-4" style={FANCY_FONT}>
                 Boring workout logs?
               </span>
-              <span className="block text-slate-400 text-3xl sm:text-3xl lg:text-4xl xl:text-5xl mb-4"><span className="bg-gradient-to-r from-emerald-300 via-emerald-400 to-green-400 bg-clip-text text-transparent" style={FANCY_FONT}>LiftShift</span> turns them into</span>
+              <span className="block text-slate-400 text-3xl sm:text-3xl lg:text-4xl xl:text-5xl mb-4"><span className="bg-gradient-to-r from-emerald-300 via-emerald-400 to-green-400 bg-clip-text text-transparent" style={FANCY_FONT}></span> turn them into</span>
               <span className="block bg-gradient-to-r from-emerald-300 via-emerald-400 to-green-400 bg-clip-text text-transparent pb-2 mt-1 " style={FANCY_FONT}>
                 Stunning & actionable insights.
               </span>
@@ -97,23 +97,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform }) =>
               <FeatureTag icon={<Trophy className="w-4 h-4 text-yellow-400" />} text="PR Detection" />
               <FeatureTag icon={<BarChart3 className="w-4 h-4 text-emerald-400" />} text="Volume Trends" />
               <FeatureTag icon={<Dumbbell className="w-4 h-4 text-purple-400" />} text="Exercise Deep Dives" />
-            </div>
-            {/* Scroll to view more — mouse cue */}
-            <div className="absolute left-0 right-0 bottom-10 lg:bottom-40 flex justify-center z-20">
-              <button
-                onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' }); } }}
-                className="flex flex-col items-center gap-2 text-slate-600 hover:text-emerald-400 focus:outline-none"
-                aria-label="Scroll to reviews"
-              >
-                <span className="animate-bounce text-slate-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mouse-icon lucide-mouse">
-                    <rect x="5" y="2" width="14" height="20" rx="7" />
-                    <path d="M12 6v4" />
-                  </svg>
-                </span>
-                <span className="text-xs">Scroll to see reviews</span>
-              </button>
             </div>
           </div>
         </div>

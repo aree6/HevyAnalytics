@@ -150,6 +150,33 @@ const App: React.FC = () => {
   const platformQueryConsumedRef = useRef(false);
 
   useEffect(() => {
+    const isShell = onboarding?.intent !== 'initial';
+    const body = document.body;
+    const html = document.documentElement;
+    if (!body || !html) return;
+
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyOverscroll = (body.style as any).overscrollBehavior;
+    const prevHtmlOverscroll = (html.style as any).overscrollBehavior;
+
+    if (isShell) {
+      body.style.overflow = 'hidden';
+      (body.style as any).overscrollBehavior = 'none';
+      (html.style as any).overscrollBehavior = 'none';
+    } else {
+      body.style.overflow = '';
+      (body.style as any).overscrollBehavior = '';
+      (html.style as any).overscrollBehavior = '';
+    }
+
+    return () => {
+      body.style.overflow = prevBodyOverflow;
+      (body.style as any).overscrollBehavior = prevBodyOverscroll;
+      (html.style as any).overscrollBehavior = prevHtmlOverscroll;
+    };
+  }, [onboarding?.intent]);
+
+  useEffect(() => {
     if (platformQueryConsumedRef.current) return;
     const params = new URLSearchParams(location.search);
     const platform = params.get('platform');
@@ -1354,7 +1381,7 @@ const App: React.FC = () => {
 
   return (
     <div
-      className="flex flex-col h-screen bg-transparent text-[color:var(--app-fg)] font-sans"
+      className="flex flex-col min-h-[100svh] h-[100dvh] overscroll-none bg-transparent text-[color:var(--app-fg)] font-sans"
       style={{ background: mode === 'svg' ? 'transparent' : 'var(--app-bg)' }}
     >
       <ThemedBackground />
@@ -1613,7 +1640,7 @@ const App: React.FC = () => {
             </div>
           )}
 
-          <main ref={mainRef} className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-black/70 px-2 py-1 sm:px-3 sm:py-2 md:p-3 lg:p-4">
+          <main ref={mainRef} className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain bg-black/70 px-2 py-1 sm:px-3 sm:py-2 md:p-3 lg:p-4">
 
             <Suspense fallback={<div className="text-slate-400 p-4">Loading...</div>}>
               {activeTab === Tab.DASHBOARD && (
@@ -1687,7 +1714,7 @@ const App: React.FC = () => {
               <SupportLinks variant="secondary" layout="footer" />
             </div>
 
-            <div className="sm:hidden pb-10 mt-8">
+            <div className="sm:hidden pb-[calc(env(safe-area-inset-bottom)+1.5rem)] mt-8">
               <SupportLinks variant="all" layout="footer" />
             </div>
           </main>
