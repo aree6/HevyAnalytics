@@ -1,4 +1,4 @@
-import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, differenceInCalendarDays, isValid } from 'date-fns';
+import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, differenceInCalendarDays, differenceInWeeks, differenceInMonths, differenceInYears, isValid } from 'date-fns';
 import { WorkoutSet } from '../../types';
 
 export type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -9,7 +9,7 @@ export interface DateKeyResult {
   label: string;
 }
 
-const MONTH_ABBR = ['Ja', 'Fb', 'Mr', 'Ap', 'My', 'Jn', 'Jl', 'Ag', 'Sp', 'Oc', 'Nv', 'Dc'] as const;
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
 export const formatYearContraction = (d: Date): string => {
   const yy = String(d.getFullYear() % 100).padStart(2, '0');
@@ -44,6 +44,35 @@ export const formatRelativeDay = (d: Date, now: Date = new Date(0)): string => {
   if (diffDays === -1) return 'tomorrow';
   if (diffDays > 1) return `${diffDays} days ago`;
   return `in ${Math.abs(diffDays)} days`;
+};
+
+export const formatRelativeTime = (d: Date, now: Date = new Date(0)): string => {
+  if (!isValid(d) || !isValid(now)) return '—';
+  
+  const diffDays = differenceInCalendarDays(now, d);
+  const diffWeeks = differenceInWeeks(now, d);
+  const diffMonths = differenceInMonths(now, d);
+  const diffYears = differenceInYears(now, d);
+  
+  // Handle today/yesterday/tomorrow
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays === -1) return 'tomorrow';
+  
+  // Future dates
+  if (diffDays < 0) {
+    const absDays = Math.abs(diffDays);
+    if (absDays <= 14) return `in ${absDays} day${absDays === 1 ? '' : 's'}`;
+    if (absDays <= 30) return `in ${Math.abs(diffWeeks)} week${Math.abs(diffWeeks) === 1 ? '' : 's'}`;
+    if (absDays <= 365) return `in ${Math.abs(diffMonths)} month${Math.abs(diffMonths) === 1 ? '' : 's'}`;
+    return `in ${Math.abs(diffYears)} year${Math.abs(diffYears) === 1 ? '' : 's'}`;
+  }
+  
+  // Past dates
+  if (diffDays <= 14) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  if (diffWeeks <= 4) return `${diffWeeks} week${diffWeeks === 1 ? '' : 's'} ago`;
+  if (diffMonths <= 12) return `${diffMonths} month${diffMonths === 1 ? '' : 's'} ago`;
+  return `${diffYears} year${diffYears === 1 ? '' : 's'} ago`;
 };
 
 export const getEffectiveNowFromWorkoutData = (

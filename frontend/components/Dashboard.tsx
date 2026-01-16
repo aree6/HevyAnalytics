@@ -19,19 +19,23 @@ import { ActivityHeatmap } from './dashboard/ActivityHeatmap';
 import { 
   Clock, Dumbbell, Copy, Check, ExternalLink, Brain, AlertTriangle
 } from 'lucide-react';
-
-// Simple monochrome SVG for Gemini (Google) that inherits color via currentColor
-const GeminiIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg width="18" height="18" viewBox="0 0 32 32" className={className} role="img" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-    <path d="M31,14h-1h-6h-8v5h7c-1.3,2.7-3.8,5.1-7,5.1c-4.5,0-8.1-3.6-8.1-8.1s3.6-8.1,8.1-8.1c2,0,3.6,0.8,5,2.1l6.7-3.3 C25,3.2,20.8,1,16,1C7.7,1,1,7.7,1,16s6.7,15,15,15s15-6.7,15-15C31,15.2,31.1,14.8,31,14z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
 import { format, startOfDay, endOfDay, startOfWeek, startOfMonth, subDays } from 'date-fns';
-import { formatDayContraction, formatDayYearContraction, formatWeekContraction, formatMonthYearContraction, getEffectiveNowFromWorkoutData, getSessionKey } from '../utils/date/dateUtils';
+import {
+  formatDayContraction,
+  formatDayYearContraction,
+  formatWeekContraction,
+  formatMonthYearContraction,
+  getEffectiveNowFromWorkoutData,
+  getSessionKey,
+} from '../utils/date/dateUtils';
 import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
 import { ViewHeader } from './ViewHeader';
-import exportAndCopyPackage, { exportPackageAndCopyText } from '../utils/export/clipboardExport';
-import { calculateDashboardInsights, detectPlateaus, calculateDelta, DashboardInsights, PlateauAnalysis, SparklinePoint, StreakInfo } from '../utils/analysis/insights';
+import { exportPackageAndCopyText } from '../utils/export/clipboardExport';
+import {
+  calculateDashboardInsights,
+  detectPlateaus,
+  calculateDelta,
+} from '../utils/analysis/insights';
 import { InsightsPanel, PlateauAlert, RecentPRsPanel } from './InsightCards';
 import { computationCache } from '../utils/storage/computationCache';
 import { MIN_SESSIONS_FOR_TREND, summarizeExerciseHistory } from '../utils/analysis/exerciseTrend';
@@ -39,20 +43,46 @@ import { isWarmupSet } from '../utils/analysis/setClassification';
 import { ChartSkeleton } from './ChartSkeleton';
 import { LazyRender } from './LazyRender';
 
-const safePct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
-
 interface DashboardProps {
   dailyData: DailySummary[];
   exerciseStats: ExerciseStats[];
-  fullData: WorkoutSet[]; // The raw set data
+  fullData: WorkoutSet[];
   onDayClick?: (date: Date) => void;
-  onMuscleClick?: (muscleId: string, viewMode: 'muscle' | 'group', weeklySetsWindow: 'all' | '7d' | '30d' | '365d') => void;
+  onMuscleClick?: (
+    muscleId: string,
+    viewMode: 'muscle' | 'group',
+    weeklySetsWindow: 'all' | '7d' | '30d' | '365d'
+  ) => void;
   onExerciseClick?: (exerciseName: string) => void;
   filtersSlot?: React.ReactNode;
   stickyHeader?: boolean;
   bodyMapGender?: BodyMapGender;
   weightUnit?: WeightUnit;
 }
+
+// Simple monochrome SVG for Gemini (Google) that inherits color via currentColor
+const GeminiIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 32 32"
+    className={className}
+    role="img"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path
+      d="M31,14h-1h-6h-8v5h7c-1.3,2.7-3.8,5.1-7,5.1c-4.5,0-8.1-3.6-8.1-8.1s3.6-8.1,8.1-8.1c2,0,3.6,0.8,5,2.1l6.7-3.3 C25,3.2,20.8,1,16,1C7.7,1,1,7.7,1,16s6.7,15,15,15s15-6.7,15-15C31,15.2,31.1,14.8,31,14z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const safePct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
 
 const WeeklySetsCard = React.lazy(() => import('./dashboard/WeeklySetsCard').then((m) => ({ default: m.WeeklySetsCard })));
 const MuscleTrendCard = React.lazy(() => import('./dashboard/MuscleTrendCard').then((m) => ({ default: m.MuscleTrendCard })));
@@ -771,7 +801,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     <>
       <style>{ANIMATION_KEYFRAMES}</style>
       <div className={`space-y-2 pb-4 sm:pb-12 transition-opacity duration-700 ease-out ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
-      
+
         <div className="hidden sm:contents">
           <ViewHeader
             leftStats={[
@@ -1083,7 +1113,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         </Suspense>
       </LazyRender>
 
-      </div>
-    </>
-  );
-};
+       </div>
+     </>
+   );
+ };

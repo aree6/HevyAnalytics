@@ -10,6 +10,7 @@ import LightRays from './landing/LightRays';
 import { Flame, CalendarDays, Trophy, BarChart3, Dumbbell } from 'lucide-react';
 import { FANCY_FONT } from '../utils/ui/uiConstants';
 import { assetPath } from '../constants';
+import { HowItWorksDoc } from './howItWorks/HowItWorksDoc';
 
 interface LandingPageProps {
   onSelectPlatform: (source: DataSourceChoice) => void;
@@ -101,6 +102,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform }) =>
           </div>
         </div>
       </section>
+
+      <section id="how-it-works" className="relative z-10 px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white" style={FANCY_FONT}>
+              How it works
+            </h2>
+            <p className="mt-3 text-slate-400 max-w-2xl mx-auto">
+              A documentation-style walkthrough of how LiftShift imports data and calculates your insights.
+            </p>
+          </div>
+
+          <div className="mt-8">
+            <HowItWorksDoc showTitle={false} />
+          </div>
+        </div>
+      </section>
+
       {/* ========== REVIEWS SECTION ========== */}
       <section id="reviews" className="relative z-10 px-4 sm:px-6 lg:px-8 py-16 sm:py-24 pb-56">
         <div className="max-w-6xl mx-auto">

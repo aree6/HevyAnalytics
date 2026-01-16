@@ -11,7 +11,7 @@ import { ExerciseStats, ExerciseHistoryEntry } from '../types';
 import { CHART_TOOLTIP_STYLE, FANCY_FONT } from '../utils/ui/uiConstants';
 import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
 import { createExerciseAssetLookup, ExerciseAssetLookup } from '../utils/exercise/exerciseAssetLookup';
-import { getDateKey, TimePeriod, formatRelativeDay, formatDayContraction } from '../utils/date/dateUtils';
+import { getDateKey, TimePeriod, formatRelativeTime, formatDayContraction } from '../utils/date/dateUtils';
 import { BodyMap, BodyMapGender } from './BodyMap';
 import { LazyRender } from './LazyRender';
 import { ChartSkeleton } from './ChartSkeleton';
@@ -1160,7 +1160,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
                 const lastDone = lastSessionByName.get(ex.name) ?? null;
                 const lastDoneLabel = lastDone
-                  ? formatRelativeDay(lastDone, effectiveNow)
+                  ? formatRelativeTime(lastDone, effectiveNow)
                   : '—';
 
                 const selectedHighlight = getSelectedHighlightClasses(status.status, !isEligible ? 'soft' : 'strong');

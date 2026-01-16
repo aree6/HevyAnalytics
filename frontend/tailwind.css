@@ -223,6 +223,34 @@ html[data-theme='light'] .text-indigo-300 {
   color: #4338ca !important;
 }
 
+html[data-theme='light'] .text-emerald-200,
+html[data-theme='light'] .text-emerald-300,
+html[data-theme='light'] .text-emerald-400 {
+  color: #047857 !important;
+}
+
+html[data-theme='light'] .text-sky-200,
+html[data-theme='light'] .text-sky-300,
+html[data-theme='light'] .text-sky-400 {
+  color: #1d4ed8 !important;
+}
+
+html[data-theme='light'] .bg-emerald-500\/15 {
+  background-color: #04785725 !important;
+}
+
+html[data-theme='light'] .bg-sky-500\/15 {
+  background-color: #1d4ed825 !important;
+}
+
+html[data-theme='light'] .border-emerald-500\/30 {
+  border-color: #0478574d !important;
+}
+
+html[data-theme='light'] .border-sky-500\/30 {
+  border-color: #1d4ed84d !important;
+}
+
 body {
   background: var(--app-bg);
   color: var(--app-fg);

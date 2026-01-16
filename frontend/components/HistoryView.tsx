@@ -3,7 +3,7 @@ import { WorkoutSet, AnalysisResult, SetWisdom, StructuredTooltip, TooltipLine }
 import { 
   ChevronLeft, ChevronRight, Trophy, Target, Hash, HelpCircle,
   AlertTriangle, Info, TrendingUp, TrendingDown, Calendar, Clock, Dumbbell,
-  Weight
+  Weight, Timer
 } from 'lucide-react';
 import { analyzeSetProgression, getStatusColor, analyzeProgression, getWisdomColor, isWarmupSet } from '../utils/analysis/masterAlgorithm';
 import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
@@ -26,7 +26,7 @@ import { convertWeight } from '../utils/format/units';
 import { formatSignedNumber } from '../utils/format/formatters';
 import { formatDisplayVolume } from '../utils/format/volumeDisplay';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../utils/format/deltaFormat';
-import { formatRelativeWithDate, getEffectiveNowFromWorkoutData, getSessionKey } from '../utils/date/dateUtils';
+import { formatRelativeTime, getEffectiveNowFromWorkoutData, getSessionKey } from '../utils/date/dateUtils';
 import { parseHevyDateString } from '../utils/date/parseHevyDateString';
 import { LazyRender } from './LazyRender';
 
@@ -826,8 +826,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
     <div
       data-history-view
       className="flex flex-col gap-2 w-full text-slate-200 pb-10"
-      onClick={() => {
-        if (tooltip) setTooltip(null);
+      onClick={(e) => {
+        // Only close tooltip if clicking on the container itself, not on interactive elements
+        if (tooltip && e.target === e.currentTarget) {
+          setTooltip(null);
+        }
       }}
     >
       {/* Header - sticky when a calendar filter is active */}
@@ -916,7 +919,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                     return next;
                   });
                 }}
-                className="border border-slate-700/50 rounded-2xl p-5 sm:p-7 min-h-[160px] sm:min-h-[168px] flex flex-row justify-between items-stretch gap-3 sm:gap-6 shadow-xl relative overflow-visible group transition-all duration-300 hover:border-slate-600/50 cursor-pointer active:scale-[0.99]"
+                className="border border-slate-700/50 rounded-2xl p-5 sm:p-7 sm:min-h-[168px] flex flex-row justify-between items-stretch gap-2 sm:gap-6 shadow-xl relative overflow-visible group transition-all duration-300 hover:border-slate-600/50 cursor-pointer active:scale-[0.99]"
                 style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.78)' }}
               >
                 <div
@@ -926,7 +929,137 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                 <div className="absolute inset-0 bg-slate-700/10 pointer-events-none rounded-2xl" />
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none group-hover:bg-blue-500/10 transition-all duration-700"></div>
                 
-                <div className="relative z-10 flex-1 min-w-0 flex flex-col justify-between gap-2 md:gap-3">
+                {sessionHeatmap.volumes.size > 0 && (
+                  <div className={`relative z-10 w-full sm:hidden grid grid-cols-3 gap-x-3 gap-y-1 transition-all duration-300 ${isCollapsed ? 'grid-rows-[auto_auto]' : 'grid-rows-[auto_auto_1.75rem_1.75rem_1.75rem_1.75rem_1.75rem]'}`}>
+                    <div className="col-span-3 relative flex items-center justify-between gap-2 min-w-0">
+                      <h3
+                        className="text-base text-slate-200 tracking-tight truncate capitalize"
+                        style={FANCY_FONT}
+                        title={session.title}
+                      >
+                        {session.title}
+                      </h3>
+                      {session.totalPRs > 0 && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 text-[10px] font-bold flex-shrink-0">
+                          <Trophy className="w-3 h-3" />
+                          {session.totalPRs} PR{session.totalPRs > 1 ? 's' : ''}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        data-no-toggle
+                        onClick={() => {
+                        setCollapsedSessions((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(session.key)) next.delete(session.key);
+                          else next.add(session.key);
+                          return next;
+                        });
+                      }}
+                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/75 border border-slate-700/60 shadow-lg flex items-center justify-center"
+                      >
+                        <ChevronRight
+                          className={`w-5 h-5 text-slate-200 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
+                          aria-hidden
+                        />
+                      </button>
+                    </div>
+
+                    <div className="col-span-3 flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="p-1.5 bg-blue-500/10 rounded-lg text-blue-400 flex-shrink-0">
+                          <Calendar className="w-4 h-4" />
+                        </div>
+                        <div className="text-[10px] text-slate-600 dark:text-slate-400 truncate">
+                          {session.date ? formatRelativeTime(session.date, effectiveNow) : '—'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {isCollapsed && (
+                      <div className="col-span-3" />
+                    )}
+
+                    {!isCollapsed && (
+                      <>
+                    <div className={`col-span-1 row-start-3 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 min-w-0 transition-all duration-300`}>
+                      <Clock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 flex-shrink-0" aria-hidden />
+                      <span className="truncate">
+                        {(() => {
+                          const d = session.date ?? parseHevyDateString(String(session.startTime ?? ''));
+                          return d ? format(d, 'h:mm a') : '—';
+                        })()}
+                      </span>
+                    </div>
+
+                    <div className={`col-span-1 row-start-4 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap transition-all duration-300`}>
+                      <Hash className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden />
+                      <span>{session.totalSets} Sets</span>
+                    </div>
+
+                    <div className={`col-span-1 row-start-5 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap transition-all duration-300`}>
+                      <Dumbbell className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden />
+                      <span>{exerciseCount} Exercise{exerciseCount === 1 ? '' : 's'}</span>
+                    </div>
+
+                    <div className={`col-span-1 row-start-6 h-7 relative flex items-center gap-1 min-w-0 text-xs text-slate-600 dark:text-slate-400 pr-10 transition-all duration-300`}>
+                      <Weight className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 flex-shrink-0" aria-hidden />
+                      <span className="truncate">{formatDisplayVolume(session.totalVolume, weightUnit, { round: 'int' })} {weightUnit}</span>
+                      {prevSession && (
+                        <span className="absolute right-0 top-1/2 -translate-y-1/2">
+                          <SessionDeltaBadge
+                            current={session.totalVolume}
+                            previous={prevSession.totalVolume}
+                            label="volume"
+                            context="vs lst"
+                          />
+                        </span>
+                      )}
+                    </div>
+
+                    <div className={`col-span-1 row-start-7 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap transition-all duration-300`}>
+                      <Timer className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden />
+                      <span>{sessionDurationText ?? '—'}</span>
+                    </div>
+
+                    <div
+                      data-no-toggle
+                      className={`col-start-2 col-span-2 row-start-3 row-span-5 flex items-stretch pl-2 border-l border-slate-800/50 overflow-visible transition-all duration-300`}
+                    >
+                      <div className="w-full h-full flex items-center justify-center overflow-visible">
+                        <div className="w-full h-full overflow-visible">
+                          <BodyMap
+                            onPartClick={() => {}}
+                            selectedPart={null}
+                            muscleVolumes={sessionHeatmap.volumes}
+                            maxVolume={sessionHeatmap.maxVolume}
+                            compact
+                            compactFill
+                            interactive
+                            gender={bodyMapGender}
+                            onPartHover={(muscleId, ev) => {
+                              if (!muscleId || !ev) {
+                                setTooltip(null);
+                                return;
+                              }
+                              const hoveredEl = (ev.target as Element | null)?.closest('g[id]');
+                              const rect = hoveredEl?.getBoundingClientRect();
+                              if (!rect) return;
+                              const sets = sessionHeatmap.volumes.get(muscleId) || 0;
+                              const label = SVG_MUSCLE_NAMES[muscleId] || muscleId;
+                              const setsText = Number.isInteger(sets) ? `${sets}` : `${sets.toFixed(1)}`;
+                              setTooltip({ rect, title: label, body: `${setsText} sets`, status: 'info' });
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className={sessionHeatmap.volumes.size > 0 ? "relative z-10 hidden sm:flex flex-1 min-w-0 flex-col justify-between gap-2 md:gap-3" : "relative z-10 flex flex-1 min-w-0 flex-col justify-between gap-2 md:gap-3"}>
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <div className="p-1.5 sm:p-2 bg-blue-500/10 rounded-lg text-blue-400 flex-shrink-0">
                       <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -947,7 +1080,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                   </div>
 
                   <div className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 pl-1">
-                    {session.date ? formatRelativeWithDate(session.date, { now: effectiveNow }) : session.startTime}
+                    {session.date ? formatRelativeTime(session.date, effectiveNow) : session.startTime}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-x-4 text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 pl-1 min-w-0">
@@ -985,8 +1118,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                   </div>
                 </div>
 
-                {/* Chevron icon positioned before the vertical separator */}
-                <div className="flex items-center justify-center px-2 text-black dark:text-slate-300">
+                <div className={sessionHeatmap.volumes.size > 0 ? "hidden sm:flex items-center justify-center px-2 text-black dark:text-slate-300" : "flex items-center justify-center px-2 text-black dark:text-slate-300"}>
                   <ChevronRight
                     className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
                     aria-hidden
@@ -994,8 +1126,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                 </div>
 
                 {sessionHeatmap.volumes.size > 0 && (
-                  <div data-no-toggle className="relative z-10 flex-shrink-0 flex items-stretch pl-3 sm:pl-4 py-1 sm:py-2 border-l border-slate-800/50 self-stretch overflow-visible">
-                    <div className="w-28 h-24 sm:w-32 sm:h-28 md:w-60 md:h-36 md:-mr-6 flex items-center justify-center overflow-visible">
+                  <div data-no-toggle className="hidden sm:flex relative z-10 flex-shrink-0 items-stretch pl-1 sm:pl-4 py-1 sm:py-2 border-l border-slate-800/50 self-stretch overflow-visible">
+                    <div className="w-[50vw] h-[30vh] sm:w-32 sm:h-28 md:w-60 md:h-36 md:-mr-6 flex items-center justify-center overflow-visible">
                       <div className="w-full h-full md:scale-[1.25] origin-center overflow-visible">
                         <BodyMap
                           onPartClick={() => {}}
