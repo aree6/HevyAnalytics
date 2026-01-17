@@ -134,6 +134,7 @@ const ensureGtagLoaded = (measurementId: string) => {
   (window as any).gtag('config', measurementId, {
     send_page_view: false,
     cookie_domain: getCookieDomain(),
+    cookie_update: false,
   });
 };
 
