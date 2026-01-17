@@ -32,6 +32,17 @@ const getPosthogConfig = (): { key: string; host: string } | null => {
   return { key: key.trim(), host: typeof host === 'string' && host.trim() ? host.trim() : 'https://us.i.posthog.com' };
 };
 
+const getCookieDomain = (): string | undefined => {
+  if (typeof window === 'undefined') return undefined;
+  const host = (window.location?.hostname ?? '').trim();
+  if (!host) return undefined;
+  const normalized = host.replace(/^www\./i, '').toLowerCase();
+  // GA rejects domains without a dot; let GA default for localhost or unusual hosts.
+  if (normalized === 'localhost') return undefined;
+  if (!normalized.includes('.')) return undefined;
+  return normalized;
+};
+
 const ensurePosthogInitialized = (): void => {
   if (typeof window === 'undefined') return;
   if (!shouldEnableAnalytics()) return;
@@ -107,6 +118,7 @@ const ensureGtagLoaded = (measurementId: string) => {
   (window as any).gtag('js', new Date());
   (window as any).gtag('config', measurementId, {
     send_page_view: false,
+    cookie_domain: getCookieDomain(),
   });
 };
 
