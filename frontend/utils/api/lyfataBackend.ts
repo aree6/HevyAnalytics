@@ -1,3 +1,5 @@
+import { mergeAnalyticsHeaders } from '../integrations/analyticsClientId';
+
 const normalizeBaseUrl = (url: string): string => url.replace(/\/+$/g, '');
 
 const isLocalhostUrl = (url: string): boolean => {
@@ -93,7 +95,7 @@ const buildBackendUrl = (path: string): string => {
 export const lyfatBackendValidateApiKey = async (apiKey: string): Promise<boolean> => {
   const res = await fetch(buildBackendUrl('/api/lyfta/validate'), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: mergeAnalyticsHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ apiKey }),
   });
 
@@ -110,7 +112,7 @@ export const lyfatBackendValidateApiKey = async (apiKey: string): Promise<boolea
 export const lyfatBackendGetSets = async <TSet>(apiKey: string): Promise<BackendSetsResponse<TSet>> => {
   const res = await fetch(buildBackendUrl('/api/lyfta/sets'), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: mergeAnalyticsHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ apiKey }),
   });
 

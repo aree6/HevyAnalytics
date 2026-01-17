@@ -38,6 +38,7 @@
     "motion": "^12.23.26",
     "ogl": "^1.0.11",
     "papaparse": "^5.4.1",
+    "posthog-js": "^1.266.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-router-dom": "^6.22.3",

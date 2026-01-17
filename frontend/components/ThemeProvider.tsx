@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { getThemeMode, saveThemeMode, ThemeMode } from '../utils/storage/localStorage';
+import { setContext, trackEvent } from '../utils/integrations/analytics';
 
 interface ThemeContextValue {
   mode: ThemeMode;
@@ -39,6 +40,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     saveThemeMode(mode);
+    setContext({ theme_mode: mode });
+    trackEvent('theme_change', { theme_mode: mode });
   }, [mode]);
 
   const value = useMemo<ThemeContextValue>(() => ({ mode, setMode, cycleMode }), [mode, setMode, cycleMode]);

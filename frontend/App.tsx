@@ -35,6 +35,7 @@ import { format, isSameDay, isWithinInterval, startOfDay, endOfDay } from 'date-
 import { CalendarSelector } from './components/CalendarSelector';
 import { formatDayYearContraction, formatHumanReadableDate } from './utils/date/dateUtils';
 import { trackPageView } from './utils/integrations/ga';
+import { setContext, trackEvent } from './utils/integrations/analytics';
 import { SupportLinks } from './components/SupportLinks';
 import { ThemedBackground } from './components/ThemedBackground';
 import { ThemeToggleButton } from './components/ThemeToggleButton';
@@ -150,6 +151,16 @@ const App: React.FC = () => {
   const platformQueryConsumedRef = useRef(false);
 
   useEffect(() => {
+    setContext({ app_shell: onboarding?.intent === 'initial' ? 'landing' : 'app' });
+  }, [onboarding?.intent]);
+
+  useEffect(() => {
+    trackEvent('app_open', {
+      path: `${window.location.pathname || '/'}${window.location.search || ''}`,
+    });
+  }, []);
+
+  useEffect(() => {
     const isShell = onboarding?.intent !== 'initial';
     const body = document.body;
     const html = document.documentElement;
@@ -185,6 +196,8 @@ const App: React.FC = () => {
     const isKnown = platform === 'hevy' || platform === 'strong' || platform === 'lyfta' || platform === 'other';
     if (!isKnown) return;
 
+    trackEvent('deep_link_platform', { platform });
+
     platformQueryConsumedRef.current = true;
 
     const intent: OnboardingIntent = getSetupComplete() ? 'update' : 'initial';
@@ -210,6 +223,14 @@ const App: React.FC = () => {
   useLayoutEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
+
+  useEffect(() => {
+    setContext({ active_tab: activeTab });
+    trackEvent('tab_view', {
+      tab: activeTab,
+      path: `${window.location.pathname || '/'}${window.location.search || ''}`,
+    });
+  }, [activeTab, location.pathname, location.search]);
 
 
   useEffect(() => {
@@ -361,6 +382,7 @@ const App: React.FC = () => {
   }, [location.pathname, location.search, navigateToTab]);
 
   const clearCacheAndRestart = useCallback(() => {
+    trackEvent('cache_clear', {});
     clearCSVData();
     clearHevyAuthToken();
     clearHevyProApiKey();
@@ -384,6 +406,7 @@ const App: React.FC = () => {
   // Persist gender to localStorage when it changes
   useEffect(() => {
     saveBodyMapGender(bodyMapGender);
+    setContext({ body_map_gender: bodyMapGender });
   }, [bodyMapGender]);
 
   // Weight unit state with localStorage persistence
@@ -392,10 +415,12 @@ const App: React.FC = () => {
   // Persist weight unit to localStorage when it changes
   useEffect(() => {
     saveWeightUnit(weightUnit);
+    setContext({ weight_unit: weightUnit });
   }, [weightUnit]);
 
   // Handler for navigating to ExerciseView from MuscleAnalysis
   const handleExerciseClick = (exerciseName: string) => {
+    trackEvent('exercise_open', { source: 'muscle_analysis' });
     setHighlightedExercise(exerciseName);
     const params = new URLSearchParams();
     params.set('exercise', exerciseName);
@@ -412,6 +437,7 @@ const App: React.FC = () => {
 
   // Handler for navigating to MuscleAnalysis from Dashboard heatmap
   const handleMuscleClick = (muscleId: string, viewMode: 'muscle' | 'group', weeklySetsWindow: 'all' | '7d' | '30d' | '365d') => {
+    trackEvent('muscle_open', { view_mode: viewMode, window: weeklySetsWindow });
     setInitialMuscleForAnalysis({ muscleId, viewMode });
     setInitialWeeklySetsWindow(weeklySetsWindow);
     const params = new URLSearchParams();
@@ -859,6 +885,7 @@ const App: React.FC = () => {
       })
       .then((resp) => {
         setLoadingStep(2);
+        trackEvent('hevy_sync_success', { method: 'saved_auth_token', workouts: resp.meta?.workouts });
         const hydrated = (resp.sets ?? []).map((s) => ({
           ...s,
           parsedDate: parseHevyDateString(String(s.start_time ?? '')),
@@ -869,6 +896,7 @@ const App: React.FC = () => {
         setCsvImportError(null);
       })
       .catch((err) => {
+        trackEvent('hevy_sync_error', { method: 'saved_auth_token' });
         clearHevyAuthToken();
         saveSetupComplete(false);
         setHevyLoginError(getHevyErrorMessage(err));
@@ -882,6 +910,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!dataSource) return;
     saveDataSourceChoice(dataSource);
+    setContext({ data_source: dataSource });
   }, [dataSource]);
 
   // Prefetch heavy views and preload exercise assets to avoid first-time lag
@@ -1093,6 +1122,7 @@ const App: React.FC = () => {
   };
 
   const handleOpenUpdateFlow = () => {
+    trackEvent('update_flow_open', { data_source: dataSource ?? 'unknown' });
     setCsvImportError(null);
     setHevyLoginError(null);
     setLyfatLoginError(null);
@@ -1199,6 +1229,8 @@ const App: React.FC = () => {
       return;
     }
 
+    trackEvent('hevy_sync_start', { method: 'pro_api_key' });
+
     setHevyLoginError(null);
     setLoadingKind('hevy');
     setIsAnalyzing(true);
@@ -1227,6 +1259,7 @@ const App: React.FC = () => {
         setOnboarding(null);
       })
       .catch((err) => {
+        trackEvent('hevy_sync_error', { method: 'pro_api_key' });
         clearHevyProApiKey();
         setHevyLoginError(getHevyErrorMessage(err));
       })
@@ -1236,6 +1269,7 @@ const App: React.FC = () => {
   };
 
   const handleHevyLogin = (emailOrUsername: string, password: string) => {
+    trackEvent('hevy_sync_start', { method: 'credentials' });
     setHevyLoginError(null);
     setLoadingKind('hevy');
     setIsAnalyzing(true);
@@ -1272,6 +1306,7 @@ const App: React.FC = () => {
         setOnboarding(null);
       })
       .catch((err) => {
+        trackEvent('hevy_sync_error', { method: 'credentials' });
         setHevyLoginError(getHevyErrorMessage(err));
       })
       .finally(() => {
@@ -1282,6 +1317,8 @@ const App: React.FC = () => {
   const handleLyfatSyncSaved = () => {
     const apiKey = getLyfataApiKey();
     if (!apiKey) return;
+
+    trackEvent('lyfta_sync_start', { method: 'saved_api_key' });
 
     setLyfatLoginError(null);
     setLoadingKind('lyfta');
@@ -1303,6 +1340,7 @@ const App: React.FC = () => {
         setOnboarding(null);
       })
       .catch((err) => {
+        trackEvent('lyfta_sync_error', { method: 'saved_api_key' });
         clearLyfataApiKey();
         setLyfatLoginError(getLyfatErrorMessage(err));
       })
@@ -1312,6 +1350,7 @@ const App: React.FC = () => {
   };
 
   const handleLyfatLogin = (apiKey: string) => {
+    trackEvent('lyfta_sync_start', { method: 'api_key' });
     setLyfatLoginError(null);
     setLoadingKind('lyfta');
     setIsAnalyzing(true);
@@ -1321,6 +1360,7 @@ const App: React.FC = () => {
     lyfatBackendGetSets<WorkoutSet>(apiKey)
       .then((resp) => {
         setLoadingStep(2);
+        trackEvent('lyfta_sync_success', { method: 'api_key', workouts: resp.meta?.workouts });
         saveLyfataApiKey(apiKey);
         saveLastLoginMethod('lyfta', 'apiKey');
         const hydrated = (resp.sets ?? []).map((s) => ({
@@ -1334,6 +1374,7 @@ const App: React.FC = () => {
         setOnboarding(null);
       })
       .catch((err) => {
+        trackEvent('lyfta_sync_error', { method: 'api_key' });
         setLyfatLoginError(getLyfatErrorMessage(err));
       })
       .finally(() => {
@@ -1342,6 +1383,7 @@ const App: React.FC = () => {
   };
 
   const processFile = (file: File, platform: DataSourceChoice, unitOverride?: WeightUnit) => {
+    trackEvent('csv_import_start', { platform, unit: unitOverride ?? weightUnit });
     setLoadingKind('csv');
     setIsAnalyzing(true);
     setLoadingStep(0);
@@ -1358,6 +1400,12 @@ const App: React.FC = () => {
           .then((result: ParseWorkoutCsvResult) => {
             setLoadingStep(2);
             const enriched = identifyPersonalRecords(result.sets);
+            trackEvent('csv_import_success', {
+              platform,
+              unit,
+              sets: result.sets?.length,
+              enriched_sets: enriched?.length,
+            });
             setParsedData(enriched);
             saveCSVData(text);
             saveLastCsvPlatform(platform);
@@ -1367,6 +1415,7 @@ const App: React.FC = () => {
             setOnboarding(null);
           })
           .catch((err) => {
+            trackEvent('csv_import_error', { platform });
             setCsvImportError(getErrorMessage(err));
           })
           .finally(() => {

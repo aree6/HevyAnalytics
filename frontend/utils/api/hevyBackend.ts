@@ -1,3 +1,5 @@
+import { mergeAnalyticsHeaders } from '../integrations/analyticsClientId';
+
 const normalizeBaseUrl = (url: string): string => url.replace(/\/+$/g, '');
 
 const stripTrailingApiPath = (url: string): string => {
@@ -115,7 +117,7 @@ const buildBackendUrl = (path: string): string => {
 export const hevyBackendValidateAuthToken = async (authToken: string): Promise<boolean> => {
   const res = await fetch(buildBackendUrl('/api/hevy/validate'), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: mergeAnalyticsHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ auth_token: authToken }),
   });
 
@@ -133,7 +135,7 @@ export const hevyBackendValidateProApiKey = async (apiKey: string): Promise<bool
   const url = buildBackendUrl('/api/hevy/api-key/validate');
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: mergeAnalyticsHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ apiKey }),
   });
 
@@ -156,7 +158,7 @@ export const hevyBackendGetSetsWithProApiKey = async <TSet>(apiKey: string): Pro
   const url = buildBackendUrl('/api/hevy/api-key/sets');
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: mergeAnalyticsHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ apiKey }),
   });
 
@@ -176,7 +178,7 @@ export const hevyBackendGetSetsWithProApiKey = async <TSet>(apiKey: string): Pro
 export const hevyBackendLogin = async (emailOrUsername: string, password: string): Promise<BackendLoginResponse> => {
   const res = await fetch(buildBackendUrl('/api/hevy/login'), {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: mergeAnalyticsHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({ emailOrUsername, password }),
   });
 
@@ -188,8 +190,10 @@ export const hevyBackendGetAccount = async (authToken: string): Promise<{ userna
   const res = await fetch(buildBackendUrl('/api/hevy/account'), {
     method: 'GET',
     headers: {
-      'content-type': 'application/json',
-      'auth-token': authToken,
+      ...mergeAnalyticsHeaders({
+        'content-type': 'application/json',
+        'auth-token': authToken,
+      }),
     },
   });
 
@@ -204,8 +208,10 @@ export const hevyBackendGetSets = async <TSet>(authToken: string, username: stri
   const res = await fetch(buildBackendUrl(`/api/hevy/sets?${params.toString()}`), {
     method: 'GET',
     headers: {
-      'content-type': 'application/json',
-      'auth-token': authToken,
+      ...mergeAnalyticsHeaders({
+        'content-type': 'application/json',
+        'auth-token': authToken,
+      }),
     },
   });
 
