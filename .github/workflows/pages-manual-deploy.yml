@@ -38,6 +38,10 @@ jobs:
       - name: Build
         env:
           VITE_BACKEND_URL: ${{ secrets.VITE_BACKEND_URL }}
+          VITE_GA_MEASUREMENT_ID: ${{ secrets.VITE_GA_MEASUREMENT_ID }}
+          VITE_PUBLIC_POSTHOG_KEY: ${{ secrets.VITE_PUBLIC_POSTHOG_KEY }}
+          VITE_PUBLIC_POSTHOG_HOST: ${{ secrets.VITE_PUBLIC_POSTHOG_HOST }}
+          VITE_ANALYTICS_DISABLED: ${{ secrets.VITE_ANALYTICS_DISABLED }}
           VITE_BASE_PATH: /LiftShift/
           BASE_ASSETS: /LiftShift/
         run: npm run build

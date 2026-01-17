@@ -166,6 +166,11 @@
    from = "/llms.txt"
    to = "/llms.txt"
    status = 200
+
+ [[redirects]]
+   from = "/UI/logo.svg"
+   to = "/UI/logo.png"
+   status = 301
  
 [[redirects]]
   from = "/*"

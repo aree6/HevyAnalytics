@@ -10,7 +10,6 @@ function Head() {
 
   return (
     <>
-      <link rel="icon" href={withBase('UI/logo.svg')} type="image/svg+xml" />
       <link rel="icon" href={withBase('UI/logo.png')} type="image/png" sizes="32x32" />
       <link rel="icon" href={withBase('UI/logo.png')} type="image/png" sizes="16x16" />
       <link rel="shortcut icon" href={withBase('UI/logo.png')} type="image/png" />

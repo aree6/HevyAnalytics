@@ -11,24 +11,23 @@ let posthogInitPromise: Promise<void> | null = null;
 let queuedPosthogCaptures: PosthogCapture[] = [];
 let queuedPosthogRegisters: AnalyticsProperties | null = null;
 
-const getEnv = (): any => (import.meta as any).env ?? {};
-
 const shouldEnableAnalytics = (): boolean => {
-  const env = getEnv();
-  const disabled = String(env.VITE_ANALYTICS_DISABLED ?? '').trim();
+  const disabled = String(import.meta.env.VITE_ANALYTICS_DISABLED ?? '').trim();
   return disabled !== '1' && disabled.toLowerCase() !== 'true';
 };
 
 const getGaMeasurementId = (): string | null => {
-  const env = getEnv();
-  const id = (env.VITE_GA_MEASUREMENT_ID ?? env.VITE_PUBLIC_GA_MEASUREMENT_ID) as string | undefined;
+  const id = (import.meta.env.VITE_GA_MEASUREMENT_ID ?? (import.meta.env as any).VITE_PUBLIC_GA_MEASUREMENT_ID) as
+    | string
+    | undefined;
   return typeof id === 'string' && id.trim() ? id.trim() : null;
 };
 
 const getPosthogConfig = (): { key: string; host: string } | null => {
-  const env = getEnv();
-  const key = (env.VITE_PUBLIC_POSTHOG_KEY ?? env.VITE_POSTHOG_KEY) as string | undefined;
-  const host = (env.VITE_PUBLIC_POSTHOG_HOST ?? env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com') as string | undefined;
+  const key = ((import.meta.env as any).VITE_PUBLIC_POSTHOG_KEY ?? (import.meta.env as any).VITE_POSTHOG_KEY) as string | undefined;
+  const host = ((import.meta.env as any).VITE_PUBLIC_POSTHOG_HOST ??
+    (import.meta.env as any).VITE_POSTHOG_HOST ??
+    'https://us.i.posthog.com') as string | undefined;
   if (!key || !key.trim()) return null;
   return { key: key.trim(), host: typeof host === 'string' && host.trim() ? host.trim() : 'https://us.i.posthog.com' };
 };
@@ -112,11 +111,10 @@ const ensureGtagLoaded = (measurementId: string) => {
 };
 
 const getCommonProperties = (): AnalyticsProperties => {
-  const env = getEnv();
   return {
     app: 'LiftShift',
     client_id: getAnalyticsClientId(),
-    env: (env.MODE ?? (env.PROD ? 'production' : env.DEV ? 'development' : 'unknown')) as string,
+    env: (import.meta.env.MODE ?? (import.meta.env.PROD ? 'production' : import.meta.env.DEV ? 'development' : 'unknown')) as string,
   };
 };
 
