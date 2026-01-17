@@ -1613,7 +1613,7 @@ const App: React.FC = () => {
             </div>
           )}
 
-          <main ref={mainRef} className="flex-1 overflow-x-hidden overflow-y-auto bg-black/70 px-2 py-1 sm:px-3 sm:py-2 md:p-3 lg:p-4">
+          <main ref={mainRef} className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-black/70 px-2 py-1 sm:px-3 sm:py-2 md:p-3 lg:p-4">
 
             <Suspense fallback={<div className="text-slate-400 p-4">Loading...</div>}>
               {activeTab === Tab.DASHBOARD && (
