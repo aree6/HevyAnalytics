@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Area,
   AreaChart,
@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { AreaChart as AreaChartIcon, BicepsFlexed, ChartColumnStacked, PersonStanding } from 'lucide-react';
+import { AreaChart as AreaChartIcon, BicepsFlexed,Infinity, ChartColumnStacked, PersonStanding } from 'lucide-react';
 import { LazyRender } from '../LazyRender';
 import { ChartSkeleton } from '../ChartSkeleton';
 import { normalizeMuscleGroup } from '../../utils/muscle/muscleNormalization';
@@ -28,15 +28,15 @@ import {
   TrendBadge,
   TrendIcon,
 } from './ChartBits';
-import { getRechartsXAxisInterval, RECHARTS_XAXIS_PADDING } from '../../utils/chart/chartEnhancements';
+import { getRechartsCategoricalTicks, RECHARTS_XAXIS_PADDING } from '../../utils/chart/chartEnhancements';
 
 type MuscleGrouping = 'groups' | 'muscles';
-type MusclePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
+type MusclePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all';
 type MuscleTrendView = 'area' | 'stackedBar';
 
 type MuscleTrendInsight = {
   totalDelta: { direction: 'up' | 'down' | 'same'; deltaPercent: number };
-  biggestMover?: { k: string; d: number };
+  biggestMover?: { k: string; deltaPercent: number; direction: 'up' | 'down' | 'same' };
 } | null;
 
 const formatSigned = (n: number) => formatSignedNumber(n, { maxDecimals: 2 });
@@ -70,6 +70,10 @@ export const MuscleTrendCard = ({
   tooltipStyle: Record<string, unknown>;
   muscleVsLabel: string;
 }) => {
+  const xTicks = useMemo(() => {
+    return getRechartsCategoricalTicks(trendData, (row: any) => row?.dateFormatted);
+  }, [trendData]);
+
   return (
     <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
@@ -113,28 +117,37 @@ export const MuscleTrendCard = ({
 
           <div className="bg-black/70 p-0.5 rounded-lg inline-flex gap-0.5 border border-slate-800 shrink-0">
             <button
-              onClick={() => setMusclePeriod('weekly')}
-              title="Weekly"
-              aria-label="Weekly"
-              className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-bold leading-none ${musclePeriod==='weekly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
+              onClick={() => setMusclePeriod('all')}
+              title="All"
+              aria-label="All"
+              className={`w-5 h-5 flex items-center justify-center rounded ${musclePeriod==='all'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
             >
-              wk
+              <Infinity className="w-3 h-3" />
+              <span className="sr-only">All</span>
+            </button>
+            <button
+              onClick={() => setMusclePeriod('weekly')}
+              title="Last Week"
+              aria-label="Last Week"
+              className={`px-1 h-5 flex items-center justify-center rounded text-[8px] font-bold leading-none whitespace-nowrap ${musclePeriod==='weekly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
+            >
+              lst wk
             </button>
             <button
               onClick={() => setMusclePeriod('monthly')}
-              title="Monthly"
-              aria-label="Monthly"
-              className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-bold leading-none ${musclePeriod==='monthly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
+              title="Last Month"
+              aria-label="Last Month"
+              className={`px-1 h-5 flex items-center justify-center rounded text-[8px] font-bold leading-none whitespace-nowrap ${musclePeriod==='monthly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
             >
-              mo
+              lst mo
             </button>
             <button
               onClick={() => setMusclePeriod('yearly')}
-              title="Yearly"
-              aria-label="Yearly"
-              className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-bold leading-none ${musclePeriod==='yearly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
+              title="Last Year"
+              aria-label="Last Year"
+              className={`px-1 h-5 flex items-center justify-center rounded text-[8px] font-bold leading-none whitespace-nowrap ${musclePeriod==='yearly'?'bg-purple-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
             >
-              yr
+              lst yr
             </button>
           </div>
 
@@ -183,7 +196,8 @@ export const MuscleTrendCard = ({
                     tickLine={false}
                     axisLine={false}
                     padding={RECHARTS_XAXIS_PADDING as any}
-                    interval={getRechartsXAxisInterval(trendData.length, 8)}
+                    interval={0}
+                    ticks={xTicks as any}
                   />
                   <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip contentStyle={tooltipStyle as any} />
@@ -229,7 +243,8 @@ export const MuscleTrendCard = ({
                     tickLine={false}
                     axisLine={false}
                     padding={RECHARTS_XAXIS_PADDING as any}
-                    interval={getRechartsXAxisInterval(trendData.length, 8)}
+                    interval={0}
+                    ticks={xTicks as any}
                   />
                   <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip contentStyle={tooltipStyle as any} cursor={{ fill: 'rgb(var(--overlay-rgb) / 0.12)' }} />
@@ -289,29 +304,21 @@ export const MuscleTrendCard = ({
                     <BadgeLabel
                       main={
                         <span className="inline-flex items-center gap-1">
-                          <TrendIcon
-                            direction={
-                              muscleTrendInsight.biggestMover.d > 0
-                                ? 'up'
-                                : muscleTrendInsight.biggestMover.d < 0
-                                  ? 'down'
-                                  : 'same'
-                            }
-                          />
+                          <TrendIcon direction={muscleTrendInsight.biggestMover.direction} />
                           <span>{muscleTrendInsight.biggestMover.k}</span>
                         </span>
                       }
                       meta={
                         <ShiftedMeta>
-                          <span>{`biggest mover: ${formatSigned(muscleTrendInsight.biggestMover.d)} sets`}</span>
+                          <span>{`biggest mover: ${formatDeltaPercentage(muscleTrendInsight.biggestMover.deltaPercent, getDeltaFormatPreset('badge'))}`}</span>
                         </ShiftedMeta>
                       }
                     />
                   }
                   tone={
-                    muscleTrendInsight.biggestMover.d === 0
+                    muscleTrendInsight.biggestMover.deltaPercent === 0
                       ? 'neutral'
-                      : muscleTrendInsight.biggestMover.d > 0
+                      : muscleTrendInsight.biggestMover.deltaPercent > 0
                         ? 'good'
                         : 'bad'
                   }

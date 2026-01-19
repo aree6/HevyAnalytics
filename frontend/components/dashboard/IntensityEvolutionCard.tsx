@@ -27,8 +27,8 @@ import { LazyRender } from '../LazyRender';
 import { ChartSkeleton } from '../ChartSkeleton';
 import { formatNumber, formatSignedNumber } from '../../utils/format/formatters';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../../utils/format/deltaFormat';
-import { addEmaSeries, DEFAULT_EMA_HALF_LIFE_DAYS } from '../../utils/analysis/ema';
 import { getRechartsXAxisInterval, RECHARTS_XAXIS_PADDING } from '../../utils/chart/chartEnhancements';
+import { formatVsPrevRollingWindow, getRollingWindowDaysForMode } from '../../utils/date/dateUtils';
 
 type IntensityView = 'area' | 'stackedBar';
 
@@ -53,6 +53,9 @@ export const IntensityEvolutionCard = ({
 }) => {
   const formatSigned = (n: number) => formatSignedNumber(n, { maxDecimals: 2 });
 
+  const primaryWindowDays = getRollingWindowDaysForMode(mode) ?? 30;
+  const primaryMeta = formatVsPrevRollingWindow(primaryWindowDays);
+
   const baseData = useMemo(() => {
     if (!Array.isArray(intensityData)) return [];
     return intensityData.map((d: any) => {
@@ -63,23 +66,9 @@ export const IntensityEvolutionCard = ({
     });
   }, [intensityData]);
 
-  const chartData = useMemo(() => {
-    const withStrength = addEmaSeries(baseData, 'Strength', 'emaStrength', {
-      halfLifeDays: DEFAULT_EMA_HALF_LIFE_DAYS,
-      timestampKey: 'timestamp',
-    });
-    const withHyper = addEmaSeries(withStrength, 'Hypertrophy', 'emaHypertrophy', {
-      halfLifeDays: DEFAULT_EMA_HALF_LIFE_DAYS,
-      timestampKey: 'timestamp',
-    });
-    return addEmaSeries(withHyper, 'Endurance', 'emaEndurance', {
-      halfLifeDays: DEFAULT_EMA_HALF_LIFE_DAYS,
-      timestampKey: 'timestamp',
-    });
-  }, [baseData]);
+  const chartData = baseData;
 
   const legendPayload = useMemo(() => {
-    // Only show primary series in legend (EMA lines are still visible as dashed overlays).
     return [
       { value: 'Strength (1-5)', type: 'line', color: '#3b82f6', id: 'Strength' },
       { value: 'Hypertrophy (6-12)', type: 'line', color: '#10b981', id: 'Hypertrophy' },
@@ -132,23 +121,33 @@ export const IntensityEvolutionCard = ({
             </button>
             <button
               onClick={() => onToggle('weekly')}
-              title="Weekly"
-              aria-label="Weekly"
-              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 text-[9px] font-bold leading-none ${
+              title="Last Week"
+              aria-label="Last Week"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
                 mode === 'weekly' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
               }`}
             >
-              wk
+              lst wk
             </button>
             <button
               onClick={() => onToggle('monthly')}
-              title="Monthly"
-              aria-label="Monthly"
-              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 text-[9px] font-bold leading-none ${
+              title="Last Month"
+              aria-label="Last Month"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
                 mode === 'monthly' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
               }`}
             >
-              mo
+              lst mo
+            </button>
+            <button
+              onClick={() => onToggle('yearly')}
+              title="Last Year"
+              aria-label="Last Year"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
+                mode === 'yearly' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              lst yr
             </button>
           </div>
         </div>
@@ -184,13 +183,12 @@ export const IntensityEvolutionCard = ({
                     tickLine={false}
                     axisLine={false}
                     padding={RECHARTS_XAXIS_PADDING as any}
-                    interval={getRechartsXAxisInterval(chartData.length, 8)}
+                    interval={getRechartsXAxisInterval(chartData.length)}
                   />
                   <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip
                     contentStyle={tooltipStyle as any}
                     formatter={(val: number, name) => {
-                      if (name === 'EMA') return null; // Don't show EMA in tooltip
                       if (name === 'Strength (1-5)') return [formatNumber(Number(val), { maxDecimals: 1 }), 'Strength'];
                       if (name === 'Hypertrophy (6-12)') return [formatNumber(Number(val), { maxDecimals: 1 }), 'Hypertrophy'];
                       if (name === 'Endurance (13+)') return [formatNumber(Number(val), { maxDecimals: 1 }), 'Endurance'];
@@ -221,47 +219,6 @@ export const IntensityEvolutionCard = ({
                     </>
                   )}
 
-                  <Line
-                    type="monotone"
-                    dataKey="emaStrength"
-                    name="EMA Strength"
-                    legendType="none"
-                    stroke="#3b82f6"
-                    strokeOpacity={0.95}
-                    strokeWidth={2.25}
-                    strokeDasharray="6 4"
-                    dot={false}
-                    activeDot={{ r: 4, strokeWidth: 0 }}
-                    animationDuration={1500}
-                  />
-
-                  <Line
-                    type="monotone"
-                    dataKey="emaHypertrophy"
-                    name="EMA Hypertrophy"
-                    legendType="none"
-                    stroke="#10b981"
-                    strokeOpacity={0.95}
-                    strokeWidth={2.25}
-                    strokeDasharray="6 4"
-                    dot={false}
-                    activeDot={{ r: 4, strokeWidth: 0 }}
-                    animationDuration={1500}
-                  />
-
-                  <Line
-                    type="monotone"
-                    dataKey="emaEndurance"
-                    name="EMA Endurance"
-                    legendType="none"
-                    stroke="#a855f7"
-                    strokeOpacity={0.95}
-                    strokeWidth={2.25}
-                    strokeDasharray="6 4"
-                    dot={false}
-                    activeDot={{ r: 4, strokeWidth: 0 }}
-                    animationDuration={1500}
-                  />
                 </ComposedChart>
             </ResponsiveContainer>
           </LazyRender>
@@ -292,7 +249,7 @@ export const IntensityEvolutionCard = ({
                         meta={
                           <ShiftedMeta>
                             <TrendIcon direction={s.delta.direction} />
-                            <span>{formatDeltaPercentage(s.delta.deltaPercent, getDeltaFormatPreset('badge'))} vs prev mo</span>
+                            <span>{formatDeltaPercentage(s.delta.deltaPercent, getDeltaFormatPreset('badge'))} {primaryMeta}</span>
                           </ShiftedMeta>
                         }
                       />

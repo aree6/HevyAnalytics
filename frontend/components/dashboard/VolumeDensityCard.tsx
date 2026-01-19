@@ -25,11 +25,13 @@ import {
   TrendBadge,
   TrendIcon,
 } from './ChartBits';
+import { formatVsPrevRollingWindow, getRollingWindowDaysForMode } from '../../utils/date/dateUtils';
 
 type VolumeView = 'area' | 'bar';
 
 type VolumeDensityTrend = {
   delta: { direction: 'up' | 'down' | 'same'; deltaPercent: number };
+  meta?: string;
 } | null;
 
 export const VolumeDensityCard = ({
@@ -54,6 +56,10 @@ export const VolumeDensityCard = ({
   tooltipStyle: Record<string, unknown>;
 }) => {
   const formatSigned = (n: number) => formatSignedNumber(n, { maxDecimals: 2 });
+
+  const primaryWindowDays = getRollingWindowDaysForMode(mode) ?? 30;
+  const fallbackMeta = formatVsPrevRollingWindow(primaryWindowDays);
+  const metaLabel = volumeDensityTrend?.meta ?? fallbackMeta;
 
   const chartData = useMemo(() => {
     return addEmaSeries(volumeDurationData, 'volumePerSet', 'emaVolumePerSet', {
@@ -111,23 +117,33 @@ export const VolumeDensityCard = ({
             </button>
             <button
               onClick={() => onToggle('weekly')}
-              title="Weekly"
-              aria-label="Weekly"
-              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 text-[9px] font-bold leading-none ${
+              title="Last Week"
+              aria-label="Last Week"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
                 mode === 'weekly' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
               }`}
             >
-              wk
+              lst wk
             </button>
             <button
               onClick={() => onToggle('monthly')}
-              title="Monthly"
-              aria-label="Monthly"
-              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 text-[9px] font-bold leading-none ${
+              title="Last Month"
+              aria-label="Last Month"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
                 mode === 'monthly' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
               }`}
             >
-              mo
+              lst mo
+            </button>
+            <button
+              onClick={() => onToggle('yearly')}
+              title="Last Year"
+              aria-label="Last Year"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
+                mode === 'yearly' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              lst yr
             </button>
           </div>
         </div>
@@ -150,7 +166,7 @@ export const VolumeDensityCard = ({
               tickLine={false}
               axisLine={false}
               padding={RECHARTS_XAXIS_PADDING as any}
-              interval={getRechartsXAxisInterval(chartData.length, 8)}
+              interval={getRechartsXAxisInterval(chartData.length)}
             />
             <YAxis
               stroke="#8b5cf6"
@@ -221,7 +237,7 @@ export const VolumeDensityCard = ({
                         <span>{formatDeltaPercentage(volumeDensityTrend.delta.deltaPercent, getDeltaFormatPreset('badge'))}</span>
                       </span>
                     }
-                    meta="vs prev mo"
+                    meta={metaLabel}
                   />
                 }
                 tone={getTrendBadgeTone(volumeDensityTrend.delta.deltaPercent, { goodWhen: 'up' })}

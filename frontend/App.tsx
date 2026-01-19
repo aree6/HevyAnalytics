@@ -33,7 +33,7 @@ import {
 import { LayoutDashboard, Dumbbell, History, CheckCircle2, X, Calendar, BicepsFlexed, Pencil, RefreshCw, Sparkles } from 'lucide-react';
 import { format, isSameDay, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { CalendarSelector } from './components/CalendarSelector';
-import { formatDayYearContraction, formatHumanReadableDate } from './utils/date/dateUtils';
+import { formatDayYearContraction, formatHumanReadableDate, getEffectiveNowFromWorkoutData, isPlausibleDate } from './utils/date/dateUtils';
 import { trackPageView } from './utils/integrations/ga';
 import { setContext, trackEvent } from './utils/integrations/analytics';
 import { SupportLinks } from './components/SupportLinks';
@@ -964,12 +964,7 @@ const App: React.FC = () => {
   }, [parsedData, selectedMonth, selectedDay, selectedRange, selectedWeeks]);
 
   const effectiveNow = useMemo(() => {
-    let maxTs = -Infinity;
-    for (const s of parsedData) {
-      const ts = s.parsedDate?.getTime?.() ?? NaN;
-      if (Number.isFinite(ts) && ts > maxTs) maxTs = ts;
-    }
-    return Number.isFinite(maxTs) ? new Date(maxTs) : new Date(0);
+    return getEffectiveNowFromWorkoutData(parsedData, new Date(0));
   }, [parsedData]);
 
   // Calendar boundaries and available dates (for blur/disable)
@@ -984,12 +979,12 @@ const App: React.FC = () => {
       if (ts > maxTs) maxTs = ts;
       set.add(format(d.parsedDate, 'yyyy-MM-dd'));
     });
-    const today = new Date(0);
+    const today = new Date();
     const minDate = isFinite(minTs) ? startOfDay(new Date(minTs)) : null;
     const maxInData = maxTs > 0 ? endOfDay(new Date(maxTs)) : null;
-    const maxDate = maxInData ?? endOfDay(today);
+    const maxDate = maxInData ?? (isPlausibleDate(effectiveNow) ? endOfDay(effectiveNow) : endOfDay(today));
     return { minDate, maxDate, availableDatesSet: set };
-  }, [parsedData]);
+  }, [effectiveNow, parsedData]);
 
   // Cache key for filter-dependent computations
   const filterCacheKey = useMemo(() => getFilteredCacheKey('filter', {
@@ -1439,7 +1434,7 @@ const App: React.FC = () => {
         <>
           {/* Top Header Navigation */}
           <header className="bg-black/70 flex-shrink-0">
-            <div className="px-2 sm:px-3 py-1.5 flex flex-col gap-2">
+            <div className="px-2 sm:px-3 py-1 flex flex-col gap-1">
               {/* Top Row: Logo and Nav Buttons */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -1498,14 +1493,14 @@ const App: React.FC = () => {
               </div>
 
               {/* Second Row: Navigation */}
-              <nav className="grid grid-cols-6 gap-1 pt-0.5 sm:grid sm:grid-cols-5 sm:gap-2">
+              <nav className="grid grid-cols-6 gap-1 sm:grid sm:grid-cols-5 sm:gap-2">
                 <button 
                   onClick={() => {
                     setHighlightedExercise(null);
                     setInitialMuscleForAnalysis(null);
                     navigate(getPathForTab(Tab.DASHBOARD));
                   }}
-                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.DASHBOARD ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.DASHBOARD ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
                 >
                   <LayoutDashboard className="w-5 h-5" />
                   <span className="font-medium text-[7px] sm:text-xs">Dashboard</span>
@@ -1516,7 +1511,7 @@ const App: React.FC = () => {
                     setInitialMuscleForAnalysis(null);
                     navigate(getPathForTab(Tab.MUSCLE_ANALYSIS));
                   }}
-                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
                 >
                   <svg
                     className="w-5 h-5"
@@ -1538,7 +1533,7 @@ const App: React.FC = () => {
                     setInitialMuscleForAnalysis(null);
                     navigate(getPathForTab(Tab.EXERCISES));
                   }}
-                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.EXERCISES ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.EXERCISES ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
                 >
                   <svg
                     className="w-5 h-5"
@@ -1566,7 +1561,7 @@ const App: React.FC = () => {
                     setInitialMuscleForAnalysis(null);
                     navigate(getPathForTab(Tab.HISTORY));
                   }}
-                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.HISTORY ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.HISTORY ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
                 >
                   <svg
                     className="w-5 h-5"
@@ -1601,7 +1596,7 @@ const App: React.FC = () => {
                     setInitialMuscleForAnalysis(null);
                     navigate(getPathForTab(Tab.FLEX));
                   }}
-                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.FLEX ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.FLEX ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
                 >
                   <svg
                     className="w-5 h-5"
@@ -1628,17 +1623,23 @@ const App: React.FC = () => {
                   title="Calendar"
                   aria-label="Calendar"
                 >
-                  {calendarOpen ? <Pencil className="w-5 h-5" /> : ((selectedDay || selectedWeeks.length > 0 || selectedRange) ? <Pencil className="w-5 h-5" /> : <Calendar className="w-5 h-5" />)}
+                  {calendarOpen ? (
+                    <Pencil className="w-5 h-5" />
+                  ) : (selectedDay || selectedWeeks.length > 0 || selectedRange) ? (
+                    <Pencil className="w-5 h-5" />
+                  ) : (
+                    <Calendar className="w-5 h-5" />
+                  )}
+
                   <span className="text-[10px] font-semibold leading-none mt-1">Calendar</span>
 
                   {(selectedDay || selectedWeeks.length > 0 || selectedRange) && !calendarOpen ? (
                     <button
                       type="button"
                       onClick={(e) => {
-                        e.preventDefault();
                         e.stopPropagation();
-                        setSelectedRange(null);
                         setSelectedDay(null);
+                        setSelectedRange(null);
                         setSelectedWeeks([]);
                       }}
                       className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 border border-slate-700/50 grid place-items-center hover:bg-black/70"
@@ -1689,7 +1690,7 @@ const App: React.FC = () => {
             </div>
           )}
 
-          <main ref={mainRef} className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain bg-black/70 px-2 py-1 sm:px-3 sm:py-2 md:p-3 lg:p-4">
+          <main ref={mainRef} className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain bg-black/70 px-2 py-0 sm:px-3 sm:py-0 md:px-1 md:py-0 lg:px-2 lg:py-0">
 
             <Suspense fallback={<div className="text-slate-400 p-4">Loading...</div>}>
               {activeTab === Tab.DASHBOARD && (
@@ -1716,6 +1717,7 @@ const App: React.FC = () => {
                   weightUnit={weightUnit}
                   bodyMapGender={bodyMapGender}
                   stickyHeader={hasActiveCalendarFilter}
+                  now={effectiveNow}
                 />
               )}
               {activeTab === Tab.HISTORY && (

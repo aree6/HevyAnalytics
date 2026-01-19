@@ -211,21 +211,44 @@ const parseFlexibleDate = (value: unknown): Date | undefined => {
   const s = String(value ?? '').trim();
   if (!s) return undefined;
 
+  const normalizeTwoDigitYearIfNeeded = (d: Date): Date => {
+    if (!isValid(d)) return d;
+    const y = d.getFullYear();
+    // date-fns parses 2-digit years using the reference date's century.
+    // When we parse with an epoch reference, years like "23" can become 1923.
+    // If bumping the century lands in our plausible data range, do it.
+    if (y > 0 && y < 1971) {
+      const bumped = y + 100;
+      if (bumped > 1970 && bumped < 2100) {
+        const copy = new Date(d.getTime());
+        copy.setFullYear(bumped);
+        return copy;
+      }
+    }
+    return d;
+  };
+
   const formats = [
     // ISO
     'yyyy-MM-dd HH:mm:ss',
     'yyyy-MM-dd HH:mm',
     'yyyy-MM-dd',
     "yyyy-MM-dd'T'HH:mm:ss",
-    "yyyy-MM-dd'T'HH:mm: ssXXX",
+    "yyyy-MM-dd'T'HH:mm:ssXXX",
+    "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
     // Hevy
     'dd MMM yyyy, HH:mm',
     'dd MMM yyyy HH:mm',
     // European
-    'dd/MM/yyyy HH:mm: ss',
+    'dd/MM/yyyy HH:mm:ss',
     'dd/MM/yyyy HH:mm',
     'dd/MM/yyyy',
-    'dd-MM-yyyy HH:mm: ss',
+    'dd/MM/yy HH:mm:ss',
+    'dd/MM/yy HH:mm',
+    'dd/MM/yy',
+    'dd-MM-yyyy HH:mm:ss',
+    'dd-MM-yy HH:mm:ss',
+    'dd-MM-yy',
     'dd-MM-yyyy',
     'dd. MM.yyyy HH:mm:ss',
     'dd. MM.yyyy',
@@ -233,8 +256,13 @@ const parseFlexibleDate = (value: unknown): Date | undefined => {
     'MM/dd/yyyy HH:mm:ss',
     'MM/dd/yyyy HH:mm',
     'MM/dd/yyyy',
+    'MM/dd/yy HH:mm:ss',
+    'MM/dd/yy HH:mm',
+    'MM/dd/yy',
     'M/d/yyyy h:mm a',
-    'M/d/yyyy h:mm: ss a',
+    'M/d/yyyy h:mm:ss a',
+    'M/d/yy h:mm a',
+    'M/d/yy h:mm:ss a',
     // Other
     'yyyy/MM/dd HH:mm:ss',
     'yyyy/MM/dd',
@@ -245,7 +273,7 @@ const parseFlexibleDate = (value: unknown): Date | undefined => {
 
   for (const fmt of formats) {
     try {
-      const d = parse(s, fmt, new Date(0));
+      const d = normalizeTwoDigitYearIfNeeded(parse(s, fmt, new Date(0)));
       if (isValid(d) && d.getFullYear() > 1970 && d.getFullYear() < 2100) {
         return d;
       }

@@ -30,6 +30,7 @@ import {
 import { SVG_MUSCLE_NAMES } from '../../utils/muscle/muscleMapping';
 import { SVG_TO_MUSCLE_GROUP, getGroupHighlightIds } from '../../utils/muscle/muscleMappingConstants';
 import { differenceInCalendarDays } from 'date-fns';
+import { isPlausibleDate } from '../../utils/date/dateUtils';
 
 type WeeklySetsView = 'radar' | 'heatmap';
 type WeeklySetsWindow = 'all' | '7d' | '30d' | '365d';
@@ -66,6 +67,7 @@ export const WeeklySetsCard = ({
   onMuscleClick,
   bodyMapGender,
   windowStart,
+  now,
 }: {
   isMounted: boolean;
   weeklySetsView: WeeklySetsView;
@@ -80,6 +82,7 @@ export const WeeklySetsCard = ({
   onMuscleClick?: (muscleId: string, viewMode: 'muscle' | 'group') => void;
   bodyMapGender?: BodyMapGender;
   windowStart?: Date | null;
+  now: Date;
 }) => {
   const [heatmapHoveredMuscle, setHeatmapHoveredMuscle] = useState<string | null>(null);
 
@@ -94,8 +97,8 @@ export const WeeklySetsCard = ({
 
     // Compute effective window duration for the label
     let durationLabel = '';
-    if (windowStart) {
-      const days = differenceInCalendarDays(new Date(), windowStart) + 1;
+    if (windowStart && isPlausibleDate(windowStart) && isPlausibleDate(now)) {
+      const days = differenceInCalendarDays(now, windowStart) + 1;
       durationLabel = ` (${formatWindowDuration(days)})`;
     }
 
@@ -106,7 +109,7 @@ export const WeeklySetsCard = ({
       top3Share,
       durationLabel,
     };
-  }, [compositionQuickData, windowStart]);
+  }, [compositionQuickData, windowStart, now]);
 
   const heatmapHoveredMuscleIds = useMemo(() => {
     if (!heatmapHoveredMuscle) return undefined;
@@ -302,6 +305,12 @@ export const WeeklySetsCard = ({
           </LazyRender>
         )}
       </div>
+
+      {weeklySetsView === 'heatmap' && heatmap.volumes.size > 0 ? (
+        <div className="sm:hidden -mt-12 text-center text-[11px] font-semibold text-slate-500">
+          Tap on the muscles
+        </div>
+      ) : null}
 
       <ChartDescription
         isMounted={isMounted}

@@ -46,14 +46,13 @@ export const clearCSVData = (): void => {
   }
 };
 
-export type TimeFilterMode = 'all' | 'weekly' | 'monthly';
+export type TimeFilterMode = 'all' | 'weekly' | 'monthly' | 'yearly';
 
 /**
- * Determine the appropriate filter mode based on date range span (in days).
- * Rules based on how many aggregated data points would be meaningful:
- * - Less than 5 weeks (35 days) → 'all' (weekly view would have <5 points)
- * - 5 weeks to 5 months (35-150 days) → 'weekly' 
- * - More than 5 months (150+ days) → 'monthly'
+ * Determine a reasonable aggregation mode for the *All* range based on total span (in days).
+ *
+ * Note: This does not represent the UI range selection (which can include 'yearly'); it's a
+ * bucketing hint for long spans so charts stay readable.
  */
 export const getSmartFilterMode = (spanDays: number): TimeFilterMode => {
   if (spanDays < 35) return 'all';      // <5 weeks → show all
@@ -201,10 +200,10 @@ export const getThemeMode = (): ThemeMode => {
     const mode = localStorage.getItem(THEME_MODE_KEY);
     return mode === 'light' || mode === 'medium-dark' || mode === 'midnight-dark' || mode === 'pure-black' || mode === 'svg'
       ? mode
-      : 'midnight-dark';
+      : 'pure-black';
   } catch (error) {
     console.error('Failed to retrieve theme mode from local storage:', error);
-    return 'midnight-dark';
+    return 'pure-black';
   }
 };
 

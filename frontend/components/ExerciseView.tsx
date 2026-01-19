@@ -5,13 +5,19 @@ import {
 } from 'recharts';
 import { 
   Search, TrendingUp, TrendingDown, AlertTriangle, Minus, Activity, Hourglass,
-  Dumbbell, Scale
+  Dumbbell, Scale, Infinity, Trophy
 } from 'lucide-react';
 import { ExerciseStats, ExerciseHistoryEntry } from '../types';
 import { CHART_TOOLTIP_STYLE, FANCY_FONT } from '../utils/ui/uiConstants';
 import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
 import { createExerciseAssetLookup, ExerciseAssetLookup } from '../utils/exercise/exerciseAssetLookup';
-import { getDateKey, TimePeriod, formatRelativeTime, formatDayContraction } from '../utils/date/dateUtils';
+import {
+  formatDayContraction,
+  formatRelativeTime,
+  getDateKey,
+  getRollingWindowStartForMode,
+  TimePeriod,
+} from '../utils/date/dateUtils';
 import { BodyMap, BodyMapGender } from './BodyMap';
 import { LazyRender } from './LazyRender';
 import { ChartSkeleton } from './ChartSkeleton';
@@ -27,7 +33,13 @@ import { WeightUnit, getSmartFilterMode, TimeFilterMode } from '../utils/storage
 import { convertWeight, getStandardWeightIncrementKg } from '../utils/format/units';
 import { summarizeExerciseHistory, analyzeExerciseTrendCore, ExerciseSessionEntry, ExerciseTrendStatus, MIN_SESSIONS_FOR_TREND } from '../utils/analysis/exerciseTrend';
 import { formatNumber, formatSignedNumber } from '../utils/format/formatters';
-import { getRechartsXAxisInterval, RECHARTS_XAXIS_PADDING, ValueDot } from '../utils/chart/chartEnhancements';
+import { 
+  EnhancedAreaChart,
+  EnhancedLineChart,
+  getRechartsCategoricalTicks,
+  getRechartsTickIndexMap,
+  RECHARTS_XAXIS_PADDING,
+} from '../utils/chart/chartEnhancements';
 import { pickDeterministic } from '../utils/analysis/messageVariations';
 import { addEmaSeries, DEFAULT_EMA_HALF_LIFE_DAYS } from '../utils/analysis/ema';
 
@@ -583,9 +595,10 @@ interface ExerciseViewProps {
   weightUnit?: WeightUnit;
   bodyMapGender?: BodyMapGender;
   stickyHeader?: boolean;
+  now?: Date;
 }
 
-export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, highlightedExercise, onHighlightApplied, onExerciseClick, weightUnit = 'kg' as WeightUnit, bodyMapGender = 'male', stickyHeader = false }) => {
+export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, highlightedExercise, onHighlightApplied, onExerciseClick, weightUnit = 'kg' as WeightUnit, bodyMapGender = 'male', stickyHeader = false, now }) => {
   // Find the most recent exercise for auto-selection
   const mostRecentExerciseName = useMemo(() => {
     if (stats.length === 0) return "";
@@ -685,16 +698,32 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     onHighlightApplied?.();
   }, [highlightedExercise, onHighlightApplied, stats]);
 
-  const effectiveNow = useMemo(() => {
+  const computedEffectiveNow = useMemo(() => {
     let maxTs = -Infinity;
     for (const s of stats) {
       for (const h of s.history) {
-        const ts = h.date?.getTime?.() ?? NaN;
-        if (Number.isFinite(ts) && ts > maxTs) maxTs = ts;
+        const d = h.date;
+        if (!d) continue;
+
+        const ts = d.getTime();
+        if (!Number.isFinite(ts) || ts <= 0) continue;
+        const y = d.getFullYear();
+        if (y <= 1970 || y >= 2100) continue;
+
+        if (ts > maxTs) maxTs = ts;
       }
     }
     return Number.isFinite(maxTs) ? new Date(maxTs) : new Date(0);
   }, [stats]);
+
+  const effectiveNow = useMemo(() => {
+    if (now) {
+      const ts = now.getTime();
+      const y = now.getFullYear();
+      if (Number.isFinite(ts) && ts > 0 && y > 1970 && y < 2100) return now;
+    }
+    return computedEffectiveNow;
+  }, [computedEffectiveNow, now]);
   const [searchTerm, setSearchTerm] = useState("");
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
   const [viewModeOverride, setViewModeOverride] = useState<TimeFilterMode | null>(null);
@@ -728,7 +757,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
     const parts: string[] = [];
     if (tooOld) parts.push('You haven\'t trained this exercise recently');
-    if (notEnoughData) parts.push('Building baseline (need a few more sessions)');
+    if (notEnoughData) parts.push('New exercise: keep logging sessions to build your baseline (check back soon for trends)');
 
     return {
       parts,
@@ -749,13 +778,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
   // Smart mode based on date range span
   const smartMode = useMemo(() => getSmartFilterMode(exerciseSpanDays), [exerciseSpanDays]);
 
-  // Reset override when exercise or smart mode changes
-  useEffect(() => {
-    setViewModeOverride(null);
-  }, [smartMode, selectedExerciseName]);
+  const allAggregationMode = useMemo<'daily' | 'weekly' | 'monthly'>(() => {
+    return smartMode === 'all' ? 'daily' : smartMode;
+  }, [smartMode]);
 
-  // Effective view mode: override if set, otherwise smart mode
-  const viewMode = viewModeOverride ?? smartMode;
+  // Reset override when exercise changes
+  // Effective view mode: override if set, otherwise default to last-year range.
+  const viewMode = viewModeOverride ?? 'yearly';
   const setViewMode = setViewModeOverride;
 
   useEffect(() => {
@@ -784,7 +813,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       for (const h of s.history) {
         const d = h.date;
         if (!d) continue;
-        if (!last || d.getTime() > last.getTime()) last = d;
+
+        const ts = d.getTime();
+        if (!Number.isFinite(ts) || ts <= 0) continue;
+
+        const y = d.getFullYear();
+        if (y <= 1970 || y >= 2100) continue;
+
+        if (!last || ts > last.getTime()) last = d;
       }
       map.set(s.name, last);
     }
@@ -988,58 +1024,108 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     );
   }, [filtersSlot, trainingStructure.activeCount, trainingStructure.neutralCount, trainingStructure.newCount, trainingStructure.overloadCount, trainingStructure.plateauCount, trainingStructure.regressionCount, trainingStructure.fakePrCount, trendFilter]);
 
-  const chartData = useMemo(() => {
-    if (!selectedStats || selectedSessions.length === 0) return [];
-    const history = [...selectedSessions].sort((a, b) => a.date.getTime() - b.date.getTime());
-    if (viewMode === 'all') {
-      return history.map(h => ({
-        timestamp: h.date.getTime(),
-        date: formatDayContraction(h.date),
-        weight: convertWeight(h.weight, weightUnit),
-        oneRepMax: convertWeight(h.oneRepMax, weightUnit),
-        reps: h.maxReps,
-        sets: h.sets,
-        volume: h.volume,
-      }));
-    }
-    const period: TimePeriod = viewMode === 'weekly' ? 'weekly' : 'monthly';
-    const buckets = new Map<string, { ts: number; label: string; oneRmMax: number; weightMax: number; repsMax: number; sets: number }>();
-
-    history.forEach(h => {
-      const { key, timestamp, label } = getDateKey(h.date, period);
-      let b = buckets.get(key);
-      if (!b) {
-        b = { ts: timestamp, label, oneRmMax: 0, weightMax: 0, repsMax: 0, sets: 0 };
-        buckets.set(key, b);
-      }
-      b.oneRmMax = Math.max(b.oneRmMax, h.oneRepMax);
-      b.weightMax = Math.max(b.weightMax, h.weight);
-      b.repsMax = Math.max(b.repsMax, h.maxReps);
-      b.sets += h.sets;
-    });
-
-    return Array.from(buckets.values())
-      .sort((a, b) => a.ts - b.ts)
-      .map(b => ({
-        timestamp: b.ts,
-        date: b.label,
-        oneRepMax: convertWeight(Number(b.oneRmMax.toFixed(1)), weightUnit),
-        weight: convertWeight(Number(b.weightMax.toFixed(1)), weightUnit),
-        reps: b.repsMax,
-        sets: b.sets,
-      }));
-  }, [selectedStats, selectedSessions, viewMode, weightUnit]);
-
   const currentStatus = selectedStats ? statusMap[selectedStats.name] : null;
   const isBodyweightLike = currentStatus?.isBodyweightLike ?? false;
 
+  const chartData = useMemo(() => {
+    if (!selectedStats || selectedSessions.length === 0) return [];
+    const history = [...selectedSessions].sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    let globalMaxWeight = -Infinity;
+    let globalMaxReps = -Infinity;
+    for (const h of history) {
+      if (Number.isFinite(h.weight)) globalMaxWeight = Math.max(globalMaxWeight, h.weight);
+      if (Number.isFinite(h.maxReps)) globalMaxReps = Math.max(globalMaxReps, h.maxReps);
+    }
+    const eps = 1e-9;
+
+    const windowStart = getRollingWindowStartForMode(viewMode, effectiveNow);
+    const source = windowStart ? history.filter((h) => h.date >= windowStart) : history;
+
+    if (viewMode === 'weekly' || viewMode === 'monthly') {
+      return source.map(h => {
+        const isPr = isBodyweightLike
+          ? (Number.isFinite(globalMaxReps) && h.maxReps >= globalMaxReps - eps)
+          : (Number.isFinite(globalMaxWeight) && h.weight >= globalMaxWeight - eps);
+
+        return {
+          timestamp: h.date.getTime(),
+          date: formatDayContraction(h.date),
+          weight: convertWeight(h.weight, weightUnit),
+          oneRepMax: convertWeight(h.oneRepMax, weightUnit),
+          reps: h.maxReps,
+          sets: h.sets,
+          volume: h.volume,
+          isPr,
+        };
+      });
+    }
+
+    const buildBucketedSeries = (period: TimePeriod) => {
+      const buckets = new Map<string, { ts: number; label: string; oneRmMax: number; weightMax: number; repsMax: number; sets: number }>();
+
+      source.forEach(h => {
+        const { key, timestamp, label } = getDateKey(h.date, period);
+        let b = buckets.get(key);
+        if (!b) {
+          b = { ts: timestamp, label, oneRmMax: 0, weightMax: 0, repsMax: 0, sets: 0 };
+          buckets.set(key, b);
+        }
+        b.oneRmMax = Math.max(b.oneRmMax, h.oneRepMax);
+        b.weightMax = Math.max(b.weightMax, h.weight);
+        b.repsMax = Math.max(b.repsMax, h.maxReps);
+        b.sets += h.sets;
+      });
+
+      return Array.from(buckets.values())
+        .sort((a, b) => a.ts - b.ts)
+        .map(b => {
+          const isPr = isBodyweightLike
+            ? (Number.isFinite(globalMaxReps) && b.repsMax >= globalMaxReps - eps)
+            : (Number.isFinite(globalMaxWeight) && b.weightMax >= globalMaxWeight - eps);
+
+          return {
+            timestamp: b.ts,
+            date: b.label,
+            oneRepMax: convertWeight(Number(b.oneRmMax.toFixed(1)), weightUnit),
+            weight: convertWeight(Number(b.weightMax.toFixed(1)), weightUnit),
+            reps: b.repsMax,
+            sets: b.sets,
+            isPr,
+          };
+        });
+    };
+
+    if (viewMode === 'yearly') {
+      return buildBucketedSeries('weekly');
+    }
+
+    if (viewMode === 'all') {
+      if (allAggregationMode === 'daily') {
+        return buildBucketedSeries('daily');
+      }
+
+      return buildBucketedSeries(allAggregationMode === 'weekly' ? 'weekly' : 'monthly');
+    }
+
+    return [];
+  }, [selectedStats, selectedSessions, viewMode, allAggregationMode, weightUnit, effectiveNow, isBodyweightLike]);
+
   const chartDataWithEma = useMemo(() => {
     const key = isBodyweightLike ? 'reps' : 'oneRepMax';
-    return addEmaSeries(chartData, key, 'emaValue', {
+    return addEmaSeries(chartData as any, key, 'emaValue', {
       halfLifeDays: DEFAULT_EMA_HALF_LIFE_DAYS,
       timestampKey: 'timestamp',
     });
   }, [chartData, isBodyweightLike]);
+
+  const xTicks = useMemo(() => {
+    return getRechartsCategoricalTicks(chartDataWithEma, (row: any) => row?.date);
+  }, [chartDataWithEma]);
+
+  const tickIndexMap = useMemo(() => {
+    return getRechartsTickIndexMap(chartDataWithEma.length);
+  }, [chartDataWithEma.length]);
   const isSelectedEligible = useMemo(() => {
     if (!selectedStats) return true;
     return trainingStructure.eligibilityByName.get(selectedStats.name)?.isEligible ?? false;
@@ -1054,12 +1140,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
   // Stats for header
   const sessionsCount = selectedStats ? selectedSessions.length : 0;
 
-  const bestReps = useMemo(() => {
-    if (selectedSessions.length === 0) return 0;
-    let max = 0;
-    for (const s of selectedSessions) max = Math.max(max, s.maxReps);
-    return max;
-  }, [selectedSessions]);
 
   const bestRepsImprovement = useMemo(() => {
     if (selectedSessions.length === 0) return 0;
@@ -1080,6 +1160,110 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     const sum = last3.reduce((acc, s) => acc + s.maxReps, 0);
     return sum / last3.length;
   }, [selectedSessions]);
+
+  const StrengthProgressionValueDot = (props: any) => {
+    const {
+      cx,
+      cy,
+      payload,
+      index,
+      data,
+      valueKey,
+      unit,
+      showAtIndexMap,
+      showEveryOther = true,
+      everyNth,
+      showDotWhenHidden = true,
+      color = 'var(--text-muted)',
+    } = props;
+
+    if (!payload) return null;
+
+    const value = payload[valueKey];
+    if (typeof value !== 'number') return null;
+
+    const prGold = '#f59e0b';
+    let bestRepsLocal = 0;
+    if (isBodyweightLike) {
+      for (const s of selectedSessions) bestRepsLocal = Math.max(bestRepsLocal, s.maxReps);
+    }
+    const globalPrValue = isBodyweightLike
+      ? bestRepsLocal
+      : convertWeight(selectedStats?.maxWeight ?? Number.NaN, weightUnit);
+    const isPr = Number.isFinite(globalPrValue) &&
+      (isBodyweightLike
+        ? value >= globalPrValue - 1e-6
+        : Math.abs(value - globalPrValue) <= 0.05);
+    const dotColor = isPr ? prGold : color;
+
+    const n = Array.isArray(data) ? data.length : 0;
+    const step = Number.isFinite(everyNth) && everyNth > 0 ? everyNth : showEveryOther ? 2 : 1;
+    const shouldShowByIndexMap = showAtIndexMap && typeof showAtIndexMap === 'object' ? !!showAtIndexMap[index] : null;
+    const shouldShowLabel =
+      isPr ||
+      (shouldShowByIndexMap !== null
+        ? (shouldShowByIndexMap || index === n - 1 || index === 0)
+        : (step <= 1 || index % step === 0 || index === n - 1 || index === 0));
+
+    if (!shouldShowLabel) {
+      if (!showDotWhenHidden) return null;
+      return <circle cx={cx} cy={cy} r={3} fill={dotColor} stroke={dotColor} strokeWidth={1} />;
+    }
+
+    const displayValue = unit
+      ? `${formatNumber(value, { maxDecimals: 1 })}${unit}`
+      : (Number.isInteger(value) ? value.toString() : formatNumber(value, { maxDecimals: 1 }));
+
+    const labelY = cy - 10;
+    const approxHalfWidth = displayValue.length * 2.7;
+    const trophyOnLeft = index === n - 1 || index === n - 2;
+    const trophyX = trophyOnLeft
+      ? cx - approxHalfWidth - 14
+      : cx + approxHalfWidth + 4;
+
+    let firstPrIndex: number | null = null;
+    if (isPr && Number.isFinite(globalPrValue) && Array.isArray(data)) {
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        const v = row?.[valueKey];
+        if (typeof v !== 'number') continue;
+        const isPrAtI = isBodyweightLike
+          ? v >= globalPrValue - 1e-6
+          : Math.abs(v - globalPrValue) <= 0.05;
+        if (isPrAtI) {
+          firstPrIndex = i;
+          break;
+        }
+      }
+    }
+    const showTrophy = isPr && firstPrIndex !== null && index === firstPrIndex;
+
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={3} fill={dotColor} stroke={dotColor} strokeWidth={1} />
+        <text
+          x={cx}
+          y={labelY}
+          fill={dotColor}
+          fontSize={9}
+          fontWeight="bold"
+          textAnchor="middle"
+        >
+          {displayValue}
+        </text>
+        {showTrophy ? (
+          <g transform={`translate(${trophyX}, ${labelY - 8})`}>
+            <Trophy
+              width={10}
+              height={10}
+              stroke={dotColor}
+              fill={dotColor}
+            />
+          </g>
+        ) : null}
+      </g>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-2 w-full text-slate-200 pb-10">
@@ -1456,61 +1640,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                 <div className="hidden sm:flex items-center gap-2">
                   <div className="flex items-center gap-2 px-2 py-1.5 min-h-8 bg-black/70 border border-slate-700/50 rounded-lg">
                     <Activity className="w-3 h-3 text-slate-400" />
-                    <div className="text-[10px]">
-                      <div className="text-white font-bold leading-4">{sessionsCount}</div>
-                      <div className="text-[8px] text-slate-500 font-semibold uppercase tracking-wider">Sessions</div>
+                    <div className="flex items-center gap-1 text-[10px]">
+                      <span className="text-white font-bold">{sessionsCount}</span>
+                      <span className="text-[8px] text-slate-500 font-semibold uppercase tracking-wider">Sessions</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 px-2 py-1.5 min-h-8 bg-black/70 border border-slate-700/50 rounded-lg">
-                    <Scale className="w-3 h-3 text-slate-400" />
-                    <div className="text-[10px]">
-                        <div className="text-white font-bold leading-4">
-                          {isBodyweightLike ? (
-                            <span className="inline-flex items-center gap-1">
-                              <span className="text-white font-bold leading-4">{bestReps}</span>
-                              <span className="text-slate-500">reps</span>
-                              {bestRepsImprovement > 0 ? (
-                                <span className="relative top-[3px]"><DeltaBadge delta={bestRepsImprovement} suffix=" reps" size="compact" /></span>
-                              ) : null}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1">
-                              <span className="text-white font-bold leading-4">{convertWeight(selectedStats.maxWeight, weightUnit)}</span>
-                              <span className="text-slate-500">{weightUnit}</span>
-                              {exerciseDeltas && exerciseDeltas.bestImprovement > 0 ? (
-                                <span className="relative top-[3px]"><DeltaBadge delta={convertWeight(exerciseDeltas.bestImprovement, weightUnit)} suffix={` ${weightUnit}`} size="compact" /></span>
-                              ) : null}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[8px] text-slate-500 font-semibold uppercase tracking-wider">Best</div>
-                      </div>
-                    </div>
-                  <div className="flex items-center gap-2 px-2 py-1.5 min-h-8 bg-black/70 border border-slate-700/50 rounded-lg">
-                    <TrendingUp className="w-3 h-3 text-slate-400" />
-                    <div className="text-[10px]">
-                        <div className="text-white font-bold leading-4">
-                          {isBodyweightLike ? (
-                            <span className="inline-flex items-center gap-1">
-                              <span className="text-white font-bold leading-4">{avgRepsLast3.toFixed(1)}</span>
-                              <span className="text-slate-500">reps</span>
-                              {repsDeltaFromLastSession !== 0 ? (
-                                <span className="relative top-[3px]"><DeltaBadge delta={repsDeltaFromLastSession} suffix=" reps" size="compact" /></span>
-                              ) : null}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1">
-                              <span className="text-white font-bold leading-4">{exerciseDeltas ? convertWeight(exerciseDeltas.avgWeightLast3, weightUnit) : '—'}</span>
-                              <span className="text-slate-500">{weightUnit}</span>
-                              {exerciseDeltas && exerciseDeltas.weightDelta !== 0 ? (
-                                <span className="relative top-[3px]"><DeltaBadge delta={convertWeight(exerciseDeltas.weightDelta, weightUnit)} suffix={` ${weightUnit}`} size="compact" /></span>
-                              ) : null}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[8px] text-slate-500 font-semibold uppercase tracking-wider">lst session</div>
-                      </div>
-                    </div>
                 </div>
                 {isBodyweightLike ? (
                   <>
@@ -1533,22 +1667,55 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                 )}
 
                 <div className="bg-black/70 p-1 rounded-lg flex gap-1 border border-slate-700/50">
-                  <button onClick={() => setViewMode('all')} className={`px-2 py-1 rounded text-[10px] font-bold ${viewMode==='all'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}>all</button>
-                  <button onClick={() => setViewMode('weekly')} className={`px-2 py-1 rounded text-[10px] font-bold ${viewMode==='weekly'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}>wk</button>
-                  <button onClick={() => setViewMode('monthly')} className={`px-2 py-1 rounded text-[10px] font-bold ${viewMode==='monthly'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}>mo</button>
+                  <button
+                    onClick={() => setViewMode('all')}
+                    title="All"
+                    aria-label="All"
+                    className={`px-2 py-1 rounded text-[10px] font-bold ${viewMode==='all'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}
+                  >
+                    <Infinity className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('weekly')}
+                    title="Last Week"
+                    aria-label="Last Week"
+                    className={`px-2 py-1 rounded text-[9px] font-bold whitespace-nowrap ${viewMode==='weekly'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}
+                  >
+                    lst wk
+                  </button>
+                  <button
+                    onClick={() => setViewMode('monthly')}
+                    title="Last Month"
+                    aria-label="Last Month"
+                    className={`px-2 py-1 rounded text-[9px] font-bold whitespace-nowrap ${viewMode==='monthly'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}
+                  >
+                    lst mo
+                  </button>
+                  <button
+                    onClick={() => setViewMode('yearly')}
+                    title="Last Year"
+                    aria-label="Last Year"
+                    className={`px-2 py-1 rounded text-[9px] font-bold whitespace-nowrap ${viewMode==='yearly'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}
+                  >
+                    lst yr
+                  </button>
                 </div>
              </div>
           </div>
 
           <div className="w-full flex-1 min-h-0">
             {chartData.length === 0 ? (
-              <div className="w-full h-full min-h-[260px] flex items-center justify-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
+              <div className="w-full h-full min-h-[260px] flex items-center justify-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg px-4 sm:px-0 text-center">
                 Building baseline — log a few more sessions to see Strength Progression.
               </div>
             ) : (
             <LazyRender className="w-full h-full" placeholder={<ChartSkeleton className="h-full min-h-[260px]" />}>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartDataWithEma} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart
+                  key={`${selectedStats.name}:${viewMode}:${allAggregationMode}:${weightUnit}`}
+                  data={chartDataWithEma}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
                   <defs>
                     <linearGradient id="color1RM" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
@@ -1562,7 +1729,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                     fontSize={10} 
                     animationDuration={1000}
                     padding={RECHARTS_XAXIS_PADDING as any}
-                    interval={getRechartsXAxisInterval(chartDataWithEma.length, 9)}
+                    interval={0}
+                    ticks={xTicks as any}
                   />
                   <YAxis
                     stroke="var(--text-muted)"
@@ -1596,11 +1764,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                     dataKey={isBodyweightLike ? 'reps' : 'weight'}
                     stroke="transparent"
                     strokeWidth={0}
-                    dot={<ValueDot 
+                    dot={<StrengthProgressionValueDot 
                       valueKey={isBodyweightLike ? 'reps' : 'weight'} 
                       unit={isBodyweightLike ? undefined : weightUnit} 
                       data={chartDataWithEma}
                       color="var(--text-muted)"
+                      showAtIndexMap={tickIndexMap}
+                      showDotWhenHidden={false}
                     />}
                     activeDot={{ r: 5, strokeWidth: 0 }}
                     isAnimationActive={true}

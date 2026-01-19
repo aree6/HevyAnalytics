@@ -31,7 +31,7 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Dumbbell, X, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Dumbbell, X, Activity, Infinity } from 'lucide-react';
 import { normalizeMuscleGroup, type NormalizedMuscleGroup } from '../utils/muscle/muscleNormalization';
 import { LazyRender } from './LazyRender';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../utils/format/deltaFormat';
@@ -75,13 +75,15 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
   const navigate = useNavigate();
   const location = useLocation();
 
+  const detailPanelRef = useRef<HTMLDivElement | null>(null);
+
   const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredMuscle, setHoveredMuscle] = useState<string | null>(null);
   const [muscleVolume, setMuscleVolume] = useState<Map<string, MuscleVolumeEntry>>(new Map());
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
-  const [weeklySetsWindow, setWeeklySetsWindow] = useState<WeeklySetsWindow>('all');
+  const [weeklySetsWindow, setWeeklySetsWindow] = useState<WeeklySetsWindow>('30d');
   const [viewMode, setViewMode] = useState<ViewMode>('group');
   const [activeQuickFilter, setActiveQuickFilter] = useState<QuickFilterCategory | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<TooltipData | null>(null);
@@ -102,7 +104,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({ data, filtersSlo
     navigate({ pathname: location.pathname, search: `?${params.toString()}` });
   }, [navigate, location.pathname]);
 
-  const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(data, new Date(0)), [data]);
+  const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(data), [data]);
 
   const allTimeWindowStart = useMemo(() => {
     let start: Date | null = null;
@@ -546,7 +548,6 @@ return acc + sum;
     return count;
   }, [viewMode, windowedGroupVolumes]);
 
-  // Stable callbacks
   const handleMuscleClick = useCallback((muscleId: string) => {
     // Clear quick filter when clicking a specific muscle
     setActiveQuickFilter(null);
@@ -747,7 +748,7 @@ return acc + sum;
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       {/* Header - consistent with Dashboard */}
       <div className="hidden sm:contents">
         <ViewHeader
@@ -825,7 +826,7 @@ return acc + sum;
             </div>
           </div>
 
-          <div className="transform scale-[0.8] origin-middle mt-8">
+          <div className="sm:transform sm:scale-[0.8] sm:origin-middle">
             <BodyMap
               onPartClick={handleMuscleClick}
               selectedPart={selectedMuscle}
@@ -837,6 +838,10 @@ return acc + sum;
               gender={bodyMapGender}
               viewMode={viewMode}
             />
+          </div>
+
+          <div className="sm:hidden  mb-10 text-center text-[11px] font-semibold text-slate-600">
+            Tap to see more details
           </div>
           
           {/* Color Legend - Bottom of body map */}
@@ -866,7 +871,7 @@ return acc + sum;
         </div>
 
         {/* Right: Detail Panel - Always visible */}
-        <div className="bg-black/70 rounded-xl border border-slate-700/50 overflow-hidden">
+        <div ref={detailPanelRef} className="bg-black/70 rounded-xl border border-slate-700/50 overflow-hidden">
           {/* Panel Header */}
           <div className="bg-black/70 border-b border-slate-700/50 p-3 flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0 flex-wrap">
@@ -945,7 +950,7 @@ return acc + sum;
                       }`}
                       title={w === 'all' ? 'All time' : w === '7d' ? 'Last week' : w === '30d' ? 'Last month' : 'Last year'}
                     >
-                      {w === 'all' ? 'all' : w === '7d' ? 'lst wk' : w === '30d' ? 'lst mo' : 'lst yr'}
+                      {w === 'all' ? <Infinity className="w-3 h-3" /> : w === '7d' ? 'lst wk' : w === '30d' ? 'lst mo' : 'lst yr'}
                     </button>
                   ))}
                 </div>

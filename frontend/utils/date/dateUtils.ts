@@ -1,7 +1,39 @@
-import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, differenceInCalendarDays, differenceInWeeks, differenceInMonths, differenceInYears, isValid } from 'date-fns';
+import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, subDays, differenceInCalendarDays, differenceInWeeks, differenceInMonths, differenceInYears, isValid } from 'date-fns';
 import { WorkoutSet } from '../../types';
+import type { TimeFilterMode } from '../storage/localStorage';
 
 export type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export const getRollingWindowDaysForMode = (mode: TimeFilterMode): number | null => {
+  if (mode === 'weekly') return 7;
+  if (mode === 'monthly') return 30;
+  if (mode === 'yearly') return 365;
+  return null;
+};
+
+export const getRollingWindowStartForMode = (mode: TimeFilterMode, now: Date): Date | null => {
+  const days = getRollingWindowDaysForMode(mode);
+  if (!days) return null;
+  return startOfDay(subDays(now, days - 1));
+};
+
+export const formatRollingWindowAbbrev = (days: number): string => {
+  if (days === 7) return 'wk';
+  if (days === 30) return 'mo';
+  if (days === 365) return 'yr';
+  return `${days}d`;
+};
+
+export const formatVsPrevRollingWindow = (days: number): string => {
+  return `vs prev ${formatRollingWindowAbbrev(days)}`;
+};
+
+export const formatLastRollingWindow = (days: number): string => {
+  if (days === 7) return 'Last Week';
+  if (days === 30) return 'Last Month';
+  if (days === 365) return 'Last Year';
+  return `Last ${days}d`;
+};
 
 export interface DateKeyResult {
   key: string;
@@ -10,6 +42,17 @@ export interface DateKeyResult {
 }
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+const MIN_PLAUSIBLE_YEAR = 1971;
+const MAX_PLAUSIBLE_YEAR = 2099;
+
+export const isPlausibleDate = (d: Date): boolean => {
+  if (!isValid(d)) return false;
+  const ts = d.getTime();
+  if (!Number.isFinite(ts) || ts <= 0) return false;
+  const y = d.getFullYear();
+  return y >= MIN_PLAUSIBLE_YEAR && y <= MAX_PLAUSIBLE_YEAR;
+};
 
 export const formatYearContraction = (d: Date): string => {
   const yy = String(d.getFullYear() % 100).padStart(2, '0');
@@ -36,8 +79,9 @@ export const formatWeekContraction = (weekStart: Date): string => {
   return `${formatDayContraction(weekStart)}`;
 };
 
-export const formatRelativeDay = (d: Date, now: Date = new Date(0)): string => {
-  if (!isValid(d) || !isValid(now)) return '—';
+export const formatRelativeDay = (d: Date, now: Date): string => {
+  if (!isPlausibleDate(d)) return '—';
+  if (!isPlausibleDate(now)) return formatDayYearContraction(d);
   const diffDays = differenceInCalendarDays(now, d);
   if (diffDays === 0) return 'today';
   if (diffDays === 1) return 'yesterday';
@@ -46,8 +90,9 @@ export const formatRelativeDay = (d: Date, now: Date = new Date(0)): string => {
   return `in ${Math.abs(diffDays)} days`;
 };
 
-export const formatRelativeTime = (d: Date, now: Date = new Date(0)): string => {
-  if (!isValid(d) || !isValid(now)) return '—';
+export const formatRelativeTime = (d: Date, now: Date): string => {
+  if (!isPlausibleDate(d)) return '—';
+  if (!isPlausibleDate(now)) return formatDayYearContraction(d);
   
   const diffDays = differenceInCalendarDays(now, d);
   const diffWeeks = differenceInWeeks(now, d);
@@ -81,8 +126,11 @@ export const getEffectiveNowFromWorkoutData = (
 ): Date => {
   let maxTs = -Infinity;
   for (const s of data) {
-    const ts = s.parsedDate?.getTime?.() ?? NaN;
-    if (Number.isFinite(ts) && ts > maxTs) maxTs = ts;
+    const d = s.parsedDate;
+    if (!d) continue;
+    if (!isPlausibleDate(d)) continue;
+    const ts = d.getTime();
+    if (ts > maxTs) maxTs = ts;
   }
   return Number.isFinite(maxTs) ? new Date(maxTs) : fallbackNow;
 };
@@ -91,8 +139,9 @@ export const formatHumanReadableDate = (
   d: Date,
   opts?: { now?: Date; cutoffDays?: number }
 ): string => {
-  const now = opts?.now ?? new Date(0);
-  if (!isValid(d) || !isValid(now)) return '—';
+  if (!isPlausibleDate(d)) return '—';
+  const now = opts?.now;
+  if (!now || !isPlausibleDate(now)) return formatDayYearContraction(d);
   const cutoffDays = opts?.cutoffDays ?? 30;
   const diffDays = Math.abs(differenceInCalendarDays(now, d));
   return diffDays > cutoffDays ? formatDayYearContraction(d) : formatRelativeDay(d, now);
@@ -102,8 +151,9 @@ export const formatRelativeWithDate = (
   d: Date,
   opts?: { now?: Date; cutoffDays?: number }
 ): string => {
-  const now = opts?.now ?? new Date(0);
-  if (!isValid(d) || !isValid(now)) return '—';
+  if (!isPlausibleDate(d)) return '—';
+  const now = opts?.now;
+  if (!now || !isPlausibleDate(now)) return formatDayYearContraction(d);
   const cutoffDays = opts?.cutoffDays ?? 30;
   const diffDays = Math.abs(differenceInCalendarDays(now, d));
   if (diffDays > cutoffDays) return formatDayYearContraction(d);

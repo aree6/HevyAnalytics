@@ -3,29 +3,47 @@ import { Area, Line } from 'recharts';
 import { formatNumber } from '../format/formatters';
 import type { WeightUnit } from '../storage/localStorage';
 
-export const getRechartsXAxisInterval = (pointCount: number, maxTicks: number = 8): number => {
-  const n = Number.isFinite(pointCount) ? pointCount : 0;
-  const m = Number.isFinite(maxTicks) ? maxTicks : 0;
-  if (n <= 0) return 0;
-  if (m <= 1) return n;
-  return Math.max(0, Math.ceil(n / m) - 1);
-};
+export {
+  RECHARTS_XAXIS_PADDING,
+  getRechartsCategoricalTicks,
+  getRechartsTickIndexMap,
+  getRechartsTickIndices,
+  getRechartsXAxisInterval,
+} from './rechartsAxis';
 
-export const RECHARTS_XAXIS_PADDING = { left: 16, right: 16 } as const;
 
 // Custom dot component to show values above data points
 export const ValueDot = (props: any) => {
-  const { cx, cy, payload, index, data, valueKey, unit, showEveryOther = true, color = "var(--text-muted)" } = props;
+  const {
+    cx,
+    cy,
+    payload,
+    index,
+    data,
+    valueKey,
+    unit,
+    showAtIndexMap,
+    showEveryOther = true,
+    everyNth,
+    showDotWhenHidden = true,
+    color = "var(--text-muted)",
+  } = props;
   
   if (!payload) return null;
   
   const value = payload[valueKey];
   if (typeof value !== 'number') return null;
   
-  // Show labels only for every other point to reduce clutter, or for significant points
-  const shouldShowLabel = !showEveryOther || index % 2 === 0 || index === data.length - 1 || index === 0;
+  const n = Array.isArray(data) ? data.length : 0;
+  const step = Number.isFinite(everyNth) && everyNth > 0 ? everyNth : showEveryOther ? 2 : 1;
+  const shouldShowByIndexMap = showAtIndexMap && typeof showAtIndexMap === 'object' ? !!showAtIndexMap[index] : null;
+  const shouldShowLabel =
+    shouldShowByIndexMap !== null
+      ? (shouldShowByIndexMap || index === n - 1 || index === 0)
+      : (step <= 1 || index % step === 0 || index === n - 1 || index === 0);
   
   if (!shouldShowLabel) {
+    if (!showDotWhenHidden) return null;
     return (
       <circle 
         cx={cx} 

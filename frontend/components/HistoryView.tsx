@@ -28,6 +28,7 @@ import { formatDisplayVolume } from '../utils/format/volumeDisplay';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../utils/format/deltaFormat';
 import { formatRelativeTime, getEffectiveNowFromWorkoutData, getSessionKey } from '../utils/date/dateUtils';
 import { parseHevyDateString } from '../utils/date/parseHevyDateString';
+import { useTheme } from './ThemeProvider';
 import { LazyRender } from './LazyRender';
 
 interface HistoryViewProps {
@@ -591,6 +592,8 @@ const useExerciseVolumePrHistory = (data: WorkoutSet[]) => {
 };
 
 export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, weightUnit = 'kg' as import('../utils/storage/localStorage').WeightUnit, bodyMapGender = 'male', stickyHeader = false, onExerciseClick, onDayTitleClick, targetDate, onTargetDateConsumed }) => {
+  const { mode } = useTheme();
+  const isLightMode = mode === 'light';
   const [currentPage, setCurrentPage] = useState(1);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
@@ -825,7 +828,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
   return (
     <div
       data-history-view
-      className="flex flex-col gap-2 w-full text-slate-200 pb-10"
+      className="flex flex-col gap-1 w-full text-slate-200 pb-10"
       onClick={(e) => {
         // Only close tooltip if clicking on the container itself, not on interactive elements
         if (tooltip && e.target === e.currentTarget) {
@@ -956,10 +959,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                           return next;
                         });
                       }}
-                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/75 border border-slate-700/60 shadow-lg flex items-center justify-center"
+                        className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full shadow-lg flex items-center justify-center ${isLightMode ? 'bg-white/90 border-slate-300/80' : 'bg-black/75 border-slate-700/60'}`}
                       >
                         <ChevronRight
-                          className={`w-5 h-5 text-slate-200 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
+                          className={`w-5 h-5 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'} ${isLightMode ? 'text-slate-700' : 'text-slate-200'}`}
                           aria-hidden
                         />
                       </button>
@@ -1005,17 +1008,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                     <div className={`col-span-1 row-start-6 h-7 relative flex items-center gap-1 min-w-0 text-xs text-slate-600 dark:text-slate-400 pr-10 transition-all duration-300`}>
                       <Weight className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 flex-shrink-0" aria-hidden />
                       <span className="truncate">{formatDisplayVolume(session.totalVolume, weightUnit, { round: 'int' })} {weightUnit}</span>
-                      {prevSession && (
-                        <span className="absolute right-0 top-1/2 -translate-y-1/2">
-                          <SessionDeltaBadge
-                            current={session.totalVolume}
-                            previous={prevSession.totalVolume}
-                            label="volume"
-                            context="vs lst"
-                          />
-                        </span>
-                      )}
-                    </div>
+                      </div>
 
                     <div className={`col-span-1 row-start-7 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap transition-all duration-300`}>
                       <Timer className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden />
@@ -1105,7 +1098,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                         <span>{formatDisplayVolume(session.totalVolume, weightUnit, { round: 'int' })} {weightUnit}</span>
                       </span>
                       {prevSession && (
-                        <span className="flex-none overflow-visible">
+                        <span className="flex-none overflow-visible hidden sm:block">
                           <SessionDeltaBadge
                             current={session.totalVolume}
                             previous={prevSession.totalVolume}

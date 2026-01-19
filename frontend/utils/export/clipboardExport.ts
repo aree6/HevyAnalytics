@@ -1,7 +1,7 @@
 import { WorkoutSet, DailySummary, ExerciseStats } from '../../types';
 import { subMonths, format, differenceInMonths, min } from 'date-fns';
 import { getDailySummaries, getExerciseStats, getIntensityEvolution, getTopExercisesOverTime, getPrsOverTime, HeatmapEntry } from '../analysis/analytics';
-import { getSessionKey } from '../date/dateUtils';
+import { getEffectiveNowFromWorkoutData, getSessionKey, isPlausibleDate } from '../date/dateUtils';
 import { isWarmupSet } from '../analysis/setClassification';
 import { getWeightUnit, WeightUnit } from '../storage/localStorage';
 import { convertWeight } from '../format/units';
@@ -13,17 +13,19 @@ export const calculateTrainingExperience = (sets: WorkoutSet[], now = new Date()
     return { monthsTraining: 0, level: 'Newbie' };
   }
 
+  const referenceNow = getEffectiveNowFromWorkoutData(sets, now);
+
   // Find the earliest workout date
   const dates = sets
-    .filter(s => s.parsedDate)
-    .map(s => s.parsedDate!);
+    .map(s => s.parsedDate)
+    .filter((d): d is Date => !!d && isPlausibleDate(d));
   
   if (dates.length === 0) {
     return { monthsTraining: 0, level: 'Newbie' };
   }
 
   const earliestDate = min(dates);
-  const monthsTraining = differenceInMonths(now, earliestDate);
+  const monthsTraining = differenceInMonths(referenceNow, earliestDate);
 
   // Determine experience level based on the provided logic
   let level: ExperienceLevel;

@@ -10,7 +10,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const THEME_CYCLE_ORDER: ThemeMode[] = ['light', 'medium-dark', 'midnight-dark', 'pure-black', 'svg'];
+const THEME_CYCLE_ORDER: ThemeMode[] = ['pure-black', 'light', 'medium-dark', 'midnight-dark', 'svg'];
 
 const getNextMode = (current: ThemeMode): ThemeMode => {
   const idx = THEME_CYCLE_ORDER.indexOf(current);
@@ -20,7 +20,7 @@ const getNextMode = (current: ThemeMode): ThemeMode => {
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mode, setModeState] = useState<ThemeMode>(() => {
-    if (typeof window === 'undefined') return 'midnight-dark';
+    if (typeof window === 'undefined') return 'pure-black';
     return getThemeMode();
   });
 

@@ -433,13 +433,13 @@ export const calculateMuscleVolume = async (
   return muscleVolume;
 };
 
-export const getWeeklyMuscleVolume = async (
+export const computeWeeklyMuscleVolume = async (
   data: WorkoutSet[],
   exerciseMuscleData: Map<string, ExerciseMuscleData>,
   weeksBack: number = 12,
   now?: Date
 ): Promise<WeeklyMuscleVolume[]> => {
-  const effectiveNow = now ?? getEffectiveNowFromWorkoutData(data, new Date(0));
+  const effectiveNow = now ?? getEffectiveNowFromWorkoutData(data);
   const startDate = subWeeks(startOfWeek(effectiveNow, { weekStartsOn: 1 }), weeksBack - 1);
   const endDate = endOfWeek(effectiveNow, { weekStartsOn: 1 });
   

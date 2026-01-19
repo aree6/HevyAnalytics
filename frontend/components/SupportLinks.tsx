@@ -47,7 +47,7 @@ export const SupportLinks: React.FC<{
                 return;
               }
             }}
-            className={`${uniformButtonClass} gap-2 ${layout === 'header' ? '' : 'flex-1 sm:flex-none min-w-[140px] sm:min-w-0'}`}
+            className={`${uniformButtonClass} gap-2 ${layout === 'header' ? 'border-transparent hover:border-emerald-400' : 'flex-1 sm:flex-none min-w-[140px] sm:min-w-0'}`}
           >
             <Github className="w-4 h-4" />
             <span>{layout === 'header' ? 'Star' : 'Star on GitHub'}</span>
@@ -90,7 +90,7 @@ export const SupportLinks: React.FC<{
                 return;
               }
             }}
-            className={`${uniformButtonClass} gap-2`}
+            className={`${uniformButtonClass} gap-2 border-transparent hover:border-emerald-400`}
           >
             <Mail className="w-4 h-4" />
             <span>Let's Talk</span>

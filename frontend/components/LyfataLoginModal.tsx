@@ -185,12 +185,12 @@ export const LyfataLoginModal: React.FC<LyfataLoginModalProps> = ({
             <li>
               Go to{' '}
               <a
-                href="https://www.lyfta.app/"
+                href="https://lyfta.app/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-semibold text-purple-300 hover:text-purple-200 underline"
               >
-                Website
+                lyfta.app
               </a>
             </li>
             <li>Sign in to your Lyfta account</li>

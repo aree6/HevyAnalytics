@@ -13,7 +13,7 @@ import { getSmartFilterMode, TimeFilterMode, WeightUnit } from '../utils/storage
 import { getDisplayVolume } from '../utils/format/volumeDisplay';
 import { CHART_TOOLTIP_STYLE, CHART_COLORS, ANIMATION_KEYFRAMES } from '../utils/ui/uiConstants';
 import { computeWeeklySetsDashboardData } from '../utils/muscle/dashboardWeeklySets';
-import { bucketRollingWeeklySeriesToWeeks } from '../utils/muscle/rollingSeriesBucketing';
+import { bucketRollingWeeklySeriesToMonths, bucketRollingWeeklySeriesToWeeks } from '../utils/muscle/rollingSeriesBucketing';
 import { getMuscleContributionsFromAsset } from '../utils/muscle/muscleContributions';
 import { ActivityHeatmap } from './dashboard/ActivityHeatmap';
 import { 
@@ -27,6 +27,10 @@ import {
   formatMonthYearContraction,
   getEffectiveNowFromWorkoutData,
   getSessionKey,
+  formatLastRollingWindow,
+  formatVsPrevRollingWindow,
+  getRollingWindowDaysForMode,
+  getRollingWindowStartForMode,
 } from '../utils/date/dateUtils';
 import { getExerciseAssets, ExerciseAsset } from '../utils/data/exerciseAssets';
 import { ViewHeader } from './ViewHeader';
@@ -98,7 +102,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   // State to control animation retriggering on mount
   const [isMounted, setIsMounted] = useState(false);
 
-  const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(fullData, new Date(0)), [fullData]);
+  const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(fullData), [fullData]);
 
   // Calculate date range span for smart filter
   const spanDays = useMemo(() => {
@@ -113,6 +117,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   // Smart filter mode based on date range span
   const smartMode = useMemo(() => getSmartFilterMode(spanDays), [spanDays]);
 
+  const allAggregationMode = useMemo<'daily' | 'weekly' | 'monthly'>(() => {
+    return smartMode === 'all' ? 'daily' : smartMode;
+  }, [smartMode]);
+
   // Count total workouts (for display purposes)
   const totalWorkouts = useMemo(() => {
     const sessions = new Set<string>();
@@ -125,28 +133,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     return sessions.size;
   }, [fullData]);
 
-  // Track user overrides only (null = use smart mode)
+  // Track user overrides only (null = use default)
   const [chartOverrides, setChartOverrides] = useState<Record<string, TimeFilterMode | null>>({
     volumeVsDuration: null,
     intensityEvo: null,
     prTrend: null,
   });
 
-  // Reset overrides when smart mode changes (new filter applied)
-  useEffect(() => {
-    setChartOverrides({
-      volumeVsDuration: null,
-      intensityEvo: null,
-      prTrend: null,
-    });
-  }, [smartMode]);
-
-  // Effective chart modes: use override if set, otherwise smart mode
+  // Effective chart modes: use override if set, otherwise default to last-month range.
   const chartModes = useMemo(() => ({
-    volumeVsDuration: chartOverrides.volumeVsDuration ?? smartMode,
-    intensityEvo: chartOverrides.intensityEvo ?? smartMode,
-    prTrend: chartOverrides.prTrend ?? smartMode,
-  }), [chartOverrides, smartMode]);
+    volumeVsDuration: chartOverrides.volumeVsDuration ?? 'monthly',
+    intensityEvo: chartOverrides.intensityEvo ?? 'monthly',
+    prTrend: chartOverrides.prTrend ?? 'monthly',
+  }), [chartOverrides]);
 
   // Simple effect to trigger animation after mount
   useEffect(() => {
@@ -161,7 +160,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     setChartOverrides(prev => ({ ...prev, [chart]: mode }));
   };
 
-  const [topExerciseMode, setTopExerciseMode] = useState<'all' | 'weekly' | 'monthly'>('all');
+  const [topExerciseMode, setTopExerciseMode] = useState<'all' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [topExercisesView, setTopExercisesView] = useState<'barh' | 'area'>('barh');
   
   // Chart view type states (defaults keep existing chart types)
@@ -171,9 +170,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   const [weekShapeView, setWeekShapeView] = useState<'radar' | 'bar'>('radar');
   
   const [muscleGrouping, setMuscleGrouping] = useState<'groups' | 'muscles'>('groups');
-  const [musclePeriod, setMusclePeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
+  const [musclePeriod, setMusclePeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'all'>('monthly');
   const [muscleTrendView, setMuscleTrendView] = useState<'area' | 'stackedBar'>('stackedBar');
-  const [muscleCompQuick, setMuscleCompQuick] = useState<'all'|'7d'|'30d'|'365d'>('all');
+  const [muscleCompQuick, setMuscleCompQuick] = useState<'all'|'7d'|'30d'|'365d'>('30d');
   const [compositionGrouping, setCompositionGrouping] = useState<'groups' | 'muscles'>('groups');
   const [weeklySetsView, setWeeklySetsView] = useState<'radar' | 'heatmap'>('heatmap');
   
@@ -299,12 +298,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   };
 
   const prsData = useMemo<PrsOverTimePoint[]>(() => {
-    const mode = chartModes.prTrend === 'all' ? 'daily' : chartModes.prTrend;
+    const rangeMode = chartModes.prTrend;
+    const mode: 'daily' | 'weekly' | 'monthly' =
+      rangeMode === 'all' ? allAggregationMode : rangeMode === 'yearly' ? 'weekly' : 'daily';
+    const windowStart = getRollingWindowStartForMode(rangeMode, effectiveNow);
+    const filtered =
+      windowStart
+        ? fullData.filter((s) => {
+            const d = s.parsedDate;
+            return !!d && d >= windowStart;
+          })
+        : fullData;
     return computationCache.getOrCompute(
-      `prsOverTime:${mode}:${effectiveNow.getTime()}`,
+      `prsOverTime:${rangeMode}:${mode}:${effectiveNow.getTime()}`,
       fullData,
       () => {
-        const data = getPrsOverTime(fullData, mode as any) as PrsOverTimePoint[];
+        const data = getPrsOverTime(filtered, mode as any) as PrsOverTimePoint[];
 
         // Add tooltip labels and mark the current (in-progress) bucket as "to date".
         const now = effectiveNow;
@@ -333,37 +342,56 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
       },
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, chartModes.prTrend, effectiveNow]);
+  }, [fullData, chartModes.prTrend, allAggregationMode, effectiveNow]);
 
   const prTrendDelta = useMemo(() => {
-    const d = dashboardInsights?.rolling28d;
+    const rangeMode = chartModes.prTrend;
+    const days = getRollingWindowDaysForMode(rangeMode) ?? 30;
+    const d =
+      days === 7
+        ? dashboardInsights?.rolling7d
+        : days === 365
+          ? dashboardInsights?.rolling365d
+          : dashboardInsights?.rolling30d;
     return d?.prs ? d.prs : null;
-  }, [dashboardInsights]);
+  }, [dashboardInsights, chartModes.prTrend]);
 
   const prTrendDelta7d = useMemo(() => {
+    if (chartModes.prTrend === 'weekly') return null;
     const d = dashboardInsights?.rolling7d;
     return d?.prs ? d.prs : null;
-  }, [dashboardInsights]);
+  }, [dashboardInsights, chartModes.prTrend]);
 
   // 2. Intensity Evolution Data
   const intensityData = useMemo(() => {
-    const mode = chartModes.intensityEvo === 'all' ? 'daily' : chartModes.intensityEvo;
+    const rangeMode = chartModes.intensityEvo;
+    const mode: 'daily' | 'weekly' | 'monthly' =
+      rangeMode === 'all' ? allAggregationMode : rangeMode === 'yearly' ? 'weekly' : 'daily';
+    const windowStart = getRollingWindowStartForMode(rangeMode, effectiveNow);
+    const filtered =
+      windowStart
+        ? fullData.filter((s) => {
+            const d = s.parsedDate;
+            return !!d && d >= windowStart;
+          })
+        : fullData;
     return computationCache.getOrCompute(
-      `intensityEvolution:${mode}`,
+      `intensityEvolution:${rangeMode}:${mode}:${effectiveNow.getTime()}`,
       fullData,
-      () => getIntensityEvolution(fullData, mode as any),
+      () => getIntensityEvolution(filtered, mode as any),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, chartModes.intensityEvo]);
+  }, [fullData, chartModes.intensityEvo, allAggregationMode, effectiveNow]);
 
   const intensityInsight = useMemo(() => {
     return computationCache.getOrCompute(
-      `intensityInsight:${effectiveNow.getTime()}`,
+      `intensityInsight:${chartModes.intensityEvo}:${effectiveNow.getTime()}`,
       fullData,
       () => {
         const now = effectiveNow;
-        const currStart = startOfDay(subDays(now, 27));
-        const prevStart = startOfDay(subDays(currStart, 28));
+        const days = getRollingWindowDaysForMode(chartModes.intensityEvo) ?? 30;
+        const currStart = startOfDay(subDays(now, days - 1));
+        const prevStart = startOfDay(subDays(currStart, days));
         const prevEnd = endOfDay(subDays(currStart, 1));
 
         const countStyles = (start: Date, end: Date) => {
@@ -421,23 +449,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             k: secondary[0],
             pct: secondary[1],
           },
-          period: 'Last 28d',
+          period: formatLastRollingWindow(days),
         };
       },
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, effectiveNow]);
+  }, [fullData, effectiveNow, chartModes.intensityEvo]);
 
   // 3. Volume Density Data (volume done per set)
   const volumeDurationData = useMemo(() => {
-    const mode = chartModes.volumeVsDuration;
+    const rangeMode = chartModes.volumeVsDuration;
+    const windowStartTs = getRollingWindowStartForMode(rangeMode, effectiveNow)?.getTime() ?? null;
+    const source = windowStartTs ? dailyData.filter((d) => d.timestamp >= windowStartTs) : dailyData;
+
+    const mode =
+      rangeMode === 'all'
+        ? (smartMode === 'all' ? 'all' : smartMode)
+        : rangeMode === 'yearly'
+          ? 'weekly'
+          : 'all';
 
     return computationCache.getOrCompute(
-      `volumeDurationData:${mode}:${weightUnit}:${effectiveNow.getTime()}`,
+      `volumeDurationData:${rangeMode}:${mode}:${weightUnit}:${effectiveNow.getTime()}`,
       dailyData,
       () => {
         if (mode === 'all') {
-          return dailyData.map(d => ({
+          return source.map(d => ({
             ...d,
             dateFormatted: formatDayContraction(new Date(d.timestamp)),
             tooltipLabel: formatDayYearContraction(new Date(d.timestamp)),
@@ -447,7 +484,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
         if (mode === 'weekly') {
           const weeklyData: Record<string, { volSum: number, setSum: number, count: number, timestamp: number }> = {};
-          dailyData.forEach(d => {
+          source.forEach(d => {
             const weekStart = startOfWeek(new Date(d.timestamp), { weekStartsOn: 1 });
             const weekKey = `wk-${format(weekStart, 'yyyy-MM-dd')}`;
             if (!weeklyData[weekKey]) {
@@ -476,7 +513,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         {
           // Manual aggregation for monthly view
           const monthlyData: Record<string, { volSum: number, setSum: number, count: number, timestamp: number }> = {};
-          dailyData.forEach(d => {
+          source.forEach(d => {
             const monthKey = format(new Date(d.timestamp), 'yyyy-MM');
             if (!monthlyData[monthKey]) {
               monthlyData[monthKey] = { volSum: 0, setSum: 0, count: 0, timestamp: startOfMonth(new Date(d.timestamp)).getTime() };
@@ -502,17 +539,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
       },
       { ttl: 10 * 60 * 1000 }
     );
-  }, [dailyData, chartModes.volumeVsDuration, weightUnit, effectiveNow]);
+  }, [dailyData, chartModes.volumeVsDuration, smartMode, weightUnit, effectiveNow]);
 
   const volumeDensityTrend = useMemo(() => {
-    const d = dashboardInsights?.rolling28d;
+    const rangeMode = chartModes.volumeVsDuration;
+    const days = getRollingWindowDaysForMode(rangeMode) ?? 30;
+    const d =
+      days === 7
+        ? dashboardInsights?.rolling7d
+        : days === 365
+          ? dashboardInsights?.rolling365d
+          : dashboardInsights?.rolling30d;
     if (!d) return null;
     if (!d.eligible || !d.volume || !d.sets) return null;
     const curr = d.current.totalSets > 0 ? (d.current.totalVolume / d.current.totalSets) : 0;
     const prev = d.previous.totalSets > 0 ? (d.previous.totalVolume / d.previous.totalSets) : 0;
     const delta = calculateDelta(curr, prev);
-    return { label: 'Last 28d', delta, delta4: null };
-  }, [dashboardInsights]);
+    return { label: formatLastRollingWindow(days), delta, delta4: null, meta: formatVsPrevRollingWindow(days) };
+  }, [dashboardInsights, chartModes.volumeVsDuration]);
 
   // Static Data
   const weekShapeData = useMemo(() => getDayOfWeekShape(dailyData), [dailyData]);
@@ -550,6 +594,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         let start: Date | null = null;
         if (topExerciseMode === 'monthly') start = subDays(now, 30);
         else if (topExerciseMode === 'weekly') start = subDays(now, 7);
+        else if (topExerciseMode === 'yearly') start = subDays(now, 365);
         // 'all' => start stays null (use all)
         const counts = new Map<string, number>();
         for (const s of fullData) {
@@ -613,7 +658,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
           return { windowLabel: 'All time', delta: null as any, top, topShare };
         }
 
-        const windowDays = topExerciseMode === 'weekly' ? 7 : 28;
+        const windowDays = topExerciseMode === 'weekly' ? 7 : topExerciseMode === 'yearly' ? 365 : 30;
         const start = subDays(now, windowDays);
         const prevStart = subDays(now, windowDays * 2);
         const prevEnd = subDays(now, windowDays);
@@ -623,7 +668,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         const currentWorkouts = getWorkoutCountBetween(start, now);
         const prevWorkouts = getWorkoutCountBetween(prevStart, prevEnd);
 
-        const windowLabel = topExerciseMode === 'weekly' ? '7d' : '28d';
+        const windowLabel = topExerciseMode === 'weekly' ? '7d' : topExerciseMode === 'yearly' ? '365d' : '30d';
         const eligible = currentWorkouts >= 2 && prevWorkouts >= 2;
         const delta = eligible ? calculateDelta(currentSets, prevSets) : null;
         return { windowLabel, delta, top, topShare, eligible };
@@ -635,15 +680,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   // Time series for area view of Top Exercises
   const topExercisesOverTimeData = useMemo(() => {
     const names = (topExercisesBarData.length > 0 ? topExercisesBarData : topExercisesData).map(e => e.name);
-    const mode = topExerciseMode === 'weekly' ? 'weekly' : 'monthly';
+    const rangeMode = topExerciseMode;
+    const mode: 'daily' | 'weekly' | 'monthly' =
+      rangeMode === 'all' ? allAggregationMode : rangeMode === 'yearly' ? 'weekly' : 'daily';
+    const windowStart =
+      rangeMode === 'weekly'
+        ? startOfDay(subDays(effectiveNow, 6))
+        : rangeMode === 'monthly'
+          ? startOfDay(subDays(effectiveNow, 29))
+          : rangeMode === 'yearly'
+            ? startOfDay(subDays(effectiveNow, 364))
+            : null;
+    const filtered =
+      windowStart
+        ? fullData.filter((s) => {
+            const d = s.parsedDate;
+            return !!d && d >= windowStart;
+          })
+        : fullData;
     const namesKey = names.join('|');
     return computationCache.getOrCompute(
-      `topExercisesOverTime:${mode}:${namesKey}`,
+      `topExercisesOverTime:${rangeMode}:${mode}:${namesKey}:${effectiveNow.getTime()}`,
       fullData,
-      () => getTopExercisesOverTime(fullData, names, mode as any),
+      () => getTopExercisesOverTime(filtered, names, mode as any),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, topExercisesBarData, topExercisesData, topExerciseMode]);
+  }, [fullData, topExercisesBarData, topExercisesData, topExerciseMode, allAggregationMode, effectiveNow]);
 
   // Keys for area stacking in Most Frequent Exercises
   const topExerciseNames = useMemo(() => (topExercisesBarData.length > 0 ? topExercisesBarData : topExercisesData).map(e => e.name), [topExercisesBarData, topExercisesData]);
@@ -651,29 +713,51 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   // 6. Muscle Volume (sets-based) unified data - cached for performance
   const muscleSeriesGroups = useMemo(() => {
     if (!assetsMap) return { data: [], keys: [] as string[] } as { data: any[]; keys: string[] };
-    return computationCache.getOrCompute(
-      `muscleSeriesGroups:${musclePeriod}`,
+    const base = computationCache.getOrCompute(
+      `muscleSeriesGroups:rollingWeekly:${assetsMap.size}`,
       fullData,
-      () => {
-        const series = getMuscleVolumeTimeSeries(fullData, assetsMap, musclePeriod);
-        return musclePeriod === 'weekly' ? bucketRollingWeeklySeriesToWeeks(series) : series;
-      },
+      () => getMuscleVolumeTimeSeries(fullData, assetsMap, 'weekly'),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, assetsMap, musclePeriod]);
+
+    if (musclePeriod === 'all') {
+      const n = (base.data || []).length;
+      return n > 140 ? bucketRollingWeeklySeriesToMonths(base as any) : bucketRollingWeeklySeriesToWeeks(base as any);
+    }
+
+    const days = musclePeriod === 'weekly' ? 7 : musclePeriod === 'yearly' ? 365 : 30;
+    const windowStart = startOfDay(subDays(effectiveNow, days - 1)).getTime();
+    const windowed = {
+      data: (base.data || []).filter((row: any) => (typeof row?.timestamp === 'number' ? row.timestamp : 0) >= windowStart),
+      keys: base.keys || [],
+    };
+
+    return musclePeriod === 'weekly' ? windowed : bucketRollingWeeklySeriesToWeeks(windowed as any);
+  }, [fullData, assetsMap, musclePeriod, effectiveNow]);
 
   const muscleSeriesMuscles = useMemo(() => {
     if (!assetsMap) return { data: [], keys: [] as string[] } as { data: any[]; keys: string[] };
-    return computationCache.getOrCompute(
-      `muscleSeriesMuscles:${musclePeriod}`,
+    const base = computationCache.getOrCompute(
+      `muscleSeriesMuscles:rollingWeekly:${assetsMap.size}`,
       fullData,
-      () => {
-        const series = getMuscleVolumeTimeSeriesDetailed(fullData, assetsMap, musclePeriod);
-        return musclePeriod === 'weekly' ? bucketRollingWeeklySeriesToWeeks(series) : series;
-      },
+      () => getMuscleVolumeTimeSeriesDetailed(fullData, assetsMap, 'weekly'),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, assetsMap, musclePeriod]);
+
+    if (musclePeriod === 'all') {
+      const n = (base.data || []).length;
+      return n > 140 ? bucketRollingWeeklySeriesToMonths(base as any) : bucketRollingWeeklySeriesToWeeks(base as any);
+    }
+
+    const days = musclePeriod === 'weekly' ? 7 : musclePeriod === 'yearly' ? 365 : 30;
+    const windowStart = startOfDay(subDays(effectiveNow, days - 1)).getTime();
+    const windowed = {
+      data: (base.data || []).filter((row: any) => (typeof row?.timestamp === 'number' ? row.timestamp : 0) >= windowStart),
+      keys: base.keys || [],
+    };
+
+    return musclePeriod === 'weekly' ? windowed : bucketRollingWeeklySeriesToWeeks(windowed as any);
+  }, [fullData, assetsMap, musclePeriod, effectiveNow]);
 
   const trendData = muscleGrouping === 'groups' ? muscleSeriesGroups.data : muscleSeriesMuscles.data;
   const trendKeys = useMemo(() => {
@@ -689,14 +773,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     if (!assetsMap || !assetsLowerMap) return null;
     if (!trendKeys || trendKeys.length === 0) return null;
 
-    const cacheKey = `muscleTrendInsight:${muscleGrouping}:${trendKeys.join('|')}:${effectiveNow.getTime()}:${assetsMap.size}`;
+    const cacheKey = `muscleTrendInsight:${muscleGrouping}:${musclePeriod}:${trendKeys.join('|')}:${effectiveNow.getTime()}:${assetsMap.size}`;
     return computationCache.getOrCompute(
       cacheKey,
       fullData,
       () => {
         const now = effectiveNow;
-        const currStart = startOfDay(subDays(now, 27));
-        const prevStart = startOfDay(subDays(currStart, 28));
+        const days = musclePeriod === 'weekly' ? 7 : musclePeriod === 'yearly' ? 365 : 30;
+        const currStart = startOfDay(subDays(now, days - 1));
+        const prevStart = startOfDay(subDays(currStart, days));
         const prevEnd = endOfDay(subDays(currStart, 1));
 
         const getWorkoutCountBetween = (start: Date, end: Date) => {
@@ -749,16 +834,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         const totalPrev = trendKeys.reduce((acc, k) => acc + (prevTotals.get(k) || 0), 0);
         const totalDelta = calculateDelta(totalLast, totalPrev);
         const biggestMover = trendKeys
-          .map((k) => ({ k, d: (currTotals.get(k) || 0) - (prevTotals.get(k) || 0) }))
-          .sort((a, b) => Math.abs(b.d) - Math.abs(a.d))[0];
+          .map((k) => {
+            const curr = currTotals.get(k) || 0;
+            const prev = prevTotals.get(k) || 0;
+            const delta = calculateDelta(curr, prev);
+            return { k, deltaPercent: delta.deltaPercent, direction: delta.direction };
+          })
+          .sort((a, b) => Math.abs(b.deltaPercent) - Math.abs(a.deltaPercent))[0];
 
-        return { label: 'Last 28d', totalDelta, biggestMover };
+        return { label: formatLastRollingWindow(days), totalDelta, biggestMover };
       },
       { ttl: 10 * 60 * 1000 }
     );
-  }, [assetsMap, assetsLowerMap, fullData, effectiveNow, trendKeys, muscleGrouping]);
+  }, [assetsMap, assetsLowerMap, fullData, effectiveNow, trendKeys, muscleGrouping, musclePeriod]);
 
-  const muscleVsLabel = 'vs prev mo';
+  const muscleVsLabel =
+    musclePeriod === 'weekly'
+      ? 'vs prev wk'
+      : musclePeriod === 'yearly'
+        ? 'vs prev yr'
+        : 'vs prev mo';
 
   const weeklySetsDashboard = useMemo(() => {
     if (!assetsMap) {
@@ -800,7 +895,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   return (
     <>
       <style>{ANIMATION_KEYFRAMES}</style>
-      <div className={`space-y-2 pb-4 sm:pb-12 transition-opacity duration-700 ease-out ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`space-y-1 pb-4 sm:pb-12 transition-opacity duration-700 ease-out ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
 
         <div className="hidden sm:contents">
           <ViewHeader
@@ -813,14 +908,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               <div className="flex items-center space-x-2">
                 <div className="flex items-center space-x-2">
                   {!exportCopied && (
-                    <button
-                      onClick={handleExportAction}
-                      className="inline-flex items-center gap-2 justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent border border-slate-700/50 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200"
-                      title="AI Analyze"
-                    >
-                      <Brain className="w-4 h-4 text-slate-300" />
-                      <span className="hidden sm:inline">AI Analyze</span>
-                    </button>
+                    <div className="relative inline-flex items-center justify-center">
+                      <div className="meteor-border-track">
+                        <div className="meteor-premium" />
+                        <div className="meteor-border-mask" />
+                      </div>
+                      <button
+                        onClick={handleExportAction}
+                        className="relative z-[2] inline-flex items-center gap-2 justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent text-slate-200 hover:text-white hover:bg-white/5 transition-all duration-200"
+                        title="AI Analyze"
+                      >
+                        <Brain className="w-4 h-4 text-purple-400" />
+                        <span className="hidden sm:inline">AI Analyze</span>
+                      </button>
+                    </div>
                   )}
 
                   {showTimelineChips && (
@@ -1016,6 +1117,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             onMuscleClick={(muscleId, viewMode) => onMuscleClick?.(muscleId, viewMode, muscleCompQuick)}
             bodyMapGender={bodyMapGender}
             windowStart={weeklySetsDashboard.windowStart}
+            now={effectiveNow}
           />
         </Suspense>
       </div>
@@ -1055,6 +1157,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             />
           </Suspense>
         </LazyRender>
+
+      </div>
 
       {/* 5. Weekly Rhythm + Muscle Composition */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-2">
@@ -1113,7 +1217,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         </Suspense>
       </LazyRender>
 
-       </div>
      </>
    );
  };

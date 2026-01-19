@@ -385,6 +385,8 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
         </svg>
       </button>
 
+      
+
       {/* Range display banner */}
       {hasSelection && (
         <div className="mb-3 px-2">
@@ -654,6 +656,9 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
             </div>
           );
         })}
+                 <div className="mt-1 mb-3 px-2 text-[11px] text-slate-400 text-center">
+        Tap to select filter limits
+      </div>
       </div>
 
       {/* Footer buttons */}
@@ -676,6 +681,7 @@ export const CalendarSelector: React.FC<CalendarSelectorProps> = ({
       >
         Close
       </button>
+   
     </div>
   );
 };

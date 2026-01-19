@@ -25,8 +25,9 @@ import {
   TrendIcon,
 } from './ChartBits';
 import { getRechartsXAxisInterval, RECHARTS_XAXIS_PADDING } from '../../utils/chart/chartEnhancements';
+import { formatVsPrevRollingWindow } from '../../utils/date/dateUtils';
 
-export type TopExerciseMode = 'all' | 'weekly' | 'monthly';
+export type TopExerciseMode = 'all' | 'weekly' | 'monthly' | 'yearly';
 export type TopExercisesView = 'barh' | 'area';
 
 export type TopExerciseBarDatum = { name: string; count: number };
@@ -72,6 +73,10 @@ export const TopExercisesCard = ({
   const formatSignedPctWithNoun = (pct: number, noun: string) =>
     `${formatDeltaPercentage(pct, getDeltaFormatPreset('badge'))} ${noun}`;
 
+  const windowDays =
+    topExerciseMode === 'weekly' ? 7 : topExerciseMode === 'yearly' ? 365 : 30;
+  const vsPrevLabel = formatVsPrevRollingWindow(windowDays);
+
   const pie = pieColors;
 
   return (
@@ -97,28 +102,40 @@ export const TopExercisesCard = ({
               <span className="sr-only">All</span>
             </button>
             <button
-              onClick={() => setTopExerciseMode('monthly')}
-              title="Monthly"
-              aria-label="Monthly"
-              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 text-[9px] font-bold leading-none ${
-                topExerciseMode === 'monthly'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              mo
-            </button>
-            <button
               onClick={() => setTopExerciseMode('weekly')}
-              title="Weekly"
-              aria-label="Weekly"
-              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 text-[9px] font-bold leading-none ${
+              title="Last Week"
+              aria-label="Last Week"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
                 topExerciseMode === 'weekly'
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                   : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
               }`}
             >
-              wk
+              lst wk
+            </button>
+            <button
+              onClick={() => setTopExerciseMode('monthly')}
+              title="Last Month"
+              aria-label="Last Month"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
+                topExerciseMode === 'monthly'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              lst mo
+            </button>
+            <button
+              onClick={() => setTopExerciseMode('yearly')}
+              title="Last Year"
+              aria-label="Last Year"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
+                topExerciseMode === 'yearly'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              lst yr
             </button>
           </div>
 
@@ -415,7 +432,7 @@ export const TopExercisesCard = ({
                     tickLine={false}
                     axisLine={false}
                     padding={RECHARTS_XAXIS_PADDING as any}
-                    interval={getRechartsXAxisInterval(topExercisesOverTimeData.length, 8)}
+                    interval={getRechartsXAxisInterval(topExercisesOverTimeData.length)}
                   />
                   <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip contentStyle={tooltipStyle as any} />
@@ -467,7 +484,7 @@ export const TopExercisesCard = ({
                           <span>{formatSignedPctWithNoun(topExercisesInsight.delta.deltaPercent, 'sets')}</span>
                         </span>
                       }
-                      meta={`vs prev ${topExercisesInsight.windowLabel}`}
+                      meta={vsPrevLabel}
                     />
                   }
                   tone={getTrendBadgeTone(topExercisesInsight.delta.deltaPercent, { goodWhen: 'up' })}

@@ -129,7 +129,12 @@ export const getExerciseStats = (data: WorkoutSet[]): ExerciseStats[] => {
   for (const set of data) {
     if (isWarmupSet(set)) continue;
     const name = set.exercise_title;
-    if (!name || !set.parsedDate) continue;
+    const d = set.parsedDate;
+    if (!name || !d) continue;
+    const ts = d.getTime();
+    if (!Number.isFinite(ts) || ts <= 0) continue;
+    const y = d.getFullYear();
+    if (y <= 1970 || y >= 2100) continue;
 
     let stats = grouped.get(name);
     if (!stats) {
@@ -153,7 +158,7 @@ export const getExerciseStats = (data: WorkoutSet[]): ExerciseStats[] => {
     if (set.isPr) stats.prCount += 1;
 
     stats.history.push({
-      date: set.parsedDate,
+      date: d,
       weight: set.weight_kg,
       reps: set.reps,
       oneRepMax,

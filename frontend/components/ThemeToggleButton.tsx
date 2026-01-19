@@ -35,6 +35,18 @@ export const ThemeToggleButton: React.FC<{ className?: string; compact?: boolean
 
   const title = `Theme: ${labelForMode(mode)} (click to cycle)`;
 
+  const getDotPosition = (index: number) => {
+    const themeOrder = ['pure-black', 'light', 'medium-dark', 'midnight-dark', 'svg'];
+    const currentIndex = themeOrder.indexOf(mode);
+    const dotIndex = themeOrder.indexOf(
+      index === 0 ? 'pure-black' :
+      index === 1 ? 'light' :
+      index === 2 ? 'medium-dark' :
+      index === 3 ? 'midnight-dark' : 'svg'
+    );
+    return dotIndex === currentIndex;
+  };
+
   return (
     <button
       type="button"
@@ -46,7 +58,22 @@ export const ThemeToggleButton: React.FC<{ className?: string; compact?: boolean
       title={title}
       aria-label={title}
     >
-      <Icon className="w-4 h-4" />
+      <div className="relative">
+        <Icon className="w-4 h-4" />
+        {/* Theme indicator dots */}
+        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 flex gap-0.5">
+          {[0, 1, 2, 3, 4].map((index) => (
+            <div
+              key={index}
+              className={`w-1 h-1 rounded-full transition-all duration-200 ${
+                getDotPosition(index) 
+                  ? mode === 'light' ? 'bg-gray-800' : 'bg-white' 
+                  : mode === 'light' ? 'bg-gray-400/60' : 'bg-white/40'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
     </button>
   );
 };

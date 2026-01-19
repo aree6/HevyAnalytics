@@ -1,8 +1,8 @@
 import React, { useState, useEffect, memo } from 'react';
 import { differenceInCalendarDays } from 'date-fns';
 import { 
-  TrendingUp, TrendingDown, Minus, Flame, Zap, Trophy, 
-  Calendar, Target, AlertTriangle, Activity, Clock, Dumbbell, Brain, Check, Copy
+  TrendingUp, TrendingDown, Activity, Flame, Zap, Trophy, 
+  Calendar, Target, AlertTriangle, Clock, Dumbbell, Brain, Check, Copy
 } from 'lucide-react';
 import CountUp from './CountUp';
 import { 
@@ -108,11 +108,11 @@ const DeltaBadge: React.FC<{ delta: DeltaResult; suffix?: string; showPercent?: 
   
   if (direction === 'same') {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-400">
-        <Minus className="w-3 h-3" />
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
+        <Activity className="w-3 h-3" />
         <span className="text-[10px] font-bold">
           Stable
-          {showPercent ? ` (${delta.deltaPercent}%)` : ''}
+          {showPercent && delta.deltaPercent !== 0 ? ` (${delta.deltaPercent}%)` : ''}
         </span>
         {context && <span className="text-[9px] opacity-75">{context}</span>}
       </span>
@@ -491,7 +491,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = memo(function Insight
 
   return (
     <div className={`grid gap-2 sm:gap-3 ${showAICard ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-3'}`}>
-      {/* Workouts This Week */}
+      {/* Workouts */}
       <KPICard
         title="Last 7d"
         value={rolling7d.current.totalWorkouts}
@@ -617,7 +617,7 @@ export const PlateauAlert: React.FC<PlateauAlertProps> = ({
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-white truncate">{exerciseName}</div>
         <div className="text-[10px] text-slate-500">
-          {lastProgressDate ? formatProgressMessage(lastProgressDate, now || new Date()) : 'No recent progress'}
+          {lastProgressDate ? formatProgressMessage(lastProgressDate, now ?? lastProgressDate) : 'No recent progress'}
         </div>
         { suggestion && (
           <div className="text-[10px] text-amber-400 mt-1 line-clamp-2 flex items-start gap-1">

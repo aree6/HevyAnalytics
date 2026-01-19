@@ -1277,7 +1277,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
     };
   }, []);
 
-  const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(data, new Date(0)), [data]);
+  const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(data), [data]);
 
   // Calculate all stats from data
   const stats = useMemo(() => {
@@ -1501,7 +1501,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-2 w-full text-slate-200 pb-6">
+    <div className="flex flex-col gap-1 w-full text-slate-200 pb-6">
       {/* Header */}
       <div className="hidden sm:contents">
         <ViewHeader

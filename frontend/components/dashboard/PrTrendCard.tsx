@@ -26,7 +26,8 @@ import {
 } from './ChartBits';
 import { LazyRender } from '../LazyRender';
 import { ChartSkeleton } from '../ChartSkeleton';
-import { getRechartsXAxisInterval, RECHARTS_XAXIS_PADDING, ValueDot } from '../../utils/chart/chartEnhancements';
+import { getRechartsCategoricalTicks, getRechartsTickIndexMap, RECHARTS_XAXIS_PADDING, ValueDot } from '../../utils/chart/chartEnhancements';
+import { formatVsPrevRollingWindow, getRollingWindowDaysForMode } from '../../utils/date/dateUtils';
 
 type PrTrendView = 'area' | 'bar';
 
@@ -53,12 +54,23 @@ export const PrTrendCard = ({
 }) => {
   const formatSigned = (n: number) => formatSignedNumber(n, { maxDecimals: 2 });
 
+  const primaryWindowDays = getRollingWindowDaysForMode(mode) ?? 30;
+  const primaryMeta = formatVsPrevRollingWindow(primaryWindowDays);
+
   const chartData = useMemo(() => {
     return addEmaSeries(prsData, 'count', 'emaCount', {
       halfLifeDays: DEFAULT_EMA_HALF_LIFE_DAYS,
       timestampKey: 'timestamp',
     });
   }, [prsData]);
+
+  const xTicks = useMemo(() => {
+    return getRechartsCategoricalTicks(chartData, (row: any) => row?.dateFormatted);
+  }, [chartData]);
+
+  const tickIndexMap = useMemo(() => {
+    return getRechartsTickIndexMap(chartData.length);
+  }, [chartData.length]);
 
   return (
     <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl">
@@ -105,23 +117,33 @@ export const PrTrendCard = ({
             </button>
             <button
               onClick={() => onToggle('weekly')}
-              title="Weekly"
-              aria-label="Weekly"
-              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 text-[9px] font-bold leading-none ${
+              title="Last Week"
+              aria-label="Last Week"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
                 mode === 'weekly' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
               }`}
             >
-              wk
+              lst wk
             </button>
             <button
               onClick={() => onToggle('monthly')}
-              title="Monthly"
-              aria-label="Monthly"
-              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 text-[9px] font-bold leading-none ${
+              title="Last Month"
+              aria-label="Last Month"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
                 mode === 'monthly' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
               }`}
             >
-              mo
+              lst mo
+            </button>
+            <button
+              onClick={() => onToggle('yearly')}
+              title="Last Year"
+              aria-label="Last Year"
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
+                mode === 'yearly' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              lst yr
             </button>
           </div>
         </div>
@@ -145,7 +167,8 @@ export const PrTrendCard = ({
                 tickLine={false}
                 axisLine={false}
                 padding={RECHARTS_XAXIS_PADDING as any}
-                interval={getRechartsXAxisInterval(chartData.length, 8)}
+                interval={0}
+                ticks={xTicks as any}
               />
               <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip
@@ -166,7 +189,7 @@ export const PrTrendCard = ({
                   stroke="#eab308"
                   strokeWidth={3}
                   fill="url(#gPRs)"
-                  dot={<ValueDot valueKey="count" unit="" data={chartData} color="#eab308" />}
+                  dot={<ValueDot valueKey="count" unit="" data={chartData} color="#eab308" showAtIndexMap={tickIndexMap} showDotWhenHidden={false} />}
                   activeDot={{ r: 5, strokeWidth: 0 }}
                   animationDuration={1500}
                 />
@@ -202,7 +225,7 @@ export const PrTrendCard = ({
                       <span>{formatDeltaPercentage(prTrendDelta.deltaPercent, getDeltaFormatPreset('badge'))}</span>
                     </span>
                   }
-                  meta="vs prev mo"
+                  meta={primaryMeta}
                 />
               }
               tone={getTrendBadgeTone(prTrendDelta.deltaPercent, { goodWhen: 'up' })}
@@ -221,7 +244,7 @@ export const PrTrendCard = ({
                       <span>{formatDeltaPercentage(prTrendDelta7d.deltaPercent, getDeltaFormatPreset('badge'))}</span>
                     </span>
                   }
-                  meta="vs prev 7d"
+                  meta={formatVsPrevRollingWindow(7)}
                 />
               }
               tone={getTrendBadgeTone(prTrendDelta7d.deltaPercent, { goodWhen: 'up' })}

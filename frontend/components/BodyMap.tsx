@@ -149,7 +149,7 @@ export const BodyMap: React.FC<BodyMapProps> = ({
     };
   }, [applyColors, handleClick, handleMouseOver, handleMouseOut, compact, interactive]);
 
-  const svgClass = compact ? (compactFill ? 'h-full w-auto' : 'h-28 w-auto') : 'h-[60vh] md:h-[70vh] w-auto';
+  const svgClass = compact ? (compactFill ? 'h-full w-auto' : 'h-28 w-auto') : 'h-[60vh] md:h-[70vh] w-auto -mb-10 -mt-5 sm:-mb-3';
 
   const FrontSvg = gender === 'female' 
     ? (viewMode === 'group' ? FemaleFrontBodyMapGroup : FemaleFrontBodyMapMuscle)
@@ -160,7 +160,7 @@ export const BodyMap: React.FC<BodyMapProps> = ({
     : (viewMode === 'group' ? MaleBackBodyMapGroup : MaleBackBodyMapMuscle);
 
   return (
-    <div
+    <div 
       ref={containerRef}
       className={`flex justify-center items-center ${compact ? 'gap-0' : 'gap-4'} w-full ${compactFill ? 'h-full' : ''}`}
     >

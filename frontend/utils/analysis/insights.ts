@@ -88,7 +88,7 @@ export interface WeeklyComparison {
 }
 
 export interface RollingWindowComparison {
-  windowDays: 7 | 28;
+  windowDays: 7 | 30 | 365;
   eligible: boolean;
   minWorkoutsRequired: number;
   current: PeriodStats;
@@ -99,7 +99,7 @@ export interface RollingWindowComparison {
   prs: DeltaResult | null;
 }
 
-const getRollingWindowRange = (now: Date, windowDays: 7 | 28) => {
+const getRollingWindowRange = (now: Date, windowDays: 7 | 30 | 365) => {
   const currentStart = startOfDay(subDays(now, windowDays - 1));
   const currentEnd = now;
 
@@ -114,7 +114,7 @@ const getRollingWindowRange = (now: Date, windowDays: 7 | 28) => {
 
 export const getRollingWindowComparison = (
   data: WorkoutSet[],
-  windowDays: 7 | 28,
+  windowDays: 7 | 30 | 365,
   now: Date = new Date(0),
   minWorkoutsRequired: number = 2
 ): RollingWindowComparison => {
@@ -606,7 +606,8 @@ export const getConsistencySparkline = (data: WorkoutSet[], weeks: number = 8, n
 
 export interface DashboardInsights {
   rolling7d: RollingWindowComparison;
-  rolling28d: RollingWindowComparison;
+  rolling30d: RollingWindowComparison;
+  rolling365d: RollingWindowComparison;
   streakInfo: StreakInfo;
   prInsights: PRInsights;
   volumeSparkline: SparklinePoint[];
@@ -623,7 +624,8 @@ export const calculateDashboardInsights = (
 ): DashboardInsights => {
   return {
     rolling7d: getRollingWindowComparison(data, 7, now, 2),
-    rolling28d: getRollingWindowComparison(data, 28, now, 2),
+    rolling30d: getRollingWindowComparison(data, 30, now, 2),
+    rolling365d: getRollingWindowComparison(data, 365, now, 2),
     streakInfo: calculateStreakInfo(data, now),
     prInsights: calculatePRInsights(data, now),
     volumeSparkline: getVolumeSparkline(dailyData),

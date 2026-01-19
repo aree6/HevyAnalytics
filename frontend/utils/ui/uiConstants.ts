@@ -70,6 +70,91 @@ export const ANIMATION_KEYFRAMES = `
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
   }
+
+  @keyframes meteorRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  :root {
+    --meteor-border-bg: rgb(var(--panel-rgb));
+    --meteor-dot: 255 255 255;
+    --meteor-dim: 255 255 255;
+    --meteor-core: 99 102 241;
+  }
+
+  html[data-theme='light'] {
+    --meteor-border-bg: rgb(var(--panel-rgb));
+    --meteor-dot: 245 158 11;
+    --meteor-dim: 245 158 11;
+    --meteor-core: 217 119 6;
+  }
+
+  .meteor-border-track {
+    position: absolute;
+    width: calc(100% + 4px);
+    height: calc(100% + 4px);
+    border-radius: 6px;
+    border: 1px solid rgb(var(--border-rgb) / 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .meteor-premium {
+    position: absolute;
+    width: 200px;
+    height: 400%;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      transparent 150deg,
+      rgba(var(--meteor-core) / 0.05) 165deg,
+      rgba(var(--meteor-core) / 0.15) 175deg,
+      rgba(var(--meteor-core) / 0.30) 182deg,
+      rgba(var(--meteor-core) / 0.50) 186deg,
+      rgba(var(--meteor-core) / 0.70) 189deg,
+      rgba(var(--meteor-core) / 0.90) 191deg,
+      rgba(var(--meteor-core) / 1) 192deg,
+      rgba(var(--meteor-core) / 0.90) 193deg,
+      rgba(var(--meteor-core) / 0.50) 195deg,
+      rgba(var(--meteor-core) / 0.20) 198deg,
+      rgba(var(--meteor-core) / 0.10) 202deg,
+      transparent 210deg,
+      transparent 360deg
+    );
+    animation: meteorRotate 4s linear infinite;
+    filter: blur(0.5px);
+  }
+
+  .meteor-premium::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      transparent 185deg,
+      rgba(var(--meteor-core) / 0.40) 190deg,
+      rgba(var(--meteor-core) / 0.60) 192deg,
+      rgba(var(--meteor-core) / 0.40) 194deg,
+      transparent 199deg,
+      transparent 360deg
+    );
+    filter: blur(6px);
+  }
+
+  .meteor-border-mask {
+    position: absolute;
+    width: calc(100% - 2px);
+    height: calc(100% - 2px);
+    background: var(--meteor-border-bg);
+    border-radius: 5px;
+    z-index: 1;
+  }
 `;
 
 /** Tooltip positioning constants */
