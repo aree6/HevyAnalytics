@@ -43,6 +43,12 @@ const getCookieDomain = (): string | undefined => {
   return normalized;
 };
 
+const isGithubPagesHost = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const host = (window.location?.hostname ?? '').trim().toLowerCase();
+  return host.endsWith('.github.io');
+};
+
 const ensurePosthogInitialized = (): void => {
   if (typeof window === 'undefined') return;
   if (!shouldEnableAnalytics()) return;
@@ -59,6 +65,15 @@ const ensurePosthogInitialized = (): void => {
 
       posthogClient.init(posthogCfg.key, {
         api_host: posthogCfg.host,
+        ...(isGithubPagesHost()
+          ? {
+              // GitHub Pages is hosted on a public suffix (github.io). PostHog's cookie-domain
+              // probing can attempt to set cookies on invalid parent domains and trigger
+              // noisy console warnings like `dmn_chk_* has been rejected for invalid domain`.
+              cross_subdomain_cookie: false,
+              persistence: 'localStorage',
+            }
+          : {}),
         autocapture: {
           dom_event_allowlist: ['click', 'submit'],
           element_allowlist: ['a', 'button', 'form', 'label'],
