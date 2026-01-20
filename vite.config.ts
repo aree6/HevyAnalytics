@@ -40,8 +40,8 @@ const serveFaviconIcoPlugin = () => {
       if (url !== '/favicon.ico') return next();
 
       // Browsers often request /favicon.ico regardless of <link rel="icon">.
-      // We don't keep a dedicated .ico asset, so we map it to an existing icon.
-      req.url = '/UI/logo.png';
+      // Keep a dedicated .ico asset for best compatibility (including crawlers).
+      req.url = '/UI/favicon.ico';
       return next();
     });
   };
