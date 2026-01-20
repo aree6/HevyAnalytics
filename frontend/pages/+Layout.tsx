@@ -2,7 +2,7 @@ export { Layout };
 
 import React from 'react';
 import type { PageContext } from 'vike/types';
-import { ThemeProvider } from '../components/ThemeProvider';
+import { ThemeProvider } from '../components/theme/ThemeProvider';
 import '../tailwind.css';
 
 type LayoutProps = {

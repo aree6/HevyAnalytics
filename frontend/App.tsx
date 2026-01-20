@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, Suspense, useRef, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   parseWorkoutCSVAsyncWithUnit,
@@ -7,42 +7,34 @@ import {
 import { getDailySummaries, getExerciseStats, identifyPersonalRecords } from './utils/analysis/analytics';
 import { computationCache, getFilteredCacheKey } from './utils/storage/computationCache';
 import { WorkoutSet } from './types';
-import { BodyMapGender } from './components/BodyMap';
-const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
-const ExerciseView = React.lazy(() => import('./components/ExerciseView').then(m => ({ default: m.ExerciseView })));
-const HistoryView = React.lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
-const MuscleAnalysis = React.lazy(() => import('./components/MuscleAnalysis').then(m => ({ default: m.MuscleAnalysis })));
-const FlexView = React.lazy(() => import('./components/FlexView').then(m => ({ default: m.FlexView })));
-import { CSVImportModal } from './components/CSVImportModal';
+import { BodyMapGender } from './components/bodyMap/BodyMap';
+import type { DataSourceChoice } from './utils/dataSources/types';
+import { Tab, getPathForTab, getTabFromPathname, parseLocalDateFromYyyyMmDd } from './app/tabs';
+import { AppHeader } from './components/app/AppHeader';
+import { AppCalendarOverlay } from './components/app/AppCalendarOverlay';
+import { AppLoadingOverlay } from './components/app/AppLoadingOverlay';
+import { AppTabContent } from './components/app/AppTabContent';
+import { AppOnboardingLayer } from './components/app/AppOnboardingLayer';
+import type { OnboardingFlow } from './app/onboarding/types';
 import {
   saveCSVData,
-  getCSVData,
-  clearCSVData,
   saveWeightUnit,
   getWeightUnit,
   clearWeightUnit,
   WeightUnit,
   getBodyMapGender,
   saveBodyMapGender,
-  clearBodyMapGender,
-  clearPreferencesConfirmed,
   getPreferencesConfirmed,
-  savePreferencesConfirmed,
-  clearThemeMode,
 } from './utils/storage/localStorage';
-import { LayoutDashboard, Dumbbell, History, CheckCircle2, X, Calendar, BicepsFlexed, Pencil, RefreshCw, Sparkles } from 'lucide-react';
+import { X, Calendar, Pencil } from 'lucide-react';
 import { format, isSameDay, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
-import { CalendarSelector } from './components/CalendarSelector';
 import { formatDayYearContraction, formatHumanReadableDate, getEffectiveNowFromWorkoutData, isPlausibleDate } from './utils/date/dateUtils';
 import { trackPageView } from './utils/integrations/ga';
 import { setContext, trackEvent } from './utils/integrations/analytics';
-import { SupportLinks } from './components/SupportLinks';
-import { ThemedBackground } from './components/ThemedBackground';
-import { ThemeToggleButton } from './components/ThemeToggleButton';
+import { ThemedBackground } from './components/theme/ThemedBackground';
 import {
   getDataSourceChoice,
   saveDataSourceChoice,
-  clearDataSourceChoice,
   getHevyAuthToken,
   saveHevyAuthToken,
   clearHevyAuthToken,
@@ -52,70 +44,22 @@ import {
   getLyfataApiKey,
   saveLyfataApiKey,
   clearLyfataApiKey,
-  getLastCsvPlatform,
   saveLastCsvPlatform,
-  clearLastCsvPlatform,
-  getLastLoginMethod,
   saveLastLoginMethod,
-  clearLastLoginMethod,
   getSetupComplete,
   saveSetupComplete,
-  clearSetupComplete,
 } from './utils/storage/dataSourceStorage';
-import { clearHevyCredentials, getHevyUsernameOrEmail, saveHevyPassword, saveHevyUsernameOrEmail } from './utils/storage/hevyCredentialsStorage';
+import { getHevyUsernameOrEmail, saveHevyPassword, saveHevyUsernameOrEmail } from './utils/storage/hevyCredentialsStorage';
 import { hevyBackendGetAccount, hevyBackendGetSets, hevyBackendGetSetsWithProApiKey, hevyBackendLogin, hevyBackendValidateProApiKey } from './utils/api/hevyBackend';
 import { lyfatBackendGetSets } from './utils/api/lyfataBackend';
-import { parseHevyDateString } from './utils/date/parseHevyDateString';
-import { useTheme } from './components/ThemeProvider';
-import { CsvLoadingAnimation } from './components/CsvLoadingAnimation';
-import { LandingPage } from './components/LandingPage';
-import { HevyLoginModal } from './components/HevyLoginModal';
-import { LyfataLoginModal } from './components/LyfataLoginModal';
-import { assetPath } from './constants';
-
-enum Tab {
-  DASHBOARD = 'dashboard',
-  EXERCISES = 'exercises',
-  HISTORY = 'history',
-  MUSCLE_ANALYSIS = 'muscle-analysis',
-  FLEX = 'flex'
-}
-
-const getTabFromPathname = (pathname: string): Tab => {
-  const normalized = (pathname || '/').replace(/\/+$/g, '') || '/';
-  if (normalized === '/' || normalized === '/dashboard') return Tab.DASHBOARD;
-  if (normalized === `/${Tab.EXERCISES}`) return Tab.EXERCISES;
-  if (normalized === `/${Tab.HISTORY}`) return Tab.HISTORY;
-  if (normalized === `/${Tab.MUSCLE_ANALYSIS}`) return Tab.MUSCLE_ANALYSIS;
-  if (normalized === `/${Tab.FLEX}`) return Tab.FLEX;
-  return Tab.DASHBOARD;
-};
-
-const getPathForTab = (tab: Tab): string => {
-  if (tab === Tab.DASHBOARD) return '/';
-  return `/${tab}`;
-};
-
-const parseLocalDateFromYyyyMmDd = (value: string): Date | null => {
-  const m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(value);
-  if (!m) return null;
-  const year = Number(m[1]);
-  const monthIndex = Number(m[2]) - 1;
-  const day = Number(m[3]);
-  if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || !Number.isFinite(day)) return null;
-  return new Date(year, monthIndex, day);
-};
-
-type OnboardingIntent = 'initial' | 'update';
-type OnboardingStep = 'platform' | 'strong_prefs' | 'strong_csv' | 'lyfta_prefs' | 'lyfta_csv' | 'other_prefs' | 'other_csv' | 'lyfta_login' | 'hevy_prefs' | 'hevy_login' | 'hevy_csv';
-
-type OnboardingFlow = {
-  intent: OnboardingIntent;
-  step: OnboardingStep;
-  platform?: DataSourceChoice;
-  backStep?: OnboardingStep;
-};
-
+import { useTheme } from './components/theme/ThemeProvider';
+import { hydrateBackendWorkoutSets } from './app/hydrateBackendWorkoutSets';
+import { getErrorMessage, getHevyErrorMessage, getLyfatErrorMessage } from './app/appErrorMessages';
+import { clearCacheAndRestart as clearCacheAndRestartNow } from './app/clearCacheAndRestart';
+import { finishProgress as finishLoadingProgress, startProgress as startLoadingProgress } from './app/loadingProgress';
+import { usePrefetchHeavyViews } from './app/usePrefetchHeavyViews';
+import { useStartupAutoLoad } from './app/useStartupAutoLoad';
+import { usePlatformDeepLink } from './app/usePlatformDeepLink';
 
 const App: React.FC = () => {
   const { mode } = useTheme();
@@ -187,38 +131,12 @@ const App: React.FC = () => {
     };
   }, [onboarding?.intent]);
 
-  useEffect(() => {
-    if (platformQueryConsumedRef.current) return;
-    const params = new URLSearchParams(location.search);
-    const platform = params.get('platform');
-    if (!platform) return;
-
-    const isKnown = platform === 'hevy' || platform === 'strong' || platform === 'lyfta' || platform === 'other';
-    if (!isKnown) return;
-
-    trackEvent('deep_link_platform', { platform });
-
-    platformQueryConsumedRef.current = true;
-
-    const intent: OnboardingIntent = getSetupComplete() ? 'update' : 'initial';
-
-    if (platform === 'strong') {
-      setOnboarding({ intent, step: 'strong_prefs', platform: 'strong' });
-    } else if (platform === 'lyfta') {
-      setOnboarding({ intent, step: 'lyfta_prefs', platform: 'lyfta' });
-    } else if (platform === 'other') {
-      setOnboarding({ intent, step: 'other_prefs', platform: 'other' });
-    } else {
-      setOnboarding({ intent, step: 'hevy_prefs', platform: 'hevy' });
-    }
-
-    params.delete('platform');
-    const nextSearch = params.toString();
-    navigate(
-      { pathname: location.pathname || '/', search: nextSearch ? `?${nextSearch}` : '' },
-      { replace: true }
-    );
-  }, [location.pathname, location.search, navigate]);
+  usePlatformDeepLink({
+    location,
+    navigate,
+    setOnboarding,
+    platformQueryConsumedRef,
+  });
 
   useLayoutEffect(() => {
     activeTabRef.current = activeTab;
@@ -244,37 +162,6 @@ const App: React.FC = () => {
     el.addEventListener('scroll', onScroll, { passive: true } as any);
     return () => el.removeEventListener('scroll', onScroll as any);
   }, []);
-
-  const getErrorMessage = (err: unknown): string => {
-    if (err instanceof Error && err.message) return err.message;
-    return 'Failed to import CSV. Please export your workout data from the Hevy app and try again.';
-  };
-
-  const getHevyErrorMessage = (err: unknown): string => {
-    if (err instanceof Error && err.message) {
-      const msg = err.message;
-      // "Load failed" is a Safari-specific error, often caused by content blockers, VPNs, or network issues
-      if (msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('failed to fetch')) {
-        return `Network error: ${msg}. This is often caused by content blockers, VPNs,  or network issues. Try disabling ad blockers or switching browsers.`;
-      }
-      return msg;
-    }
-    return 'Failed to fetch Hevy data. Please try again.';
-  };
-
-  const getLyfatErrorMessage = (err: unknown): string => {
-    if (err instanceof Error && err.message) {
-      const msg = err.message;
-      if (msg.toLowerCase().includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('invalid')) {
-        return 'Invalid API key. Please check your Lyfta API key and try again.';
-      }
-      if (msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('failed to fetch')) {
-        return `Network error: ${msg}. This is often caused by content blockers, VPNs, or network issues. Try disabling ad blockers or switching browsers.`;
-      }
-      return msg;
-    }
-    return 'Failed to fetch Lyfta data. Please try again.';
-  };
 
   useEffect(() => {
     const el = mainRef.current;
@@ -382,22 +269,7 @@ const App: React.FC = () => {
   }, [location.pathname, location.search, navigateToTab]);
 
   const clearCacheAndRestart = useCallback(() => {
-    trackEvent('cache_clear', {});
-    clearCSVData();
-    clearHevyAuthToken();
-    clearHevyProApiKey();
-    clearHevyCredentials();
-    clearLyfataApiKey();
-    clearDataSourceChoice();
-    clearLastCsvPlatform();
-    clearLastLoginMethod();
-    clearSetupComplete();
-    clearWeightUnit();
-    clearBodyMapGender();
-    clearPreferencesConfirmed();
-    clearThemeMode();
-    computationCache.clear();
-    window.location.reload();
+    clearCacheAndRestartNow();
   }, []);
 
   // Gender state with localStorage persistence
@@ -449,32 +321,17 @@ const App: React.FC = () => {
   };
 
   const startProgress = () => {
-    setProgress(0);
-    if (progressTimerRef.current) window.clearInterval(progressTimerRef.current);
-    const start = Date.now();
-    const t = window.setInterval(() => {
-      setProgress(prev => Math.min(90, Math.round(prev + Math.max(1, (90 - prev) * 0.05))));
-    }, 100);
-    progressTimerRef.current = t;
-    return start;
+    return startLoadingProgress({ setProgress, progressTimerRef });
   };
 
   const finishProgress = (startedAt: number) => {
-    const MIN_MS = 1200;
-    const elapsed = Date.now() - startedAt;
-    const remaining = Math.max(0, MIN_MS - elapsed);
-    window.setTimeout(() => {
-      if (progressTimerRef.current) {
-        window.clearInterval(progressTimerRef.current);
-        progressTimerRef.current = null;
-      }
-      setProgress(100);
-      setTimeout(() => {
-        setIsAnalyzing(false);
-        setLoadingKind(null);
-        setProgress(0);
-      }, 200);
-    }, remaining);
+    finishLoadingProgress({
+      startedAt,
+      setProgress,
+      setIsAnalyzing,
+      setLoadingKind,
+      progressTimerRef,
+    });
   };
 
   // Filter States
@@ -484,428 +341,19 @@ const App: React.FC = () => {
   const [selectedWeeks, setSelectedWeeks] = useState<Array<{ start: Date; end: Date }>>([]);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  useEffect(() => {
-    if (!getSetupComplete()) return;
-
-    // Backwards compatibility: older setups predate the preferences-confirmed flag.
-    // Keep existing users unblocked, but require explicit confirmation for new setups.
-    if (!getPreferencesConfirmed()) {
-      savePreferencesConfirmed(true);
-    }
-
-    const storedChoice = getDataSourceChoice();
-    if (!storedChoice) {
-      saveSetupComplete(false);
-      setOnboarding({ intent: 'initial', step: 'platform' });
-      return;
-    }
-
-    setDataSource(storedChoice);
-
-    const hevyAccountKey = storedChoice === 'hevy' ? (getHevyUsernameOrEmail() ?? undefined) : undefined;
-    const lastMethod = getLastLoginMethod(storedChoice, hevyAccountKey);
-
-    const storedCSV = getCSVData();
-    const lastCsvPlatform = getLastCsvPlatform();
-    const shouldUseCsv = lastMethod === 'csv' || (!lastMethod && storedCSV && lastCsvPlatform === storedChoice);
-
-    if (storedChoice === 'strong') {
-      if (!storedCSV || lastCsvPlatform !== 'strong') {
-        saveSetupComplete(false);
-        setOnboarding({ intent: 'initial', step: 'platform' });
-        return;
-      }
-
-      setLoadingKind('csv');
-      setIsAnalyzing(true);
-      setLoadingStep(0);
-      const startedAt = startProgress();
-      setTimeout(() => {
-        setLoadingStep(1);
-        parseWorkoutCSVAsyncWithUnit(storedCSV, { unit: getWeightUnit() })
-          .then((result: ParseWorkoutCsvResult) => {
-            setLoadingStep(2);
-            const enriched = identifyPersonalRecords(result.sets);
-            setParsedData(enriched);
-            setHevyLoginError(null);
-            setCsvImportError(null);
-          })
-          .catch((err) => {
-            clearCSVData();
-            saveSetupComplete(false);
-            setCsvImportError(getErrorMessage(err));
-            setOnboarding({ intent: 'initial', step: 'platform' });
-          })
-          .finally(() => {
-            finishProgress(startedAt);
-          });
-      }, 0);
-      return;
-    }
-
-    if (storedChoice === 'lyfta') {
-      const lyfatApiKey = getLyfataApiKey();
-      if (lastMethod === 'apiKey' && lyfatApiKey) {
-        setLoadingKind('lyfta');
-        setIsAnalyzing(true);
-        setLoadingStep(0);
-        const startedAt = startProgress();
-        Promise.resolve()
-          .then(() => {
-            setLoadingStep(1);
-            return lyfatBackendGetSets<WorkoutSet>(lyfatApiKey);
-          })
-          .then((resp) => {
-            setLoadingStep(2);
-            const hydrated = (resp.sets ?? []).map((s) => ({
-              ...s,
-              parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-            }));
-            const enriched = identifyPersonalRecords(hydrated);
-            setParsedData(enriched);
-            setLyfatLoginError(null);
-            setCsvImportError(null);
-          })
-          .catch((err) => {
-            clearLyfataApiKey();
-            saveSetupComplete(false);
-            setLyfatLoginError(getHevyErrorMessage(err));
-            setOnboarding({ intent: 'initial', step: 'platform' });
-          })
-          .finally(() => {
-            finishProgress(startedAt);
-          });
-        return;
-      }
-
-      if (shouldUseCsv) {
-        if (!storedCSV || lastCsvPlatform !== 'lyfta') {
-          saveSetupComplete(false);
-          setOnboarding({ intent: 'initial', step: 'platform' });
-          return;
-        }
-
-        setLoadingKind('csv');
-        setIsAnalyzing(true);
-        setLoadingStep(0);
-        const startedAt = startProgress();
-        setTimeout(() => {
-          setLoadingStep(1);
-          parseWorkoutCSVAsyncWithUnit(storedCSV, { unit: getWeightUnit() })
-            .then((result: ParseWorkoutCsvResult) => {
-              setLoadingStep(2);
-              const enriched = identifyPersonalRecords(result.sets);
-              setParsedData(enriched);
-              setLyfatLoginError(null);
-              setCsvImportError(null);
-            })
-            .catch((err) => {
-              clearCSVData();
-              saveSetupComplete(false);
-              setCsvImportError(getErrorMessage(err));
-              setOnboarding({ intent: 'initial', step: 'platform' });
-            })
-            .finally(() => {
-              finishProgress(startedAt);
-            });
-        }, 0);
-        return;
-      }
-
-      // Fallback for older setups: prefer API key, then CSV, otherwise restart.
-      if (lyfatApiKey) {
-        setLoadingKind('lyfta');
-        setIsAnalyzing(true);
-        setLoadingStep(0);
-        const startedAt = startProgress();
-        Promise.resolve()
-          .then(() => {
-            setLoadingStep(1);
-            return lyfatBackendGetSets<WorkoutSet>(lyfatApiKey);
-          })
-          .then((resp) => {
-            setLoadingStep(2);
-            const hydrated = (resp.sets ?? []).map((s) => ({
-              ...s,
-              parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-            }));
-            const enriched = identifyPersonalRecords(hydrated);
-            setParsedData(enriched);
-            setLyfatLoginError(null);
-            setCsvImportError(null);
-          })
-          .catch((err) => {
-            clearLyfataApiKey();
-            saveSetupComplete(false);
-            setLyfatLoginError(getHevyErrorMessage(err));
-            setOnboarding({ intent: 'initial', step: 'platform' });
-          })
-          .finally(() => {
-            finishProgress(startedAt);
-          });
-        return;
-      }
-
-      if (storedCSV && lastCsvPlatform === 'lyfta') {
-        setLoadingKind('csv');
-        setIsAnalyzing(true);
-        setLoadingStep(0);
-        const startedAt = startProgress();
-        setTimeout(() => {
-          setLoadingStep(1);
-          parseWorkoutCSVAsyncWithUnit(storedCSV, { unit: getWeightUnit() })
-            .then((result: ParseWorkoutCsvResult) => {
-              setLoadingStep(2);
-              const enriched = identifyPersonalRecords(result.sets);
-              setParsedData(enriched);
-              setLyfatLoginError(null);
-              setCsvImportError(null);
-            })
-            .catch((err) => {
-              clearCSVData();
-              saveSetupComplete(false);
-              setCsvImportError(getErrorMessage(err));
-              setOnboarding({ intent: 'initial', step: 'platform' });
-            })
-            .finally(() => {
-              finishProgress(startedAt);
-            });
-        }, 0);
-        return;
-      }
-
-      saveSetupComplete(false);
-      setOnboarding({ intent: 'initial', step: 'platform' });
-      return;
-    }
-
-    if (storedChoice === 'hevy' && shouldUseCsv) {
-      if (!storedCSV || lastCsvPlatform !== 'hevy') {
-        saveSetupComplete(false);
-        setOnboarding({ intent: 'initial', step: 'platform' });
-        return;
-      }
-
-      setLoadingKind('csv');
-      setIsAnalyzing(true);
-      setLoadingStep(0);
-      const startedAt = startProgress();
-      setTimeout(() => {
-        setLoadingStep(1);
-        parseWorkoutCSVAsyncWithUnit(storedCSV, { unit: getWeightUnit() })
-          .then((result: ParseWorkoutCsvResult) => {
-            setLoadingStep(2);
-            const enriched = identifyPersonalRecords(result.sets);
-            setParsedData(enriched);
-            setHevyLoginError(null);
-            setCsvImportError(null);
-          })
-          .catch((err) => {
-            clearCSVData();
-            saveSetupComplete(false);
-            setCsvImportError(getErrorMessage(err));
-            setOnboarding({ intent: 'initial', step: 'platform' });
-          })
-          .finally(() => {
-            finishProgress(startedAt);
-          });
-      }, 0);
-      return;
-    }
-
-    // Check for Hevy Pro API key
-    const hevyProApiKey = getHevyProApiKey();
-    if (storedChoice === 'hevy' && lastMethod === 'apiKey' && hevyProApiKey) {
-      setLoadingKind('hevy');
-      setIsAnalyzing(true);
-      setLoadingStep(0);
-      const startedAt = startProgress();
-      Promise.resolve()
-        .then(() => {
-          setLoadingStep(1);
-          return hevyBackendGetSetsWithProApiKey<WorkoutSet>(hevyProApiKey);
-        })
-        .then((resp) => {
-          setLoadingStep(2);
-          const hydrated = (resp.sets ?? []).map((s) => ({
-            ...s,
-            parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-          }));
-          const enriched = identifyPersonalRecords(hydrated);
-          setParsedData(enriched);
-          setHevyLoginError(null);
-          setCsvImportError(null);
-        })
-        .catch((err) => {
-          clearHevyProApiKey();
-          saveSetupComplete(false);
-          setHevyLoginError(getHevyErrorMessage(err));
-          setOnboarding({ intent: 'initial', step: 'platform' });
-        })
-        .finally(() => {
-          finishProgress(startedAt);
-        });
-      return;
-    }
-
-    const token = getHevyAuthToken();
-    if (storedChoice === 'hevy' && lastMethod === 'credentials' && !token) {
-      saveSetupComplete(false);
-      setOnboarding({ intent: 'initial', step: 'platform' });
-      return;
-    }
-
-    // Backwards-compatible fallback for existing users: prefer API key or credentials,
-    // only using CSV when the last method indicates CSV.
-    if (storedChoice === 'hevy' && !lastMethod) {
-      if (hevyProApiKey) {
-        setLoadingKind('hevy');
-        setIsAnalyzing(true);
-        setLoadingStep(0);
-        const startedAt = startProgress();
-        Promise.resolve()
-          .then(() => {
-            setLoadingStep(1);
-            return hevyBackendGetSetsWithProApiKey<WorkoutSet>(hevyProApiKey);
-          })
-          .then((resp) => {
-            setLoadingStep(2);
-            const hydrated = (resp.sets ?? []).map((s) => ({
-              ...s,
-              parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-            }));
-            const enriched = identifyPersonalRecords(hydrated);
-            setParsedData(enriched);
-            setHevyLoginError(null);
-            setCsvImportError(null);
-          })
-          .catch((err) => {
-            clearHevyProApiKey();
-            saveSetupComplete(false);
-            setHevyLoginError(getHevyErrorMessage(err));
-            setOnboarding({ intent: 'initial', step: 'platform' });
-          })
-          .finally(() => {
-            finishProgress(startedAt);
-          });
-        return;
-      }
-      if (token) {
-        setLoadingKind('hevy');
-        setIsAnalyzing(true);
-        setLoadingStep(0);
-        const startedAt = startProgress();
-        Promise.resolve()
-          .then(() => hevyBackendGetAccount(token))
-          .then(({ username }) => {
-            setLoadingStep(1);
-            return hevyBackendGetSets<WorkoutSet>(token, username);
-          })
-          .then((resp) => {
-            setLoadingStep(2);
-            const hydrated = (resp.sets ?? []).map((s) => ({
-              ...s,
-              parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-            }));
-            const enriched = identifyPersonalRecords(hydrated);
-            setParsedData(enriched);
-            setHevyLoginError(null);
-            setCsvImportError(null);
-          })
-          .catch((err) => {
-            clearHevyAuthToken();
-            saveSetupComplete(false);
-            setHevyLoginError(getHevyErrorMessage(err));
-            setOnboarding({ intent: 'initial', step: 'platform' });
-          })
-          .finally(() => {
-            finishProgress(startedAt);
-          });
-        return;
-      }
-      if (storedCSV && lastCsvPlatform === 'hevy') {
-        setLoadingKind('csv');
-        setIsAnalyzing(true);
-        setLoadingStep(0);
-        const startedAt = startProgress();
-        setTimeout(() => {
-          setLoadingStep(1);
-          parseWorkoutCSVAsyncWithUnit(storedCSV, { unit: getWeightUnit() })
-            .then((result: ParseWorkoutCsvResult) => {
-              setLoadingStep(2);
-              const enriched = identifyPersonalRecords(result.sets);
-              setParsedData(enriched);
-              setHevyLoginError(null);
-              setCsvImportError(null);
-            })
-            .catch((err) => {
-              clearCSVData();
-              saveSetupComplete(false);
-              setCsvImportError(getErrorMessage(err));
-              setOnboarding({ intent: 'initial', step: 'platform' });
-            })
-            .finally(() => {
-              finishProgress(startedAt);
-            });
-        }, 0);
-        return;
-      }
-      saveSetupComplete(false);
-      setOnboarding({ intent: 'initial', step: 'platform' });
-      return;
-    }
-
-    if (storedChoice === 'hevy' && lastMethod === 'apiKey' && !hevyProApiKey) {
-      saveSetupComplete(false);
-      setOnboarding({ intent: 'initial', step: 'platform' });
-      return;
-    }
-
-    if (storedChoice !== 'hevy') {
-      saveSetupComplete(false);
-      setOnboarding({ intent: 'initial', step: 'platform' });
-      return;
-    }
-
-    if (!token) {
-      saveSetupComplete(false);
-      setOnboarding({ intent: 'initial', step: 'platform' });
-      return;
-    }
-
-    setLoadingKind('hevy');
-    setIsAnalyzing(true);
-    setLoadingStep(0);
-    const startedAt = startProgress();
-    Promise.resolve()
-      .then(() => hevyBackendGetAccount(token))
-      .then(({ username }) => {
-        setLoadingStep(1);
-        return hevyBackendGetSets<WorkoutSet>(token, username);
-      })
-      .then((resp) => {
-        setLoadingStep(2);
-        trackEvent('hevy_sync_success', { method: 'saved_auth_token', workouts: resp.meta?.workouts });
-        const hydrated = (resp.sets ?? []).map((s) => ({
-          ...s,
-          parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-        }));
-        const enriched = identifyPersonalRecords(hydrated);
-        setParsedData(enriched);
-        setHevyLoginError(null);
-        setCsvImportError(null);
-      })
-      .catch((err) => {
-        trackEvent('hevy_sync_error', { method: 'saved_auth_token' });
-        clearHevyAuthToken();
-        saveSetupComplete(false);
-        setHevyLoginError(getHevyErrorMessage(err));
-        setOnboarding({ intent: 'initial', step: 'platform' });
-      })
-      .finally(() => {
-        finishProgress(startedAt);
-      });
-  }, []);
+  useStartupAutoLoad({
+    setOnboarding,
+    setDataSource,
+    setParsedData,
+    setHevyLoginError,
+    setLyfatLoginError,
+    setCsvImportError,
+    setIsAnalyzing,
+    setLoadingStep,
+    setLoadingKind,
+    startProgress,
+    finishProgress,
+  });
 
   useEffect(() => {
     if (!dataSource) return;
@@ -914,16 +362,7 @@ const App: React.FC = () => {
   }, [dataSource]);
 
   // Prefetch heavy views and preload exercise assets to avoid first-time lag
-  useEffect(() => {
-    const idle = (cb: () => void) => (('requestIdleCallback' in window) ? (window as any).requestIdleCallback(cb) : setTimeout(cb, 300));
-    idle(() => {
-      // Preload components
-      import('./components/ExerciseView');
-      import('./components/HistoryView');
-      import('./components/MuscleAnalysis');
-      import('./components/FlexView');
-    });
-  }, []);
+  usePrefetchHeavyViews();
 
   // Track "page" views when switching tabs
   useEffect(() => {
@@ -1029,7 +468,7 @@ const App: React.FC = () => {
     <div
       className={`relative flex items-center gap-2 rounded-lg px-3 py-2 h-10 shadow-sm transition-all duration-300 ${
         hasActiveCalendarFilter
-          ? 'bg-black/70 border border-slate-600/60 ring-2 ring-white/10'
+          ? 'bg-black/70 border border-slate-600/60'
           : 'bg-black/70 border border-slate-700/50'
       }`}
     >
@@ -1144,6 +583,12 @@ const App: React.FC = () => {
     setOnboarding({ intent: 'update', step: 'platform' });
   };
 
+  const handleSelectTab = (tab: Tab) => {
+    setHighlightedExercise(null);
+    setInitialMuscleForAnalysis(null);
+    navigate(getPathForTab(tab));
+  };
+
   const handleHevySyncSaved = () => {
     const savedProKey = getHevyProApiKey();
     if (savedProKey) {
@@ -1160,10 +605,7 @@ const App: React.FC = () => {
         })
         .then((resp) => {
           setLoadingStep(2);
-          const hydrated = (resp.sets ?? []).map((s) => ({
-            ...s,
-            parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-          }));
+          const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
           const enriched = identifyPersonalRecords(hydrated);
           setParsedData(enriched);
           saveLastLoginMethod('hevy', 'apiKey', getHevyUsernameOrEmail() ?? undefined);
@@ -1197,10 +639,7 @@ const App: React.FC = () => {
       })
       .then((resp) => {
         setLoadingStep(2);
-        const hydrated = (resp.sets ?? []).map((s) => ({
-          ...s,
-          parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-        }));
+        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
         const enriched = identifyPersonalRecords(hydrated);
         setParsedData(enriched);
         saveLastLoginMethod('hevy', 'credentials', getHevyUsernameOrEmail() ?? undefined);
@@ -1243,10 +682,7 @@ const App: React.FC = () => {
       })
       .then((resp) => {
         setLoadingStep(2);
-        const hydrated = (resp.sets ?? []).map((s) => ({
-          ...s,
-          parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-        }));
+        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
         const enriched = identifyPersonalRecords(hydrated);
         setParsedData(enriched);
         setDataSource('hevy');
@@ -1290,10 +726,7 @@ const App: React.FC = () => {
       })
       .then((resp) => {
         setLoadingStep(2);
-        const hydrated = (resp.sets ?? []).map((s) => ({
-          ...s,
-          parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-        }));
+        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
         const enriched = identifyPersonalRecords(hydrated);
         setParsedData(enriched);
         setDataSource('hevy');
@@ -1324,10 +757,7 @@ const App: React.FC = () => {
     lyfatBackendGetSets<WorkoutSet>(apiKey)
       .then((resp) => {
         setLoadingStep(2);
-        const hydrated = (resp.sets ?? []).map((s) => ({
-          ...s,
-          parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-        }));
+        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
         const enriched = identifyPersonalRecords(hydrated);
         setParsedData(enriched);
         setDataSource('lyfta');
@@ -1358,10 +788,7 @@ const App: React.FC = () => {
         trackEvent('lyfta_sync_success', { method: 'api_key', workouts: resp.meta?.workouts });
         saveLyfataApiKey(apiKey);
         saveLastLoginMethod('lyfta', 'apiKey');
-        const hydrated = (resp.sets ?? []).map((s) => ({
-          ...s,
-          parsedDate: parseHevyDateString(String(s.start_time ?? '')),
-        }));
+        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
         const enriched = identifyPersonalRecords(hydrated);
         setParsedData(enriched);
         setDataSource('lyfta');
@@ -1433,759 +860,137 @@ const App: React.FC = () => {
       {onboarding?.intent === 'initial' ? null : (
         <>
           {/* Top Header Navigation */}
-          <header className="bg-black/70 flex-shrink-0">
-            <div className="px-2 sm:px-3 py-1 flex flex-col gap-1">
-              {/* Top Row: Logo and Nav Buttons */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                  <img src={assetPath('/UI/logo.png')} alt="LiftShift Logo" className="w-6 h-6 sm:w-7 sm:h-7" decoding="async" />
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className="font-bold text-base sm:text-lg tracking-tight inline-flex items-start whitespace-nowrap"
-                      style={{ color: 'var(--app-fg)' }}
-                    >
-                      <span>LiftShift</span>
-                      <sup className="ml-1 inline-block rounded-full border border-amber-500/30 bg-amber-500/15 px-1 py-0.5 text-[7px] sm:text-[9px] font-semibold leading-none tracking-wide text-amber-400 align-super -translate-y-0.5 -translate-x-2">
-                        BETA
-                      </sup>
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2  min-w-0">
-                  {/* Desktop: right-aligned support buttons, Update pinned as rightmost */}
-                  <div className="hidden md:block">
-                    <SupportLinks
-                      variant="primary"
-                      layout="header"
-                      primaryRightSlot={(
-                        <div className="flex items-center gap-2">
-                          <ThemeToggleButton />
-                          <button
-                            type="button"
-                            onClick={handleOpenUpdateFlow}
-                            className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 py-1 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200 gap-2"
-                          >
-                            <RefreshCw className="w-4 h-4" />
-                            <span>Update Data</span>
-                          </button>
-                        </div>
-                      )}
-                    />
-                  </div>
-
-                  {/* Mobile: keep Update action */}
-                  <div className="md:hidden">
-                    <div className="flex items-center gap-2">
-                      <ThemeToggleButton compact={true} />
-                      <button
-                        type="button"
-                        onClick={handleOpenUpdateFlow}
-                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200 gap-2"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        <span className="hidden sm:inline">Update Data</span>
-                        <span className="sm:hidden">Update</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Second Row: Navigation */}
-              <nav className="grid grid-cols-6 gap-1 sm:grid sm:grid-cols-5 sm:gap-2">
-                <button 
-                  onClick={() => {
-                    setHighlightedExercise(null);
-                    setInitialMuscleForAnalysis(null);
-                    navigate(getPathForTab(Tab.DASHBOARD));
-                  }}
-                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.DASHBOARD ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
-                >
-                  <LayoutDashboard className="w-5 h-5" />
-                  <span className="font-medium text-[7px] sm:text-xs">Dashboard</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    setHighlightedExercise(null);
-                    setInitialMuscleForAnalysis(null);
-                    navigate(getPathForTab(Tab.MUSCLE_ANALYSIS));
-                  }}
-                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
-                >
-                  <svg
-                    className="w-5 h-5"
-                    viewBox="0 0 195.989 195.989"
-                    fill="currentColor"
-                    stroke="currentColor"
-                    strokeWidth="10"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    paintOrder="stroke fill"
-                  >
-                    <path d="M195.935,84.745c-2.07-15.789-20.983-37.722-20.983-37.722c-4.933-12.69-17.677-8.47-17.677-8.47l-8.507,2.295 c-8.421,2.533-8.025,13.555-4.372,15.789c1.602,0.978,6.297,1.233,7.685,0c0.414-0.374,0.098-2.165,0.098-2.165 c8.933,0.487,9.584-4.688,9.584-4.688l3.039-0.606c3.044-1.665,3.72,5.395,3.72,5.395c-2.07,20.009,6.595,27.334,6.595,27.334 c-1.254,3.973-5.62,3.206-5.62,3.206c-13.853-7.197-24.131,6.403-24.131,6.403c-7.831-6.671-23.991,5.148-23.991,5.148 c-9.055,1.79-9.591-9.106-9.591-9.106s-0.42-6.941-0.713-7.578c-0.426-1.084,1.925-0.536,1.925-0.536 c7.965-14.495,0-12.559,0-12.559c1.93-25.008-19.991-19.759-19.991-19.759C76.143,51.748,82.32,68.544,82.32,68.544 c-3.702-0.904-1.927,4.616-1.927,4.616c0.956,8.473,3.985,6.552,3.985,6.552c0.393,2.968,2.058,7.054,2.058,7.054l0.256,6.808 c-1.903,11.298-13.829,1.927-13.829,1.927c-6.996-9.864-24.536-4.348-24.536-4.348c-9.061-13.479-23.333-5.785-23.333-5.785 c1.516-3.349-0.256-20.009-0.256-20.009c1.772-2.058,5.331-13.712,5.331-13.712c1.522,2.058,8.388,2.42,8.388,2.42 c0.524,3.093,2.731,4.351,2.731,4.351c4.665,1.934,2.731-13.335,2.731-13.335c1.221-4.847-6.573-6.013-6.573-6.013 c-13.594-3.739-16.742,4.847-16.742,4.847l-3.547,7.712c-5.063,5.52-14.565,24.368-14.565,24.368 C-2.977,90.999,2.26,93.705,2.26,93.705l9.864,7.667c16.736,16.203,26.85,13.877,26.85,13.877 c13.46-0.256,12.352,8.458,12.352,8.458c0.536,13.342,9.852,27.182,9.852,27.182c0.685,2.326,1.172,4.786,1.656,7.222h63.811 c1.182-2.636,2.412-5.097,3.508-6.625c5.225-7.38,12.361-16.952,14.991-23.297c5.151-12.477,7.594-12.185,7.594-12.185 c18.383,0,28.527-13.329,28.527-13.329c3.014-3.86,7.593-8.616,10.948-10.522C196.726,89.571,195.935,84.745,195.935,84.745z"/>
-                  </svg>
-                  <span className="font-medium text-[7px] sm:text-xs">Muscle</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    setHighlightedExercise(null);
-                    setInitialMuscleForAnalysis(null);
-                    navigate(getPathForTab(Tab.EXERCISES));
-                  }}
-                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.EXERCISES ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
-                >
-                  <svg
-                    className="w-5 h-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M3.43125 14.704L14.2387 16.055C14.8568 16.1322 15.3208 16.6578 15.3208 17.2805C15.3208 18.0233 14.6694 18.5985 13.9325 18.5063L3.12502 17.1554C2.50697 17.0782 2.04297 16.5526 2.04297 15.9299C2.04297 15.187 2.69401 14.6119 3.43125 14.704Z" />
-                    <path d="M3.70312 17.2275V21.9992" />
-                    <path d="M13.6602 18.4727V21.9995" />
-                    <path d="M2.15625 12.7135C2.15625 11.5676 3.08519 10.6387 4.23105 10.6387C5.3769 10.6387 6.30584 11.5676 6.30584 12.7135C6.30584 13.8593 5.3769 14.7883 4.23105 14.7883C3.08519 14.7883 2.15625 13.8593 2.15625 12.7135Z" />
-                    <path d="M11.5858 9.25226V13.2867V12.3792L18.1186 13.1958C19.3644 13.3514 20.2995 14.4108 20.2995 15.6662V20.7556C20.2995 21.4431 19.7422 22.0004 19.0547 22.0004C18.3673 22.0004 17.8099 21.4431 17.8099 20.7556V16.5024L7.64535 15.2317C6.81475 15.1278 6.19141 14.422 6.19141 13.5848C6.19141 12.5865 7.0662 11.8141 8.05707 11.938L9.09618 12.0677V9.25195" />
-                    <path d="M6.60547 5.73445C6.60547 3.6721 8.27757 2 10.3399 2C12.4023 2 14.0744 3.6721 14.0744 5.73445C14.0744 7.7968 12.4023 9.46889 10.3399 9.46889C8.27757 9.46889 6.60547 7.7968 6.60547 5.73445Z" />
-                    <path d="M9.09766 5.73407C9.09766 5.04662 9.65502 4.48926 10.3425 4.48926C11.0299 4.48926 11.5873 5.04662 11.5873 5.73407C11.5873 6.42152 11.0299 6.97889 10.3425 6.97889C9.65502 6.97889 9.09766 6.42152 9.09766 5.73407Z" />
-                    <path d="M2 22H22.0001" />
-                  </svg>
-                  <span className="font-medium text-[7px] sm:text-xs">Exercises</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    setHighlightedExercise(null);
-                    setInitialMuscleForAnalysis(null);
-                    navigate(getPathForTab(Tab.HISTORY));
-                  }}
-                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.HISTORY ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
-                >
-                  <svg
-                    className="w-5 h-5"
-                    viewBox="0 0 503.379 503.379"
-                    fill="currentColor"
-                    stroke="currentColor"
-                    strokeWidth="10"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    paintOrder="stroke fill"
-                  >
-                    <path d="M458.091,128.116v326.842c0,26.698-21.723,48.421-48.422,48.421h-220.92c-26.699,0-48.421-21.723-48.421-48.421V242.439
-		c6.907,1.149,13.953,1.894,21.184,1.894c5.128,0,10.161-0.381,15.132-0.969v211.594c0,6.673,5.429,12.104,12.105,12.104h220.92
-		c6.674,0,12.105-5.432,12.105-12.104V128.116c0-6.676-5.432-12.105-12.105-12.105H289.835c0-12.625-1.897-24.793-5.297-36.315
-		h125.131C436.368,79.695,458.091,101.417,458.091,128.116z M159.49,228.401c-62.973,0-114.202-51.229-114.202-114.199
-		C45.289,51.229,96.517,0,159.49,0c62.971,0,114.202,51.229,114.202,114.202C273.692,177.172,222.461,228.401,159.49,228.401z
-		 M159.49,204.19c49.618,0,89.989-40.364,89.989-89.988c0-49.627-40.365-89.991-89.989-89.991
-		c-49.626,0-89.991,40.364-89.991,89.991C69.499,163.826,109.87,204.19,159.49,204.19z M227.981,126.308
-		c6.682,0,12.105-5.423,12.105-12.105s-5.423-12.105-12.105-12.105h-56.386v-47.52c0-6.682-5.423-12.105-12.105-12.105
-		s-12.105,5.423-12.105,12.105v59.625c0,6.682,5.423,12.105,12.105,12.105H227.981z M367.697,224.456h-131.14
-		c-6.682,0-12.105,5.423-12.105,12.105c0,6.683,5.423,12.105,12.105,12.105h131.14c6.685,0,12.105-5.423,12.105-12.105
-		C379.803,229.879,374.382,224.456,367.697,224.456z M367.91,297.885h-131.14c-6.682,0-12.105,5.42-12.105,12.105
-		s5.423,12.105,12.105,12.105h131.14c6.685,0,12.104-5.42,12.104-12.105S374.601,297.885,367.91,297.885z M367.91,374.353h-131.14
-		c-6.682,0-12.105,5.426-12.105,12.105c0,6.685,5.423,12.104,12.105,12.104h131.14c6.685,0,12.104-5.42,12.104-12.104
-		C380.015,379.778,374.601,374.353,367.91,374.353z"/>
-                  </svg>
-                  <span className="font-medium text-[7px] sm:text-xs">History</span>
-                </button>
-                <button 
-                  onClick={() => {
-                    setHighlightedExercise(null);
-                    setInitialMuscleForAnalysis(null);
-                    navigate(getPathForTab(Tab.FLEX));
-                  }}
-                  className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border transition-all duration-200 ${activeTab === Tab.FLEX ? 'bg-white/10 border-slate-600/70 text-white ring-2 ring-white/25 shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
-                >
-                  <svg
-                    className="w-5 h-5"
-                    viewBox="0 0 512.001 512.001"
-                    fill="currentColor"
-                    stroke="currentColor"
-                    strokeWidth="10"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    paintOrder="stroke fill"
-                  >
-                    <path d="M426.667,0H85.334C73.552,0,64,9.552,64,21.334v469.333C64,502.449,73.552,512,85.334,512h341.333 c11.782,0,21.333-9.551,21.333-21.333V21.334C448,9.552,438.449,0,426.667,0z M182.326,469.334l223.007-207.078v69.398 l-157.349,137.68H182.326z M405.334,96.987L106.667,358.32v-50.35L392.378,42.667h12.956V96.987z M329.674,42.667L106.667,249.745 v-69.398l157.349-137.68H329.674z M199.223,42.667l-92.556,80.986V42.667H199.223z M106.667,415.014l298.667-261.333v50.35 L119.623,469.334h-12.956V415.014z M312.778,469.334l92.556-80.986v80.986H312.778z"/>
-                  </svg>
-                  <span className="font-medium text-[7px] sm:text-xs">Flex</span>
-                </button>
-
-                <button
-                  onClick={() => setCalendarOpen((v) => !v)}
-                  className={`sm:hidden w-full h-full relative flex flex-col items-center justify-center px-2 py-1.5 rounded-lg transition-all duration-200 ${
-                    (selectedDay || selectedWeeks.length > 0 || selectedRange)
-                      ? 'bg-white/10 ring-2 ring-white/25 border border-slate-700/50 text-white shadow-sm'
-                      : 'bg-black/30 hover:bg-black/60 text-slate-200'
-                  }`}
-                  title="Calendar"
-                  aria-label="Calendar"
-                >
-                  {calendarOpen ? (
-                    <Pencil className="w-5 h-5" />
-                  ) : (selectedDay || selectedWeeks.length > 0 || selectedRange) ? (
-                    <Pencil className="w-5 h-5" />
-                  ) : (
-                    <Calendar className="w-5 h-5" />
-                  )}
-
-                  <span className="text-[10px] font-semibold leading-none mt-1">Calendar</span>
-
-                  {(selectedDay || selectedWeeks.length > 0 || selectedRange) && !calendarOpen ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedDay(null);
-                        setSelectedRange(null);
-                        setSelectedWeeks([]);
-                      }}
-                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 border border-slate-700/50 grid place-items-center hover:bg-black/70"
-                      aria-label="Clear calendar filter"
-                      title="Clear"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  ) : null}
-                </button>
-              </nav>
-            </div>
-          </header>
+          <AppHeader
+            activeTab={activeTab}
+            onSelectTab={handleSelectTab}
+            onOpenUpdateFlow={handleOpenUpdateFlow}
+            calendarOpen={calendarOpen}
+            onToggleCalendarOpen={() => setCalendarOpen((v) => !v)}
+            hasActiveCalendarFilter={hasActiveCalendarFilter}
+            onClearCalendarFilter={() => {
+              setSelectedDay(null);
+              setSelectedRange(null);
+              setSelectedWeeks([]);
+            }}
+          />
 
           {calendarOpen && (
-            <div className="fixed inset-0 z-50 grid place-items-center p-4">
-              <div className="absolute inset-0 bg-black/40" onClick={() => setCalendarOpen(false)} />
-              <CalendarSelector
-                mode="both"
-                initialMonth={selectedDay ?? selectedRange?.start ?? selectedWeeks[0]?.start ?? effectiveNow ?? null}
-                initialRange={
-                  selectedRange
-                    ? { start: selectedRange.start, end: selectedRange.end }
-                    : selectedWeeks.length === 1
-                    ? { start: startOfDay(selectedWeeks[0].start), end: endOfDay(selectedWeeks[0].end) }
-                    : null
+            <AppCalendarOverlay
+              open={calendarOpen}
+              onClose={() => setCalendarOpen(false)}
+              selectedDay={selectedDay}
+              selectedRange={selectedRange}
+              selectedWeeks={selectedWeeks}
+              effectiveNow={effectiveNow}
+              minDate={minDate}
+              maxDate={maxDate}
+              availableDatesSet={availableDatesSet}
+              onSelectWeeks={(ranges) => {
+                setSelectedWeeks(ranges);
+                setSelectedDay(null);
+                setSelectedRange(null);
+                setCalendarOpen(false);
+              }}
+              onSelectDay={(d) => {
+                setSelectedDay(d);
+                setSelectedWeeks([]);
+                setSelectedRange(null);
+                setCalendarOpen(false);
+              }}
+              onSelectWeek={(r) => {
+                setSelectedWeeks([r]);
+                setSelectedDay(null);
+                setSelectedRange(null);
+                setCalendarOpen(false);
+              }}
+              onSelectMonth={(r) => {
+                setSelectedRange(r);
+                setSelectedDay(null);
+                setSelectedWeeks([]);
+                setCalendarOpen(false);
+              }}
+              onSelectYear={(r) => {
+                setSelectedRange(r);
+                setSelectedDay(null);
+                setSelectedWeeks([]);
+                setCalendarOpen(false);
+              }}
+              onClear={() => {
+                setSelectedRange(null);
+                setSelectedDay(null);
+                setSelectedWeeks([]);
+              }}
+              onApply={({ range }) => {
+                if (range) {
+                  setSelectedRange(range);
+                  setSelectedDay(null);
+                  setSelectedWeeks([]);
                 }
-                minDate={minDate}
-                maxDate={maxDate}
-                availableDates={availableDatesSet}
-                multipleWeeks={true}
-                onSelectWeeks={(ranges) => { setSelectedWeeks(ranges); setSelectedDay(null); setSelectedRange(null); setCalendarOpen(false); }}
-                onSelectDay={(d) => { setSelectedDay(d); setSelectedWeeks([]); setSelectedRange(null); setCalendarOpen(false); }}
-                onSelectWeek={(r) => { setSelectedWeeks([r]); setSelectedDay(null); setSelectedRange(null); setCalendarOpen(false); }}
-                onSelectMonth={(r) => { setSelectedRange(r); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
-                onSelectYear={(r) => { setSelectedRange(r); setSelectedDay(null); setSelectedWeeks([]); setCalendarOpen(false); }}
-                onClear={() => { setSelectedRange(null); setSelectedDay(null); setSelectedWeeks([]); }}
-                onClose={() => setCalendarOpen(false)}
-                onApply={({ range }) => {
-                  if (range) {
-                    setSelectedRange(range);
-                    setSelectedDay(null);
-                    setSelectedWeeks([]);
-                  }
-                  setCalendarOpen(false);
-                }}
-              />
-            </div>
+                setCalendarOpen(false);
+              }}
+            />
           )}
 
-          <main ref={mainRef} className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain bg-black/70 px-2 py-0 sm:px-3 sm:py-0 md:px-1 md:py-0 lg:px-2 lg:py-0">
-
-            <Suspense fallback={<div className="text-slate-400 p-4">Loading...</div>}>
-              {activeTab === Tab.DASHBOARD && (
-                <Dashboard 
-                  dailyData={dailySummaries} 
-                  exerciseStats={exerciseStats} 
-                  fullData={filteredData} 
-                  filtersSlot={desktopFilterControls}
-                  stickyHeader={hasActiveCalendarFilter}
-                  onDayClick={handleDayClick}
-                  onMuscleClick={handleMuscleClick}
-                  onExerciseClick={handleExerciseClick}
-                  bodyMapGender={bodyMapGender}
-                  weightUnit={weightUnit}
-                />
-              )}
-              {activeTab === Tab.EXERCISES && (
-                <ExerciseView
-                  stats={exerciseStats}
-                  filtersSlot={desktopFilterControls}
-                  highlightedExercise={highlightedExercise}
-                  onHighlightApplied={() => setHighlightedExercise(null)}
-                  onExerciseClick={handleExerciseClick}
-                  weightUnit={weightUnit}
-                  bodyMapGender={bodyMapGender}
-                  stickyHeader={hasActiveCalendarFilter}
-                  now={effectiveNow}
-                />
-              )}
-              {activeTab === Tab.HISTORY && (
-                <HistoryView
-                  data={filteredData}
-                  filtersSlot={desktopFilterControls}
-                  weightUnit={weightUnit}
-                  bodyMapGender={bodyMapGender}
-                  stickyHeader={hasActiveCalendarFilter}
-                  onExerciseClick={handleExerciseClick}
-                  onDayTitleClick={handleHistoryDayTitleClick}
-                  targetDate={targetHistoryDate}
-                  onTargetDateConsumed={handleTargetDateConsumed}
-                />
-              )}
-              {activeTab === Tab.MUSCLE_ANALYSIS && (
-                <MuscleAnalysis
-                  data={filteredData}
-                  filtersSlot={desktopFilterControls}
-                  onExerciseClick={handleExerciseClick}
-                  initialMuscle={initialMuscleForAnalysis}
-                  initialWeeklySetsWindow={initialWeeklySetsWindow}
-                  onInitialMuscleConsumed={() => {
-                    setInitialMuscleForAnalysis(null);
-                    setInitialWeeklySetsWindow(null);
-                  }}
-                  bodyMapGender={bodyMapGender}
-                  stickyHeader={hasActiveCalendarFilter}
-                />
-              )}
-              {activeTab === Tab.FLEX && (
-                <FlexView
-                  data={filteredData}
-                  filtersSlot={desktopFilterControls}
-                  weightUnit={weightUnit}
-                  dailySummaries={dailySummaries}
-                  exerciseStats={exerciseStats}
-                  stickyHeader={hasActiveCalendarFilter}
-                  bodyMapGender={bodyMapGender}
-                />
-              )}
-            </Suspense>
-
-            <div className="hidden sm:block mt-8">
-              <SupportLinks variant="secondary" layout="footer" />
-            </div>
-
-            <div className="sm:hidden pb-[calc(env(safe-area-inset-bottom)+1.5rem)] mt-8">
-              <SupportLinks variant="all" layout="footer" />
-            </div>
-          </main>
+          <AppTabContent
+            mainRef={mainRef}
+            activeTab={activeTab}
+            hasActiveCalendarFilter={hasActiveCalendarFilter}
+            dailySummaries={dailySummaries}
+            exerciseStats={exerciseStats}
+            filteredData={filteredData}
+            filtersSlot={desktopFilterControls}
+            highlightedExercise={highlightedExercise}
+            onHighlightApplied={() => setHighlightedExercise(null)}
+            onDayClick={handleDayClick}
+            onMuscleClick={handleMuscleClick}
+            onExerciseClick={handleExerciseClick}
+            onHistoryDayTitleClick={handleHistoryDayTitleClick}
+            targetHistoryDate={targetHistoryDate}
+            onTargetHistoryDateConsumed={handleTargetDateConsumed}
+            initialMuscleForAnalysis={initialMuscleForAnalysis}
+            initialWeeklySetsWindow={initialWeeklySetsWindow}
+            onInitialMuscleConsumed={() => {
+              setInitialMuscleForAnalysis(null);
+              setInitialWeeklySetsWindow(null);
+            }}
+            bodyMapGender={bodyMapGender}
+            weightUnit={weightUnit}
+            now={effectiveNow}
+          />
         </>
       )}
 
-      {/* Landing page for initial visitors - shows real content for SEO/AdSense */}
-      {onboarding?.intent === 'initial' && onboarding?.step === 'platform' ? (
-        <LandingPage
-          onSelectPlatform={(source) => {
-            setCsvImportError(null);
-            setHevyLoginError(null);
-            setLyfatLoginError(null);
-            if (source === 'strong') {
-              setOnboarding({ intent: onboarding.intent, step: 'strong_prefs', platform: 'strong' });
-              return;
-            }
-            if (source === 'lyfta') {
-              setOnboarding({ intent: onboarding.intent, step: 'lyfta_prefs', platform: 'lyfta' });
-              return;
-            }
-            if (source === 'other') {
-              setOnboarding({ intent: onboarding.intent, step: 'other_prefs', platform: 'other' });
-              return;
-            }
-            setOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' });
-          }}
-        />
-      ) : null}
+      <AppOnboardingLayer
+        onboarding={onboarding}
+        dataSource={dataSource}
+        bodyMapGender={bodyMapGender}
+        weightUnit={weightUnit}
+        isAnalyzing={isAnalyzing}
+        csvImportError={csvImportError}
+        hevyLoginError={hevyLoginError}
+        lyfatLoginError={lyfatLoginError}
+        onSetOnboarding={(next) => setOnboarding(next)}
+        onSetBodyMapGender={(g) => setBodyMapGender(g)}
+        onSetWeightUnit={(u) => setWeightUnit(u)}
+        onSetCsvImportError={(msg) => setCsvImportError(msg)}
+        onSetHevyLoginError={(msg) => setHevyLoginError(msg)}
+        onSetLyfatLoginError={(msg) => setLyfatLoginError(msg)}
+        onClearCacheAndRestart={clearCacheAndRestart}
+        onProcessFile={processFile}
+        onHevyLogin={handleHevyLogin}
+        onHevyApiKeyLogin={handleHevyApiKeyLogin}
+        onHevySyncSaved={handleHevySyncSaved}
+        onLyfatLogin={handleLyfatLogin}
+        onLyfatSyncSaved={handleLyfatSyncSaved}
+      />
 
-      {/* Modal for update flow only */}
-      {onboarding?.intent === 'update' && onboarding?.step === 'platform' ? (
-        // If user's saved data source is 'other', skip the choose-platform modal
-        // and open the CSV import modal directly so they return to their CSV upload
-        // screen (no platform-specific copy).
-        dataSource === 'other' ? (
-          <CSVImportModal
-            intent={onboarding.intent}
-            platform="other"
-            onClearCache={clearCacheAndRestart}
-            onFileSelect={(file, gender, unit) => {
-              setBodyMapGender(gender);
-              setWeightUnit(unit);
-              savePreferencesConfirmed(true);
-              setCsvImportError(null);
-              processFile(file, 'other', unit);
-            }}
-            isLoading={isAnalyzing}
-            initialGender={bodyMapGender}
-            initialUnit={weightUnit}
-            onGenderChange={(g) => setBodyMapGender(g)}
-            onUnitChange={(u) => setWeightUnit(u)}
-            errorMessage={csvImportError}
-            onBack={() => setOnboarding(null)}
-            onClose={() => setOnboarding(null)}
-          />
-        ) : (
-          <LandingPage
-            onSelectPlatform={(source) => {
-              setCsvImportError(null);
-              setHevyLoginError(null);
-              setLyfatLoginError(null);
-              if (source === 'strong') {
-                setOnboarding({ intent: onboarding.intent, step: 'strong_prefs', platform: 'strong' });
-                return;
-              }
-              if (source === 'lyfta') {
-                setOnboarding({ intent: onboarding.intent, step: 'lyfta_prefs', platform: 'lyfta' });
-                return;
-              }
-              if (source === 'other') {
-                setOnboarding({ intent: onboarding.intent, step: 'other_prefs', platform: 'other' });
-                return;
-              }
-              setOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' });
-            }}
-          />
-        )
-      ) : null}
-
-      {onboarding?.step === 'hevy_prefs' ? (
-        <CSVImportModal
-          intent={onboarding.intent}
-          platform="hevy"
-          variant="preferences"
-          continueLabel="Continue"
-          isLoading={isAnalyzing}
-          initialGender={getPreferencesConfirmed() ? bodyMapGender : undefined}
-          initialUnit={getPreferencesConfirmed() ? weightUnit : undefined}
-          onGenderChange={(g) => setBodyMapGender(g)}
-          onUnitChange={(u) => setWeightUnit(u)}
-          onContinue={(gender, unit) => {
-            setBodyMapGender(gender);
-            setWeightUnit(unit);
-            savePreferencesConfirmed(true);
-            setOnboarding({ intent: onboarding.intent, step: 'hevy_login', platform: 'hevy' });
-          }}
-          onBack={
-            onboarding.intent === 'initial'
-              ? () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
-              : () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
-          }
-          onClose={
-            onboarding.intent === 'update'
-              ? () => setOnboarding(null)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {onboarding?.step === 'lyfta_prefs' ? (
-        <CSVImportModal
-          intent={onboarding.intent}
-          platform="lyfta"
-          variant="preferences"
-          continueLabel="Continue"
-          isLoading={isAnalyzing}
-          initialGender={getPreferencesConfirmed() ? bodyMapGender : undefined}
-          initialUnit={getPreferencesConfirmed() ? weightUnit : undefined}
-          onGenderChange={(g) => setBodyMapGender(g)}
-          onUnitChange={(u) => setWeightUnit(u)}
-          onContinue={(gender, unit) => {
-            setBodyMapGender(gender);
-            setWeightUnit(unit);
-            savePreferencesConfirmed(true);
-            setOnboarding({ intent: onboarding.intent, step: 'lyfta_login', platform: 'lyfta' });
-          }}
-          onBack={
-            onboarding.intent === 'initial'
-              ? () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
-              : () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
-          }
-          onClose={
-            onboarding.intent === 'update'
-              ? () => setOnboarding(null)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {onboarding?.step === 'strong_prefs' ? (
-        <CSVImportModal
-          intent={onboarding.intent}
-          platform="strong"
-          variant="preferences"
-          continueLabel="Continue"
-          isLoading={isAnalyzing}
-          initialGender={getPreferencesConfirmed() ? bodyMapGender : undefined}
-          initialUnit={getPreferencesConfirmed() ? weightUnit : undefined}
-          onGenderChange={(g) => setBodyMapGender(g)}
-          onUnitChange={(u) => setWeightUnit(u)}
-          onContinue={(gender, unit) => {
-            setBodyMapGender(gender);
-            setWeightUnit(unit);
-            savePreferencesConfirmed(true);
-            setOnboarding({ intent: onboarding.intent, step: 'strong_csv', platform: 'strong', backStep: 'strong_prefs' });
-          }}
-          onBack={
-            onboarding.intent === 'initial'
-              ? () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
-              : () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
-          }
-          onClose={
-            onboarding.intent === 'update'
-              ? () => setOnboarding(null)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {onboarding?.step === 'other_prefs' ? (
-        <CSVImportModal
-          intent={onboarding.intent}
-          platform="other"
-          variant="preferences"
-          continueLabel="Continue"
-          isLoading={isAnalyzing}
-          initialGender={getPreferencesConfirmed() ? bodyMapGender : undefined}
-          initialUnit={getPreferencesConfirmed() ? weightUnit : undefined}
-          onGenderChange={(g) => setBodyMapGender(g)}
-          onUnitChange={(u) => setWeightUnit(u)}
-          onContinue={(gender, unit) => {
-            setBodyMapGender(gender);
-            setWeightUnit(unit);
-            savePreferencesConfirmed(true);
-            setOnboarding({ intent: onboarding.intent, step: 'other_csv', platform: 'other', backStep: 'other_prefs' });
-          }}
-          onBack={
-            onboarding.intent === 'initial'
-              ? () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
-              : () => setOnboarding({ intent: onboarding.intent, step: 'platform' })
-          }
-          onClose={
-            onboarding.intent === 'update'
-              ? () => setOnboarding(null)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {onboarding?.step === 'hevy_login' ? (
-        <HevyLoginModal
-          intent={onboarding.intent}
-          initialMode={getHevyProApiKey() ? 'apiKey' : 'credentials'}
-          errorMessage={hevyLoginError}
-          isLoading={isAnalyzing}
-          onLogin={handleHevyLogin}
-          onLoginWithApiKey={handleHevyApiKeyLogin}
-          loginLabel={onboarding.intent === 'initial' ? 'Continue' : 'Login with Hevy'}
-          apiKeyLoginLabel={onboarding.intent === 'initial' ? 'Continue' : 'Continue with API key'}
-          hasSavedSession={Boolean(getHevyAuthToken() || getHevyProApiKey()) && getPreferencesConfirmed()}
-          onSyncSaved={handleHevySyncSaved}
-          onClearCache={clearCacheAndRestart}
-          onImportCsv={() => setOnboarding({ intent: onboarding.intent, step: 'hevy_csv', platform: 'hevy', backStep: 'hevy_login' })}
-          onBack={
-            onboarding.intent === 'initial'
-              ? () => setOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' })
-              : () => setOnboarding({ intent: 'initial', step: 'platform' })
-          }
-          onClose={
-            onboarding.intent === 'update'
-              ? () => setOnboarding(null)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {onboarding?.step === 'lyfta_login' ? (
-        <LyfataLoginModal
-          intent={onboarding.intent}
-          errorMessage={lyfatLoginError}
-          isLoading={isAnalyzing}
-          onLogin={handleLyfatLogin}
-          loginLabel={onboarding.intent === 'initial' ? 'Continue' : 'Login with Lyfta'}
-          hasSavedSession={Boolean(getLyfataApiKey()) && getPreferencesConfirmed()}
-          onSyncSaved={handleLyfatSyncSaved}
-          onClearCache={clearCacheAndRestart}
-          onImportCsv={() => setOnboarding({ intent: onboarding.intent, step: 'lyfta_csv', platform: 'lyfta', backStep: 'lyfta_login' })}
-          onBack={
-            onboarding.intent === 'initial'
-              ? () => setOnboarding({ intent: onboarding.intent, step: 'lyfta_prefs', platform: 'lyfta' })
-              : () => setOnboarding({ intent: 'initial', step: 'platform' })
-          }
-          onClose={
-            onboarding.intent === 'update'
-              ? () => setOnboarding(null)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {onboarding?.step === 'strong_csv' ? (
-        <CSVImportModal
-          intent={onboarding.intent}
-          platform="strong"
-          hideBodyTypeAndUnit={true}
-          onClearCache={clearCacheAndRestart}
-          onFileSelect={(file, gender, unit) => {
-            setCsvImportError(null);
-            processFile(file, 'strong', unit);
-          }}
-          isLoading={isAnalyzing}
-          initialGender={bodyMapGender}
-          initialUnit={weightUnit}
-          onGenderChange={(g) => setBodyMapGender(g)}
-          onUnitChange={(u) => setWeightUnit(u)}
-          errorMessage={csvImportError}
-          onBack={() => {
-            if (onboarding.intent === 'initial') {
-              const backStep = onboarding.backStep ?? 'strong_prefs';
-              setOnboarding({ intent: onboarding.intent, step: backStep, platform: 'strong' });
-              return;
-            }
-            setOnboarding({ intent: 'initial', step: 'platform' });
-          }}
-          onClose={
-            onboarding.intent === 'update'
-              ? () => setOnboarding(null)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {onboarding?.step === 'other_csv' ? (
-        <CSVImportModal
-          intent={onboarding.intent}
-          platform="other"
-          hideBodyTypeAndUnit={true}
-          onClearCache={clearCacheAndRestart}
-          onFileSelect={(file, gender, unit) => {
-            setCsvImportError(null);
-            processFile(file, 'other', unit);
-          }}
-          isLoading={isAnalyzing}
-          initialGender={bodyMapGender}
-          initialUnit={weightUnit}
-          onGenderChange={(g) => setBodyMapGender(g)}
-          onUnitChange={(u) => setWeightUnit(u)}
-          errorMessage={csvImportError}
-          onBack={() => {
-            if (onboarding.intent === 'initial') {
-              const backStep = onboarding.backStep ?? 'other_prefs';
-              setOnboarding({ intent: onboarding.intent, step: backStep, platform: 'other' });
-              return;
-            }
-            setOnboarding(null);
-          }}
-          onClose={
-            onboarding.intent === 'update'
-              ? () => setOnboarding(null)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {onboarding?.step === 'lyfta_csv' ? (
-        <CSVImportModal
-          intent={onboarding.intent}
-          platform="lyfta"
-          hideBodyTypeAndUnit={true}
-          onClearCache={clearCacheAndRestart}
-          onFileSelect={(file, gender, unit) => {
-            setCsvImportError(null);
-            processFile(file, 'lyfta', unit);
-          }}
-          isLoading={isAnalyzing}
-          initialGender={bodyMapGender}
-          initialUnit={weightUnit}
-          onGenderChange={(g) => setBodyMapGender(g)}
-          onUnitChange={(u) => setWeightUnit(u)}
-          errorMessage={csvImportError}
-          onBack={() => {
-            if (onboarding.intent === 'initial') {
-              const backStep = onboarding.backStep ?? 'lyfta_prefs';
-              setOnboarding({ intent: onboarding.intent, step: backStep, platform: 'lyfta' });
-              return;
-            }
-            setOnboarding({ intent: 'initial', step: 'platform' });
-          }}
-          onClose={
-            onboarding.intent === 'update'
-              ? () => setOnboarding(null)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {onboarding?.step === 'hevy_csv' ? (
-        <CSVImportModal
-          intent={onboarding.intent}
-          platform="hevy"
-          hideBodyTypeAndUnit
-          onFileSelect={(file, gender, unit) => {
-            setBodyMapGender(gender);
-            setWeightUnit(unit);
-            savePreferencesConfirmed(true);
-            setCsvImportError(null);
-            processFile(file, 'hevy', unit);
-          }}
-          isLoading={isAnalyzing}
-          initialGender={bodyMapGender}
-          initialUnit={weightUnit}
-          onGenderChange={(g) => setBodyMapGender(g)}
-          onUnitChange={(u) => setWeightUnit(u)}
-          errorMessage={csvImportError}
-          onBack={() => {
-            if (onboarding.intent === 'initial') {
-              const backStep = onboarding.backStep ?? 'hevy_login';
-              setOnboarding({ intent: onboarding.intent, step: backStep, platform: 'hevy' });
-              return;
-            }
-            setOnboarding({ intent: 'initial', step: 'platform' });
-          }}
-          onClose={
-            onboarding.intent === 'update'
-              ? () => setOnboarding(null)
-              : undefined
-          }
-        />
-      ) : null}
-      
       {/* Loading Overlay */}
-      {isAnalyzing && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in px-4 sm:px-6">
-          <div className="w-full max-w-md p-8 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col items-center">
-            <CsvLoadingAnimation className="mb-6" size={160} />
-            <h2 className="text-2xl font-bold text-white mb-2">
-              {loadingKind === 'hevy' ? 'Crunching your numbers' : 'Analyzing Workout Data'}
-            </h2>
-            <p className="text-slate-400 mb-6 text-center">
-              {loadingKind === 'hevy'
-                ? 'Syncing your workouts from Hevy and preparing your dashboard.'
-                : 'Please wait while we process your sets, calculate volume, and identify personal records.'}
-            </p>
-            
-            <div className="w-full space-y-4">
-               <div className="flex items-center space-x-3 text-sm">
-                  {loadingStep >= 0 ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <div className="w-5 h-5 rounded-full border-2 border-slate-700"></div>}
-                  <span className={loadingStep >= 0 ? "text-slate-200" : "text-slate-600"}>Loading workout data...</span>
-               </div>
-               <div className="flex items-center space-x-3 text-sm">
-                  {loadingStep >= 1 ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <div className="w-5 h-5 rounded-full border-2 border-slate-700"></div>}
-                  <span className={loadingStep >= 1 ? "text-slate-200" : "text-slate-600"}>Calculating Personal Records (PRs)...</span>
-               </div>
-               <div className="flex items-center space-x-3 text-sm">
-                  {loadingStep >= 2 ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <div className="w-5 h-5 rounded-full border-2 border-slate-700"></div>}
-                  <span className={loadingStep >= 2 ? "text-slate-200" : "text-slate-600"}>Generating visualizations...</span>
-               </div>
-
-               {/* Progress bar */}
-               <div className="mt-4">
-                 <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-                   <div className="h-full bg-blue-600 transition-all duration-200" style={{ width: `${progress}%` }} />
-                 </div>
-                 <div className="text-right text-[10px] text-slate-500 mt-1">{progress}%</div>
-               </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <AppLoadingOverlay
+        open={isAnalyzing}
+        loadingKind={loadingKind}
+        loadingStep={loadingStep}
+        progress={progress}
+      />
     </div>
   );
 };

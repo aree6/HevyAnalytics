@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { BrowserRouter } from 'react-router-dom';
 import { initGA } from './utils/integrations/ga';
-import { ThemeProvider } from './components/ThemeProvider';
+import { ThemeProvider } from './components/theme/ThemeProvider';
 import './tailwind.css';
 
 const rootElement = document.getElementById('root');

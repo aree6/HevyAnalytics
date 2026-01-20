@@ -13,8 +13,8 @@ import {
 import type { ExerciseAsset } from '../../utils/data/exerciseAssets';
 import { formatSignedNumber } from '../../utils/format/formatters';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../../utils/format/deltaFormat';
-import { LazyRender } from '../LazyRender';
-import { ChartSkeleton } from '../ChartSkeleton';
+import { LazyRender } from '../ui/LazyRender';
+import { ChartSkeleton } from '../ui/ChartSkeleton';
 import {
   BadgeLabel,
   ChartDescription,
@@ -253,11 +253,11 @@ export const TopExercisesCard = ({
 
                               const medalRing =
                                 medal === 'gold'
-                                  ? 'ring-2 ring-amber-300/70'
+                                  ? ''
                                   : medal === 'silver'
-                                    ? 'ring-2 ring-slate-100/80'
+                                    ? ''
                                     : medal === 'bronze'
-                                      ? 'ring-2 ring-orange-300/60'
+                                      ? ''
                                       : '';
 
                               const countShimmerStyle: React.CSSProperties | undefined = medal

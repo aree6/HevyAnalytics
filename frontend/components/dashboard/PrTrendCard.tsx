@@ -24,8 +24,8 @@ import {
   TrendBadge,
   TrendIcon,
 } from './ChartBits';
-import { LazyRender } from '../LazyRender';
-import { ChartSkeleton } from '../ChartSkeleton';
+import { LazyRender } from '../ui/LazyRender';
+import { ChartSkeleton } from '../ui/ChartSkeleton';
 import { getRechartsCategoricalTicks, getRechartsTickIndexMap, RECHARTS_XAXIS_PADDING, ValueDot } from '../../utils/chart/chartEnhancements';
 import { formatVsPrevRollingWindow, getRollingWindowDaysForMode } from '../../utils/date/dateUtils';
 

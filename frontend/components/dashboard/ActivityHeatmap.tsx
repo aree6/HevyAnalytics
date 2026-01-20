@@ -4,8 +4,8 @@ import { Target } from 'lucide-react';
 import type { DailySummary } from '../../types';
 import { computationCache } from '../../utils/storage/computationCache';
 import { formatHumanReadableDate, formatMonthYearContraction } from '../../utils/date/dateUtils';
-import { Tooltip as HoverTooltip, type TooltipData } from '../Tooltip';
-import { Sparkline, StreakBadge } from '../InsightCards';
+import { Tooltip as HoverTooltip, type TooltipData } from '../ui/Tooltip';
+import { Sparkline, StreakBadge } from '../insights/InsightCards';
 import type { SparklinePoint, StreakInfo } from '../../utils/analysis/insights';
 
 const DashboardTooltip: React.FC<{ data: TooltipData }> = ({ data }) => {
@@ -121,7 +121,7 @@ export const ActivityHeatmap = memo(({
   if (heatmapData.length === 0) return null;
 
   const getColor = (count: number) => {
-    if (count === 0) return 'bg-slate-800/50';
+    if (count === 0) return 'bg-slate-500/20';
     if (count <= 15) return 'bg-emerald-400';
     if (count <= 30) return 'bg-emerald-500';
     if (count <= 45) return 'bg-emerald-700';
@@ -181,7 +181,7 @@ export const ActivityHeatmap = memo(({
                     return (
                       <div
                         key={day.date.toISOString()}
-                        className={`w-3 h-3 rounded-sm ${getColor(day.count)} transition-all duration-300 ${day.count > 0 ? 'cursor-pointer hover:z-10 ring-0 hover:ring-2 ring-white/20' : 'cursor-default'}`}
+                        className={`w-3 h-3 rounded-sm ${getColor(day.count)} transition-all duration-300 ${day.count > 0 ? 'cursor-pointer hover:z-10' : 'cursor-default'}`}
                         onClick={() => day.count > 0 && onDayClick?.(day.date)}
                         onMouseEnter={(e) => handleMouseEnter(e, day)}
                         onMouseLeave={() => setTooltip(null)}

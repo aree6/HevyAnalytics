@@ -17,9 +17,9 @@ import {
   Tooltip,
 } from 'recharts';
 import { formatDeltaPercentage } from '../../utils/format/deltaFormat';
-import { BodyMap, type BodyMapGender } from '../BodyMap';
-import { LazyRender } from '../LazyRender';
-import { ChartSkeleton } from '../ChartSkeleton';
+import { BodyMap, type BodyMapGender } from '../bodyMap/BodyMap';
+import { LazyRender } from '../ui/LazyRender';
+import { ChartSkeleton } from '../ui/ChartSkeleton';
 import {
   BadgeLabel,
   ChartDescription,

@@ -1,6 +1,6 @@
 import React from 'react';
-import { ThemedBackground } from '../ThemedBackground';
-import { Navigation } from '../Navigation';
+import { ThemedBackground } from '../theme/ThemedBackground';
+import { Navigation } from '../layout/Navigation';
 import { assetPath } from '../../constants';
 import { clientOnly } from 'vike-react/clientOnly';
 

@@ -23,8 +23,8 @@ import {
   TrendBadge,
   TrendIcon,
 } from './ChartBits';
-import { LazyRender } from '../LazyRender';
-import { ChartSkeleton } from '../ChartSkeleton';
+import { LazyRender } from '../ui/LazyRender';
+import { ChartSkeleton } from '../ui/ChartSkeleton';
 import { formatNumber, formatSignedNumber } from '../../utils/format/formatters';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../../utils/format/deltaFormat';
 import { getRechartsXAxisInterval, RECHARTS_XAXIS_PADDING } from '../../utils/chart/chartEnhancements';

@@ -12,8 +12,8 @@ import {
   YAxis,
 } from 'recharts';
 import { AreaChart as AreaChartIcon, BicepsFlexed,Infinity, ChartColumnStacked, PersonStanding } from 'lucide-react';
-import { LazyRender } from '../LazyRender';
-import { ChartSkeleton } from '../ChartSkeleton';
+import { LazyRender } from '../ui/LazyRender';
+import { ChartSkeleton } from '../ui/ChartSkeleton';
 import { normalizeMuscleGroup } from '../../utils/muscle/muscleNormalization';
 import { MUSCLE_COLORS, INDIVIDUAL_MUSCLE_COLORS } from '../../utils/domain/categories';
 import { formatSignedNumber } from '../../utils/format/formatters';
