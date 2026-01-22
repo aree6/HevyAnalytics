@@ -859,7 +859,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
                         title={ex.name}
                       >
 
-                        <div className="grid grid-cols-1 sm:grid-cols-[4rem_1fr_5.25rem] items-stretch gap-2">
+                        <div className="grid grid-cols-[3rem_1fr] sm:grid-cols-[4rem_1fr_5.25rem] items-stretch gap-2">
                           {/* First column: Image/Icon */}
                           <div className="flex items-center justify-center">
                             <div className="w-full aspect-square">
@@ -867,7 +867,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
                                 <img
                                   src={imgUrl}
                                   alt=""
-                                  className="h-full w-full rounded-md object-cover"
+                                  className="h-full w-full rounded-md object-cover bg-white"
                                   loading="lazy"
                                   decoding="async"
                                 />
