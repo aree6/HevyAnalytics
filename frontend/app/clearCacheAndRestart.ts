@@ -3,6 +3,7 @@ import { computationCache } from '../utils/storage/computationCache';
 import {
   clearBodyMapGender,
   clearCSVData,
+  clearDateMode,
   clearPreferencesConfirmed,
   clearThemeMode,
   clearWeightUnit,
@@ -33,6 +34,7 @@ export const clearCacheAndRestart = (): void => {
   clearBodyMapGender();
   clearPreferencesConfirmed();
   clearThemeMode();
+  clearDateMode();
   computationCache.clear();
   window.location.reload();
 };

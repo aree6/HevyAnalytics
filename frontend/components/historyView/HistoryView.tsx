@@ -44,6 +44,8 @@ interface HistoryViewProps {
   onDayTitleClick?: (date: Date) => void;
   targetDate?: Date | null;
   onTargetDateConsumed?: () => void;
+  /** Reference date for relative time calculations. Pass from App for centralized date mode control. */
+  now?: Date;
 }
 
 // Session comparison delta badge
@@ -154,7 +156,7 @@ const getSessionDurationMs = (session: Session): number | null => {
 };
 
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, weightUnit = 'kg', bodyMapGender = 'male', stickyHeader = false, onExerciseClick, onDayTitleClick, targetDate, onTargetDateConsumed }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, weightUnit = 'kg', bodyMapGender = 'male', stickyHeader = false, onExerciseClick, onDayTitleClick, targetDate, onTargetDateConsumed, now }) => {
   const { mode } = useTheme();
   const isLightMode = mode === 'light';
   const [currentPage, setCurrentPage] = useState(1);
@@ -163,7 +165,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
   const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
   const [collapsedSessions, setCollapsedSessions] = useState<Set<string>>(() => new Set());
 
-  const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(data, new Date(0)), [data]);
+  // Use centralized now if provided, otherwise fall back to data-based calculation
+  const effectiveNow = useMemo(() => now ?? getEffectiveNowFromWorkoutData(data, new Date(0)), [now, data]);
   
   // Exercise volume history for deltas
   const exerciseVolumeHistory = useExerciseVolumeHistory(data);

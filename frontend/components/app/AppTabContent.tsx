@@ -94,6 +94,7 @@ export const AppTabContent: React.FC<AppTabContentProps> = ({
             onExerciseClick={onExerciseClick}
             bodyMapGender={bodyMapGender}
             weightUnit={weightUnit}
+            now={now}
           />
         )}
         {activeTab === Tab.EXERCISES && (
@@ -120,6 +121,7 @@ export const AppTabContent: React.FC<AppTabContentProps> = ({
             onDayTitleClick={onHistoryDayTitleClick}
             targetDate={targetHistoryDate}
             onTargetDateConsumed={onTargetHistoryDateConsumed}
+            now={now}
           />
         )}
         {activeTab === Tab.MUSCLE_ANALYSIS && (
@@ -132,6 +134,7 @@ export const AppTabContent: React.FC<AppTabContentProps> = ({
             onInitialMuscleConsumed={onInitialMuscleConsumed}
             bodyMapGender={bodyMapGender}
             stickyHeader={hasActiveCalendarFilter}
+            now={now}
           />
         )}
         {activeTab === Tab.FLEX && (
@@ -143,6 +146,7 @@ export const AppTabContent: React.FC<AppTabContentProps> = ({
             exerciseStats={exerciseStats}
             stickyHeader={hasActiveCalendarFilter}
             bodyMapGender={bodyMapGender}
+            now={now}
           />
         )}
       </Suspense>

@@ -47,6 +47,8 @@ interface DashboardProps {
   stickyHeader?: boolean;
   bodyMapGender?: BodyMapGender;
   weightUnit?: WeightUnit;
+  /** Reference date for relative time calculations. Pass from App for centralized date mode control. */
+  now?: Date;
 }
 
 // Simple monochrome SVG for Gemini (Google) that inherits color via currentColor
@@ -83,11 +85,12 @@ const TopExercisesCard = React.lazy(() => import('./TopExercisesCard').then((m) 
 
 // --- MAIN DASHBOARD ---
 
-export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick, onMuscleClick, onExerciseClick, filtersSlot, stickyHeader = false, bodyMapGender = 'male' as BodyMapGender, weightUnit = 'kg' as WeightUnit }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick, onMuscleClick, onExerciseClick, filtersSlot, stickyHeader = false, bodyMapGender = 'male' as BodyMapGender, weightUnit = 'kg' as WeightUnit, now }) => {
   // State to control animation retriggering on mount
   const [isMounted, setIsMounted] = useState(false);
 
-  const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(fullData), [fullData]);
+  // Use centralized now if provided, otherwise fall back to data-based calculation
+  const effectiveNow = useMemo(() => now ?? getEffectiveNowFromWorkoutData(fullData), [now, fullData]);
 
   // Calculate date range span for smart filter
   const spanDays = useMemo(() => {

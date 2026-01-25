@@ -65,6 +65,8 @@ interface MuscleAnalysisProps {
   onInitialMuscleConsumed?: () => void;
   stickyHeader?: boolean;
   bodyMapGender?: BodyMapGender;
+  /** Reference date for relative time calculations. Pass from App for centralized date mode control. */
+  now?: Date;
 }
 
 type ViewMode = 'muscle' | 'group';
@@ -81,6 +83,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
   onInitialMuscleConsumed,
   stickyHeader = false,
   bodyMapGender = 'male',
+  now,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -115,7 +118,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
     [navigate, location.pathname]
   );
 
-  const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(data), [data]);
+  const effectiveNow = useMemo(() => now ?? getEffectiveNowFromWorkoutData(data), [now, data]);
 
   const allTimeWindowStart = useMemo(() => {
     let start: Date | null = null;

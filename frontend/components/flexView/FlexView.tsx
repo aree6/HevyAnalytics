@@ -34,6 +34,8 @@ interface FlexViewProps {
   exerciseStats?: ExerciseStats[];
   stickyHeader?: boolean;
   bodyMapGender?: BodyMapGender;
+  /** Reference date for relative time calculations. Pass from App for centralized date mode control. */
+  now?: Date;
 }
 
 export const FlexView: React.FC<FlexViewProps> = ({
@@ -44,6 +46,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
   exerciseStats: exerciseStatsProp,
   stickyHeader = false,
   bodyMapGender = 'male',
+  now,
 }) => {
   const { mode } = useTheme();
   const cardTheme: CardTheme = mode === 'light' ? 'light' : 'dark';
@@ -120,7 +123,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
     };
   }, []);
 
-  const effectiveNow = useMemo(() => getEffectiveNowFromWorkoutData(data), [data]);
+  const effectiveNow = useMemo(() => now ?? getEffectiveNowFromWorkoutData(data), [now, data]);
 
   // Calculate all stats from data
   const stats = useMemo(() => {

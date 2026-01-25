@@ -26,10 +26,14 @@ import {
   getBodyMapGender,
   saveBodyMapGender,
   getPreferencesConfirmed,
+  DateMode,
+  getDateMode,
+  saveDateMode,
 } from './utils/storage/localStorage';
 import { X, Calendar, Pencil } from 'lucide-react';
 import { format, isSameDay, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { formatDayYearContraction, formatHumanReadableDate, getEffectiveNowFromWorkoutData, isPlausibleDate } from './utils/date/dateUtils';
+import { getDataAgeInfo } from './hooks/usePreferences';
 import { trackPageView } from './utils/integrations/ga';
 import { setContext, trackEvent } from './utils/integrations/analytics';
 import { ThemedBackground } from './components/theme/ThemedBackground';
@@ -291,6 +295,14 @@ const App: React.FC = () => {
     setContext({ weight_unit: weightUnit });
   }, [weightUnit]);
 
+  // Date mode state with localStorage persistence
+  const [dateMode, setDateMode] = useState<DateMode>(() => getDateMode());
+
+  // Persist date mode to localStorage when it changes
+  useEffect(() => {
+    saveDateMode(dateMode);
+  }, [dateMode]);
+
   // User Preferences Modal state
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
 
@@ -406,9 +418,30 @@ const App: React.FC = () => {
     });
   }, [parsedData, selectedMonth, selectedDay, selectedRange, selectedWeeks]);
 
-  const effectiveNow = useMemo(() => {
+  // Data-based "now" - the date of the most recent workout
+  const dataBasedNow = useMemo(() => {
     return getEffectiveNowFromWorkoutData(parsedData, new Date(0));
   }, [parsedData]);
+
+  // Data age info - useful for warnings when using actual date mode with old data
+  const dataAgeInfo = useMemo(() => {
+    return getDataAgeInfo(dataBasedNow);
+  }, [dataBasedNow]);
+
+  // Effective "now" - respects user's date mode preference
+  // 'effective' mode: uses the latest workout date (default, better for relative time displays)
+  // 'actual' mode: uses the real current date
+  const effectiveNow = useMemo(() => {
+    return dateMode === 'actual' ? new Date() : dataBasedNow;
+  }, [dataBasedNow, dateMode]);
+
+  const filteredDataBasedNow = useMemo(() => {
+    return getEffectiveNowFromWorkoutData(filteredData, new Date(0));
+  }, [filteredData]);
+
+  const filteredEffectiveNow = useMemo(() => {
+    return dateMode === 'actual' ? new Date() : filteredDataBasedNow;
+  }, [filteredDataBasedNow, dateMode]);
 
   // Calendar boundaries and available dates (for blur/disable)
   const { minDate, maxDate, availableDatesSet } = useMemo(() => {
@@ -960,7 +993,7 @@ const App: React.FC = () => {
             }}
             bodyMapGender={bodyMapGender}
             weightUnit={weightUnit}
-            now={effectiveNow}
+            now={filteredEffectiveNow}
           />
         </>
       )}
@@ -975,6 +1008,9 @@ const App: React.FC = () => {
         onBodyMapGenderChange={setBodyMapGender}
         themeMode={mode}
         onThemeModeChange={setMode}
+        dateMode={dateMode}
+        onDateModeChange={setDateMode}
+        dataAgeInfo={dataAgeInfo}
       />
 
       <AppOnboardingLayer

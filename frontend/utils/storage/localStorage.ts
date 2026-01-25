@@ -215,3 +215,35 @@ export const clearThemeMode = (): void => {
   }
 };
 
+// Date Mode Preference Storage
+// 'effective' = use the latest workout date as "now" (default, better for relative time displays)
+// 'actual' = use the real current date as "now"
+export type DateMode = 'effective' | 'actual';
+const DATE_MODE_KEY = 'hevy_analytics_date_mode';
+
+export const saveDateMode = (mode: DateMode): void => {
+  try {
+    localStorage.setItem(DATE_MODE_KEY, mode);
+  } catch (error) {
+    console.error('Failed to save date mode to local storage:', error);
+  }
+};
+
+export const getDateMode = (): DateMode => {
+  try {
+    const mode = localStorage.getItem(DATE_MODE_KEY);
+    return mode === 'effective' || mode === 'actual' ? mode : 'effective';
+  } catch (error) {
+    console.error('Failed to retrieve date mode from local storage:', error);
+    return 'effective';
+  }
+};
+
+export const clearDateMode = (): void => {
+  try {
+    localStorage.removeItem(DATE_MODE_KEY);
+  } catch (error) {
+    console.error('Failed to clear date mode from local storage:', error);
+  }
+};
+
