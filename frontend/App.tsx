@@ -15,6 +15,7 @@ import { AppCalendarOverlay } from './components/app/AppCalendarOverlay';
 import { AppLoadingOverlay } from './components/app/AppLoadingOverlay';
 import { AppTabContent } from './components/app/AppTabContent';
 import { AppOnboardingLayer } from './components/app/AppOnboardingLayer';
+import { UserPreferencesModal } from './components/modals/UserPreferencesModal';
 import type { OnboardingFlow } from './app/onboarding/types';
 import {
   saveCSVData,
@@ -62,7 +63,7 @@ import { useStartupAutoLoad } from './app/useStartupAutoLoad';
 import { usePlatformDeepLink } from './app/usePlatformDeepLink';
 
 const App: React.FC = () => {
-  const { mode } = useTheme();
+  const { mode, setMode } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [parsedData, setParsedData] = useState<WorkoutSet[]>([]);
@@ -289,6 +290,9 @@ const App: React.FC = () => {
     saveWeightUnit(weightUnit);
     setContext({ weight_unit: weightUnit });
   }, [weightUnit]);
+
+  // User Preferences Modal state
+  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
 
   // Handler for navigating to ExerciseView from MuscleAnalysis
   const handleExerciseClick = (exerciseName: string) => {
@@ -864,6 +868,7 @@ const App: React.FC = () => {
             activeTab={activeTab}
             onSelectTab={handleSelectTab}
             onOpenUpdateFlow={handleOpenUpdateFlow}
+            onOpenPreferences={() => setPreferencesModalOpen(true)}
             calendarOpen={calendarOpen}
             onToggleCalendarOpen={() => setCalendarOpen((v) => !v)}
             hasActiveCalendarFilter={hasActiveCalendarFilter}
@@ -959,6 +964,18 @@ const App: React.FC = () => {
           />
         </>
       )}
+
+      {/* User Preferences Modal */}
+      <UserPreferencesModal
+        isOpen={preferencesModalOpen}
+        onClose={() => setPreferencesModalOpen(false)}
+        weightUnit={weightUnit}
+        onWeightUnitChange={setWeightUnit}
+        bodyMapGender={bodyMapGender}
+        onBodyMapGenderChange={setBodyMapGender}
+        themeMode={mode}
+        onThemeModeChange={setMode}
+      />
 
       <AppOnboardingLayer
         onboarding={onboarding}

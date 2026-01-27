@@ -78,6 +78,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>(highlightedExercise || mostRecentExerciseName || "");
   const [trendFilter, setTrendFilter] = useState<ExerciseTrendStatus | null>(null);
+  // Toggle for showing unilateral (L/R) view
+  const [showUnilateral, setShowUnilateral] = useState(false);
 
   // Auto-select most recent exercise when component loads or when no exercise is selected
   useEffect(() => {
@@ -133,7 +135,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
   const selectedSessions = useMemo(() => {
     if (!selectedStats) return [] as ExerciseSessionEntry[];
-    return summarizeExerciseHistory(selectedStats.history);
+    // If exercise has unilateral data, separate by side so we can show L/R on chart
+    const separateSides = selectedStats.hasUnilateralData ?? false;
+    return summarizeExerciseHistory(selectedStats.history, { separateSides });
   }, [selectedStats]);
 
   const inactiveReason = useMemo(() => {
@@ -429,6 +433,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       isBodyweightLike,
     });
   }, [selectedStats, selectedSessions, viewMode, allAggregationMode, weightUnit, effectiveNow, isBodyweightLike]);
+
+  // Check if chart has unilateral L/R data
+  const hasUnilateralChartData = useMemo(() => {
+    if (!selectedStats?.hasUnilateralData) return false;
+    return chartData.some((d: any) => d.leftOneRepMax !== undefined || d.rightOneRepMax !== undefined);
+  }, [chartData, selectedStats?.hasUnilateralData]);
 
   const chartDataWithEma = useMemo(() => {
     const key = isBodyweightLike ? 'reps' : 'oneRepMax';
@@ -870,6 +880,15 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                       <span className="w-2.5 h-0.5 bg-slate-500 border-t border-dashed border-slate-500"></span> Sets
                     </div>
                   </>
+                ) : showUnilateral && hasUnilateralChartData ? (
+                  <>
+                    <div className="flex items-center gap-2 text-cyan-400">
+                      <span className="w-2.5 h-2.5 rounded bg-cyan-500/20 border border-cyan-500"></span> Left
+                    </div>
+                    <div className="flex items-center gap-2 text-violet-400">
+                      <span className="w-2.5 h-2.5 rounded bg-violet-500/20 border border-violet-500"></span> Right
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div className="flex items-center gap-2 text-blue-400">
@@ -879,6 +898,22 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                       <span className="w-2.5 h-0.5 bg-slate-500 border-t border-dashed border-slate-500"></span> Lift Weight
                     </div>
                   </>
+                )}
+                
+                {/* Unilateral toggle - only show if exercise has L/R data */}
+                {hasUnilateralChartData && !isBodyweightLike && (
+                  <button
+                    onClick={() => setShowUnilateral(!showUnilateral)}
+                    title={showUnilateral ? 'Hide L/R split' : 'Show L/R split'}
+                    aria-label={showUnilateral ? 'Hide L/R split' : 'Show L/R split'}
+                    className={`px-2 py-1 rounded text-[9px] font-bold whitespace-nowrap border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 ${
+                      showUnilateral
+                        ? 'bg-blue-600 text-white border-transparent'
+                        : 'text-slate-500 hover:text-slate-300 hover:bg-black/60 border border-slate-700/50'
+                    }`}
+                  >
+                    L / R
+                  </button>
                 )}
 
                 <div className="bg-black/70 p-1 rounded-lg flex gap-1 border border-slate-700/50">
@@ -927,7 +962,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
             <LazyRender className="w-full h-full" placeholder={<ChartSkeleton className="h-full min-h-[260px]" />}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
-                  key={`${selectedStats.name}:${viewMode}:${allAggregationMode}:${weightUnit}`}
+                  key={`${selectedStats.name}:${viewMode}:${allAggregationMode}:${weightUnit}:${showUnilateral}`}
                   data={chartDataWithEma}
                   margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                 >
@@ -935,6 +970,14 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                     <linearGradient id="color1RM" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorLeftRM" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.25}/>
+                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorRightRM" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.25}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--border-rgb) / 0.35)" vertical={false} />
@@ -959,43 +1002,78 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                     }
                   />
                   <Tooltip
-                    content={<CustomTooltip weightUnit={weightUnit} />}
+                    content={<CustomTooltip weightUnit={weightUnit} hasUnilateralData={hasUnilateralChartData} showUnilateral={showUnilateral} />}
                     cursor={{ stroke: 'rgb(var(--border-rgb) / 0.5)', strokeWidth: 1, strokeDasharray: '4 4' }}
                   />
-                  <>
-                  <Area
-                    type="monotone"
-                    dataKey={isBodyweightLike ? 'reps' : 'oneRepMax'}
-                    stroke="#3b82f6"
-                    strokeWidth={2.5}
-                    fill="url(#color1RM)"
-                    dot={false}
-                    activeDot={{ r: 5, strokeWidth: 0 }}
-                    isAnimationActive={true}
-                    animationDuration={1000}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={isBodyweightLike ? 'reps' : 'weight'}
-                    stroke="transparent"
-                    strokeWidth={0}
-                    dot={<StrengthProgressionValueDot 
-                      valueKey={isBodyweightLike ? 'reps' : 'weight'} 
-                      unit={isBodyweightLike ? undefined : weightUnit} 
-                      data={chartDataWithEma}
-                      color="var(--text-muted)"
-                      showAtIndexMap={tickIndexMap}
-                      showDotWhenHidden={false}
-                      isBodyweightLike={isBodyweightLike}
-                      selectedSessions={selectedSessions}
-                      selectedStats={selectedStats}
-                      weightUnit={weightUnit}
-                    />}
-                    activeDot={{ r: 5, strokeWidth: 0 }}
-                    isAnimationActive={true}
-                    animationDuration={1000}
-                  />
-                </>
+                  {/* Show either Combined chart OR L/R charts based on toggle */}
+                  {(!showUnilateral || !hasUnilateralChartData) ? (
+                    <>
+                      {/* Combined/Normal chart */}
+                      <Area
+                        type="monotone"
+                        dataKey={isBodyweightLike ? 'reps' : 'oneRepMax'}
+                        stroke="#3b82f6"
+                        strokeWidth={2.5}
+                        fill="url(#color1RM)"
+                        dot={{ r: 3, fill: '#3b82f6', strokeWidth: 0 }}
+                        activeDot={{ r: 5, strokeWidth: 0 }}
+                        isAnimationActive={true}
+                        animationDuration={1000}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={isBodyweightLike ? 'reps' : 'weight'}
+                        stroke="transparent"
+                        strokeWidth={0}
+                        dot={<StrengthProgressionValueDot 
+                          valueKey={isBodyweightLike ? 'reps' : 'weight'} 
+                          unit={isBodyweightLike ? undefined : weightUnit} 
+                          data={chartDataWithEma}
+                          color="var(--text-muted)"
+                          showAtIndexMap={tickIndexMap}
+                          showDotWhenHidden={false}
+                          isBodyweightLike={isBodyweightLike}
+                          selectedSessions={selectedSessions}
+                          selectedStats={selectedStats}
+                          weightUnit={weightUnit}
+                        />}
+                        activeDot={{ r: 5, strokeWidth: 0 }}
+                        isAnimationActive={true}
+                        animationDuration={1000}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      {/* Left side - cyan with visible dots */}
+                      <Area
+                        type="monotone"
+                        dataKey={isBodyweightLike ? 'leftReps' : 'leftOneRepMax'}
+                        stroke="#06b6d4"
+                        strokeWidth={2.5}
+                        fill="url(#colorLeftRM)"
+                        dot={{ r: 3, fill: '#06b6d4', strokeWidth: 0 }}
+                        activeDot={{ r: 5, strokeWidth: 0, fill: '#06b6d4' }}
+                        isAnimationActive={true}
+                        animationDuration={1000}
+                        name="Left"
+                        connectNulls
+                      />
+                      {/* Right side - purple with visible dots */}
+                      <Area
+                        type="monotone"
+                        dataKey={isBodyweightLike ? 'rightReps' : 'rightOneRepMax'}
+                        stroke="#8b5cf6"
+                        strokeWidth={2.5}
+                        fill="url(#colorRightRM)"
+                        dot={{ r: 3, fill: '#8b5cf6', strokeWidth: 0 }}
+                        activeDot={{ r: 5, strokeWidth: 0, fill: '#8b5cf6' }}
+                        isAnimationActive={true}
+                        animationDuration={1000}
+                        name="Right"
+                        connectNulls
+                      />
+                    </>
+                  )}
 
                   <Line
                     type="stepAfter" 

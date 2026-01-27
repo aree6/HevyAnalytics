@@ -6,6 +6,7 @@ import {
   FULL_BODY_TARGET_GROUPS,
 } from './muscleMappingConstants';
 import { createExerciseNameResolver, type ExerciseNameResolver } from '../exercise/exerciseNameResolver';
+import { isUnilateralSet } from '../analysis/setClassification';
 
 /**
  * Maps CSV muscle names (from exercise data) to SVG muscle element IDs.
@@ -383,37 +384,42 @@ export const calculateMuscleVolume = async (
     // Skip Cardio entirely
     if (primaryKey === 'cardio') continue;
     
-    // Handle Full Body - add 1 set to every muscle group
+    // Handle Full Body - add 1 set to every muscle group (0.5 for L/R sets)
     if (primaryKey === 'full body' || primaryKey === 'full-body') {
+      // L/R sets count as 0.5 each (pair = 1 set)
+      const setIncrement = isUnilateralSet(set) ? 0.5 : 1;
       for (const muscleName of FULL_BODY_MUSCLES) {
         const svgIds = getSvgIdsForCsvMuscleName(muscleName);
         if (svgIds.length === 0) continue;
         for (const svgId of svgIds) {
           const entry = muscleVolume.get(svgId);
           if (!entry) continue;
-          entry.sets += 1;
+          entry.sets += setIncrement;
           const exerciseEntry = entry.exercises.get(set.exercise_title) || { sets: 0, primarySets: 0, secondarySets: 0 };
-          exerciseEntry.sets += 1;
-          exerciseEntry.primarySets += 1;
+          exerciseEntry.sets += setIncrement;
+          exerciseEntry.primarySets += setIncrement;
           entry.exercises.set(set.exercise_title, exerciseEntry);
         }
       }
       continue;
     }
     
-    // Handle primary muscle (counts as 1 set)
+    // Handle primary muscle (counts as 1 set, or 0.5 for L/R sets)
+    // L/R sets count as 0.5 each so a L+R pair = 1 bilateral set equivalent
+    const setIncrement = isUnilateralSet(set) ? 0.5 : 1;
     const primarySvgIds = CSV_TO_SVG_MUSCLE_MAP_LOWER[primaryKey] ?? [];
     for (const svgId of primarySvgIds) {
       const entry = muscleVolume.get(svgId);
       if (!entry) continue;
-      entry.sets += 1;
+      entry.sets += setIncrement;
       const exerciseEntry = entry.exercises.get(set.exercise_title) || { sets: 0, primarySets: 0, secondarySets: 0 };
-      exerciseEntry.sets += 1;
-      exerciseEntry.primarySets += 1;
+      exerciseEntry.sets += setIncrement;
+      exerciseEntry.primarySets += setIncrement;
       entry.exercises.set(set.exercise_title, exerciseEntry);
     }
     
-    // Handle secondary muscles (each counts as 0.5 sets)
+    // Handle secondary muscles (each counts as 0.5 sets, or 0.25 for L/R sets)
+    const secondaryIncrement = isUnilateralSet(set) ? 0.25 : 0.5;
     for (const secondaryMuscle of secondaryMuscles) {
       const secondaryKey = secondaryMuscle.toLowerCase();
       const secondarySvgIds = CSV_TO_SVG_MUSCLE_MAP_LOWER[secondaryKey] ?? [];
@@ -421,10 +427,10 @@ export const calculateMuscleVolume = async (
       for (const svgId of secondarySvgIds) {
         const entry = muscleVolume.get(svgId);
         if (!entry) continue;
-        entry.sets += 0.5;
+        entry.sets += secondaryIncrement;
         const exerciseEntry = entry.exercises.get(set.exercise_title) || { sets: 0, primarySets: 0, secondarySets: 0 };
-        exerciseEntry.sets += 0.5;
-        exerciseEntry.secondarySets += 0.5;
+        exerciseEntry.sets += secondaryIncrement;
+        exerciseEntry.secondarySets += secondaryIncrement;
         entry.exercises.set(set.exercise_title, exerciseEntry);
       }
     }

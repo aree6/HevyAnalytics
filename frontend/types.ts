@@ -24,6 +24,8 @@ export interface ExerciseHistoryEntry {
   oneRepMax: number;
   volume: number;
   isPr: boolean;
+  /** For unilateral exercises: 'left', 'right', or undefined for bilateral */
+  side?: 'left' | 'right';
 }
 
 export interface ExerciseStats {
@@ -33,6 +35,8 @@ export interface ExerciseStats {
   maxWeight: number;
   prCount: number;
   history: ExerciseHistoryEntry[];
+  /** True if exercise has left/right set data */
+  hasUnilateralData?: boolean;
 }
 
 export interface DailySummary {

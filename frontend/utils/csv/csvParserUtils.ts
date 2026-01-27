@@ -260,23 +260,56 @@ export const parseDuration = (value: unknown): number => {
 };
 
 /**
- * Normalize set type to standard values
+ * Normalize set type to standard values.
+ * These values match the SetTypeId in setClassification.ts
  */
 export const normalizeSetType = (value: unknown): string => {
-  const s = String(value ?? '').toLowerCase().replace(/[^a-z]/g, '');
+  const s = String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
   if (!s || s === 'normalset' || s === 'normal' || s === 'working' || s === 'work' || s === 'regular' || s === 'standard') return 'normal';
-  if (s.includes('warm')) return 'warmup';
-  if (s.includes('drop')) return 'dropset';
-  if (s.includes('fail')) return 'failure';
-  if (s.includes('amrap')) return 'amrap';
-  if (s.includes('rest') && s.includes('pause')) return 'restpause';
-  if (s.includes('myo')) return 'myoreps';
-  if (s.includes('cluster')) return 'cluster';
-  if (s.includes('giant')) return 'giantset';
-  if (s.includes('super')) return 'superset';
-  if (s.includes('backoff') || (s.includes('back') && s.includes('off'))) return 'backoff';
-  if (s.includes('right') || s.includes('left')) return 'normal';
+  
+  // Warmup variations
+  if (s.includes('warm') || s === 'w' || s === 'warmupset') return 'warmup';
+  
+  // Unilateral (left/right)
+  if (s === 'left' || s === 'leftset' || s === 'l' || (s.includes('left') && s.includes('set'))) return 'left';
+  if (s === 'right' || s === 'rightset' || s === 'r' || (s.includes('right') && s.includes('set'))) return 'right';
+  
+  // Drop sets
+  if (s.includes('drop') || s === 'd' || s === 'dropset') return 'dropset';
+  
+  // Failure
+  if (s.includes('fail') || s === 'x' || s === 'failure') return 'failure';
+  
+  // AMRAP
+  if (s.includes('amrap') || s === 'a') return 'amrap';
+  
+  // Rest-pause
+  if ((s.includes('rest') && s.includes('pause')) || s === 'rp' || s === 'restpause') return 'restpause';
+  
+  // Myo reps
+  if (s.includes('myo') || s === 'm' || s === 'myoreps' || s === 'myorepsset') return 'myoreps';
+  
+  // Cluster
+  if (s.includes('cluster') || s === 'c') return 'cluster';
+  
+  // Giant set
+  if (s.includes('giant') || s === 'g' || s === 'giantset') return 'giantset';
+  
+  // Superset
+  if (s.includes('super') || s === 's' || s === 'superset') return 'superset';
+  
+  // Back-off set
+  if (s.includes('backoff') || (s.includes('back') && s.includes('off')) || s === 'b' || s === 'backoffset') return 'backoff';
+  
+  // Top set
+  if (s.includes('top') || s === 't' || s === 'topset') return 'topset';
+  
+  // Feeder set
+  if (s.includes('feeder') || s === 'f' || s === 'feederset') return 'feederset';
+  
+  // Partial reps
+  if (s.includes('partial') || s === 'p' || s === 'partialreps' || s === 'partialrepsset') return 'partial';
 
   return 'normal';
 };

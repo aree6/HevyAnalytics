@@ -10,7 +10,7 @@ import { getDisplayVolume } from '../../utils/format/volumeDisplay';
 import { calculateStreakInfo, calculatePRInsights } from '../../utils/analysis/insights';
 import { getDailySummaries, getExerciseStats } from '../../utils/analysis/analytics';
 import { getExerciseAssets, ExerciseAsset } from '../../utils/data/exerciseAssets';
-import { isWarmupSet } from '../../utils/analysis/setClassification';
+import { isWarmupSet, countSets } from '../../utils/analysis/setClassification';
 import { normalizeMuscleGroup, type NormalizedMuscleGroup } from '../../utils/muscle/muscleNormalization';
 import { type BodyMapGender } from '../bodyMap/BodyMap';
 import { getMonth } from 'date-fns';
@@ -236,7 +236,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
     return {
       totalVolume: getDisplayVolume(totalVolumeKg, weightUnit, { round: 'int' }),
       totalVolumeKg,
-      totalSets: data.reduce((acc, s) => acc + (isWarmupSet(s) ? 0 : 1), 0),
+      totalSets: countSets(data),
       totalReps,
       totalDuration,
       totalWorkouts: sessions.size,

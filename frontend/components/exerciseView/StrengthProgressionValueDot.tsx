@@ -48,7 +48,8 @@ export const StrengthProgressionValueDot = (props: any) => {
   const value = payload[valueKey];
   if (typeof value !== 'number') return null;
 
-  const prGold = '#f59e0b';
+  // Use a darker amber so PR ticks/trophies remain visible in both light and dark themes
+  const prGold = '#d97706';
   let bestRepsLocal = 0;
   if (isBodyweightLike) {
     for (const s of selectedSessions) bestRepsLocal = Math.max(bestRepsLocal, s.maxReps);

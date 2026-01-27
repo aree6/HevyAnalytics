@@ -14,6 +14,8 @@ export interface ExerciseSessionEntry {
   sets: number;
   totalReps: number;
   maxReps: number;
+  /** For unilateral exercises: 'left', 'right', or undefined for bilateral/combined */
+  side?: 'left' | 'right';
 }
 
 export interface ExerciseTrendCoreResult {
@@ -68,7 +70,11 @@ const getConfidence = (historyLen: number, windowSize: number): 'low' | 'medium'
   return 'low';
 };
 
-export const summarizeExerciseHistory = (history: ExerciseHistoryEntry[]): ExerciseSessionEntry[] => {
+export const summarizeExerciseHistory = (
+  history: ExerciseHistoryEntry[],
+  options?: { separateSides?: boolean }
+): ExerciseSessionEntry[] => {
+  const separateSides = options?.separateSides ?? false;
   const bySession = new Map<string, ExerciseSessionEntry>();
 
   for (const h of history) {
@@ -76,7 +82,9 @@ export const summarizeExerciseHistory = (history: ExerciseHistoryEntry[]): Exerc
     if (!d) continue;
 
     const ts = d.getTime();
-    const key = Number.isFinite(ts) ? String(ts) : format(d, 'yyyy-MM-dd');
+    // If separating sides, include side in the key so L and R create different entries
+    const baseKey = Number.isFinite(ts) ? String(ts) : format(d, 'yyyy-MM-dd');
+    const key = separateSides && h.side ? `${baseKey}-${h.side}` : baseKey;
 
     let entry = bySession.get(key);
     if (!entry) {
@@ -89,11 +97,12 @@ export const summarizeExerciseHistory = (history: ExerciseHistoryEntry[]): Exerc
         sets: 0,
         totalReps: 0,
         maxReps: 0,
+        side: separateSides ? h.side : undefined,
       };
       bySession.set(key, entry);
     }
 
-    entry.sets += 1;
+    entry.sets += h.side ? 0.5 : 1; // L/R sets count as 0.5 each (pair = 1 set)
     entry.volume += h.volume || 0;
     entry.totalReps += h.reps || 0;
     entry.maxReps = Math.max(entry.maxReps, h.reps || 0);

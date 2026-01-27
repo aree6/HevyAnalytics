@@ -214,3 +214,4 @@ export const clearThemeMode = (): void => {
     console.error('Failed to clear theme mode from local storage:', error);
   }
 };
+

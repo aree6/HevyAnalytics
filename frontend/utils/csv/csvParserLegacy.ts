@@ -349,7 +349,11 @@ const normalizeSetType = (value: unknown): string => {
   if (s.includes('giant')) return 'giantset';
   if (s.includes('super')) return 'superset';
   if (s.includes('backoff') || (s.includes('back') && s.includes('off'))) return 'backoff';
-  if (s.includes('right') || s.includes('left')) return 'normal';
+  // Preserve unilateral set types for left/right pairing
+  if (s.includes('right') && s.includes('set')) return 'right';
+  if (s.includes('left') && s.includes('set')) return 'left';
+  if (s === 'right' || s === 'rightset') return 'right';
+  if (s === 'left' || s === 'leftset') return 'left';
 
   return 'normal';
 };

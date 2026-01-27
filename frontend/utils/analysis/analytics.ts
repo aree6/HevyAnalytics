@@ -2,7 +2,7 @@ import { WorkoutSet, ExerciseStats, DailySummary } from '../../types';
 import { format, startOfDay, subDays, eachDayOfInterval, getDay, parse, differenceInMinutes, isValid } from 'date-fns';
 import { getDateKey, TimePeriod, sortByTimestamp, getSessionKey } from '../date/dateUtils';
 import { roundTo } from '../format/formatters';
-import { isWarmupSet } from './setClassification';
+import { isWarmupSet, countSets, isLeftSet, isRightSet } from './setClassification';
 
 const sortByParsedDate = (sets: WorkoutSet[], ascending: boolean): WorkoutSet[] => {
   const sign = ascending ? 1 : -1;
@@ -45,17 +45,6 @@ export const identifyPersonalRecords = (data: WorkoutSet[]): WorkoutSet[] => {
   return sortByParsedDate(dataWithPrs, false);
 };
 
-interface DailyAccumulator {
-  date: string;
-  timestamp: number;
-  totalVolume: number;
-  workoutTitle: string;
-  sets: number;
-  totalReps: number;
-  sessions: Set<string>;
-  durationMinutes: number;
-}
-
 const parseSessionDuration = (startDate: Date | undefined, endTimeStr: string): number => {
   if (!startDate) return 0;
   try {
@@ -69,53 +58,72 @@ const parseSessionDuration = (startDate: Date | undefined, endTimeStr: string): 
 };
 
 export const getDailySummaries = (data: WorkoutSet[]): DailySummary[] => {
-  const grouped = new Map<string, DailyAccumulator>();
+  // First, group sets by date
+  const setsByDate = new Map<string, WorkoutSet[]>();
+  const metaByDate = new Map<string, {
+    timestamp: number;
+    workoutTitle: string;
+    sessions: Set<string>;
+    durationMinutes: number;
+  }>();
 
   for (const set of data) {
     if (!set.parsedDate) continue;
     
     const dateKey = format(set.parsedDate, 'yyyy-MM-dd');
-    let acc = grouped.get(dateKey);
     
-    if (!acc) {
-      acc = {
-        date: dateKey,
+    if (!setsByDate.has(dateKey)) {
+      setsByDate.set(dateKey, []);
+      metaByDate.set(dateKey, {
         timestamp: startOfDay(set.parsedDate).getTime(),
-        totalVolume: 0,
         workoutTitle: set.title || 'Workout',
-        sets: 0,
-        totalReps: 0,
         sessions: new Set(),
         durationMinutes: 0,
-      };
-      grouped.set(dateKey, acc);
+      });
     }
     
+    setsByDate.get(dateKey)!.push(set);
+    
+    const meta = metaByDate.get(dateKey)!;
     const sessionKey = getSessionKey(set);
-    if (sessionKey && !acc.sessions.has(sessionKey)) {
-      acc.sessions.add(sessionKey);
-      acc.durationMinutes += parseSessionDuration(set.parsedDate, set.end_time);
+    if (sessionKey && !meta.sessions.has(sessionKey)) {
+      meta.sessions.add(sessionKey);
+      meta.durationMinutes += parseSessionDuration(set.parsedDate, set.end_time);
     }
-
-    if (isWarmupSet(set)) continue;
-
-    acc.totalVolume += (set.weight_kg || 0) * (set.reps || 0);
-    acc.sets += 1;
-    acc.totalReps += set.reps || 0;
   }
 
-  const summaries: DailySummary[] = Array.from(grouped.values()).map(d => ({
-    date: d.date,
-    timestamp: d.timestamp,
-    totalVolume: d.totalVolume,
-    workoutTitle: d.workoutTitle,
-    sets: d.sets,
-    avgReps: d.sets > 0 ? Math.round(d.totalReps / d.sets) : 0,
-    durationMinutes: d.durationMinutes,
-    density: d.durationMinutes > 0 ? Math.round(d.totalVolume / d.durationMinutes) : 0,
-  }));
+  const summaries: DailySummary[] = [];
+  
+  for (const [dateKey, sets] of setsByDate) {
+    const meta = metaByDate.get(dateKey)!;
+    
+    // Calculate volume and reps from non-warmup sets
+    let totalVolume = 0;
+    let totalReps = 0;
+    for (const set of sets) {
+      if (isWarmupSet(set)) continue;
+      totalVolume += (set.weight_kg || 0) * (set.reps || 0);
+      totalReps += set.reps || 0;
+    }
+    
+    // Count working sets (warmups excluded)
+    const setCount = countSets(sets);
+    
+    if (setCount > 0) {
+      summaries.push({
+        date: dateKey,
+        timestamp: meta.timestamp,
+        totalVolume,
+        workoutTitle: meta.workoutTitle,
+        sets: setCount,
+        avgReps: setCount > 0 ? Math.round(totalReps / setCount) : 0,
+        durationMinutes: meta.durationMinutes,
+        density: meta.durationMinutes > 0 ? Math.round(totalVolume / meta.durationMinutes) : 0,
+      });
+    }
+  }
 
-  return sortByTimestamp(summaries.filter(s => s.sets > 0));
+  return sortByTimestamp(summaries);
 };
 
 const calculateOneRepMax = (weight: number, reps: number): number => {
@@ -124,8 +132,9 @@ const calculateOneRepMax = (weight: number, reps: number): number => {
 };
 
 export const getExerciseStats = (data: WorkoutSet[]): ExerciseStats[] => {
-  const grouped = new Map<string, ExerciseStats>();
-
+  // First, group sets by exercise name
+  const setsByExercise = new Map<string, WorkoutSet[]>();
+  
   for (const set of data) {
     if (isWarmupSet(set)) continue;
     const name = set.exercise_title;
@@ -136,38 +145,65 @@ export const getExerciseStats = (data: WorkoutSet[]): ExerciseStats[] => {
     const y = d.getFullYear();
     if (y <= 1970 || y >= 2100) continue;
 
-    let stats = grouped.get(name);
-    if (!stats) {
-      stats = {
-        name,
-        totalSets: 0,
-        totalVolume: 0,
-        maxWeight: 0,
-        prCount: 0,
-        history: [],
-      };
-      grouped.set(name, stats);
+    if (!setsByExercise.has(name)) {
+      setsByExercise.set(name, []);
+    }
+    setsByExercise.get(name)!.push(set);
+  }
+
+  const results: ExerciseStats[] = [];
+
+  for (const [name, sets] of setsByExercise) {
+    let totalVolume = 0;
+    let maxWeight = 0;
+    let prCount = 0;
+    let hasUnilateralData = false;
+    const history: ExerciseStats['history'] = [];
+
+    for (const set of sets) {
+      const volume = (set.weight_kg || 0) * (set.reps || 0);
+      const oneRepMax = calculateOneRepMax(set.weight_kg, set.reps);
+
+      totalVolume += volume;
+      if (set.weight_kg > maxWeight) maxWeight = set.weight_kg;
+      if (set.isPr) prCount += 1;
+
+      // Determine side for unilateral exercises
+      let side: 'left' | 'right' | undefined;
+      if (isLeftSet(set)) {
+        side = 'left';
+        hasUnilateralData = true;
+      } else if (isRightSet(set)) {
+        side = 'right';
+        hasUnilateralData = true;
+      }
+
+      history.push({
+        date: set.parsedDate!,
+        weight: set.weight_kg,
+        reps: set.reps,
+        oneRepMax,
+        volume,
+        isPr: set.isPr ?? false,
+        side,
+      });
     }
 
-    const volume = (set.weight_kg || 0) * (set.reps || 0);
-    const oneRepMax = calculateOneRepMax(set.weight_kg, set.reps);
+    // Count sets (warmups already filtered above)
+    const totalSets = countSets(sets, { excludeWarmup: false });
 
-    stats.totalSets += 1;
-    stats.totalVolume += volume;
-    if (set.weight_kg > stats.maxWeight) stats.maxWeight = set.weight_kg;
-    if (set.isPr) stats.prCount += 1;
-
-    stats.history.push({
-      date: d,
-      weight: set.weight_kg,
-      reps: set.reps,
-      oneRepMax,
-      volume,
-      isPr: set.isPr ?? false,
+    results.push({
+      name,
+      totalSets,
+      totalVolume,
+      maxWeight,
+      prCount,
+      history,
+      hasUnilateralData,
     });
   }
 
-  return Array.from(grouped.values()).sort((a, b) => b.totalSets - a.totalSets);
+  return results.sort((a, b) => b.totalSets - a.totalSets);
 };
 
 export interface HeatmapEntry {

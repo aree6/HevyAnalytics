@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, LayoutDashboard, Pencil, RefreshCw, X } from 'lucide-react';
+import { Calendar, LayoutDashboard, Pencil, RefreshCw, Settings, X } from 'lucide-react';
 import { assetPath } from '../../constants';
 import { Tab } from '../../app/tabs';
 import { SupportLinks } from '../layout/SupportLinks';
@@ -9,6 +9,7 @@ interface AppHeaderProps {
   activeTab: Tab;
   onSelectTab: (tab: Tab) => void;
   onOpenUpdateFlow: () => void;
+  onOpenPreferences: () => void;
 
   calendarOpen: boolean;
   onToggleCalendarOpen: () => void;
@@ -20,6 +21,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   activeTab,
   onSelectTab,
   onOpenUpdateFlow,
+  onOpenPreferences,
   calendarOpen,
   onToggleCalendarOpen,
   hasActiveCalendarFilter,
@@ -56,6 +58,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     <ThemeToggleButton />
                     <button
                       type="button"
+                      onClick={onOpenPreferences}
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-10 w-10 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200"
+                      title="User Preferences"
+                      aria-label="User Preferences"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={onOpenUpdateFlow}
                       className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 py-1 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200 gap-2"
                     >
@@ -71,6 +82,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             <div className="md:hidden">
               <div className="flex items-center gap-2">
                 <ThemeToggleButton compact={true} />
+                <button
+                  type="button"
+                  onClick={onOpenPreferences}
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-9 w-9 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200"
+                  title="User Preferences"
+                  aria-label="User Preferences"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
                 <button
                   type="button"
                   onClick={onOpenUpdateFlow}

@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { WorkoutSet, AnalysisResult, SetWisdom, StructuredTooltip } from '../../types';
 import { 
@@ -6,6 +7,7 @@ import {
   Weight, Timer
 } from 'lucide-react';
 import { analyzeSetProgression, analyzeProgression, getWisdomColor, isWarmupSet } from '../../utils/analysis/masterAlgorithm';
+import { getSetTypeConfig, isWorkingSet } from '../../utils/analysis/setClassification';
 import { getExerciseAssets, ExerciseAsset } from '../../utils/data/exerciseAssets';
 import { BodyMap, BodyMapGender } from '../bodyMap/BodyMap';
 import { 
@@ -365,6 +367,22 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
         {currentSessions.map((session, index) => {
           const allSessionSets = session.exercises.flatMap(e => e.sets);
           const sessionHeatmap = buildSessionMuscleHeatmap(allSessionSets, exerciseMuscleData);
+          
+          // Aggregate session heatmap by display name for consistent tooltips.
+          // Multiple SVG IDs can map to the same display name (e.g., anterior-deltoid,
+          // lateral-deltoid, posterior-deltoid all map to "Shoulders").
+          // We take the MAX value because buildSessionMuscleHeatmap already sums across
+          // all exercises that hit each specific SVG ID. The max represents the most-worked
+          // part of that muscle group.
+          const sessionAggregated = new Map<string, number>();
+          sessionHeatmap.volumes.forEach((sets, svgId) => {
+            const label = SVG_MUSCLE_NAMES[svgId] || svgId;
+            const prev = sessionAggregated.get(label) || 0;
+            if (sets > prev) {
+              sessionAggregated.set(label, sets);
+            }
+          });
+          
           const isCollapsed = collapsedSessions.has(session.key);
           const sessionDurationMs = getSessionDurationMs(session);
           const sessionDurationText = sessionDurationMs != null ? formatWorkoutDuration(sessionDurationMs) : null;
@@ -537,8 +555,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                               const hoveredEl = (ev.target as Element | null)?.closest('g[id]');
                               const rect = hoveredEl?.getBoundingClientRect();
                               if (!rect) return;
-                              const sets = sessionHeatmap.volumes.get(muscleId) || 0;
                               const label = SVG_MUSCLE_NAMES[muscleId] || muscleId;
+                              const sets = sessionAggregated.get(label) || 0;
                               const setsText = Number.isInteger(sets) ? `${sets}` : `${sets.toFixed(1)}`;
                               setTooltip({ rect, title: label, body: `${setsText} sets`, status: 'info' });
                             }}
@@ -594,7 +612,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                     <span className="flex items-baseline min-w-0">
                       <span className="inline-flex items-center gap-1 whitespace-nowrap min-w-0 truncate">
                         <Weight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" aria-hidden />
-                        <span>{formatDisplayVolume(session.totalVolume, weightUnit, { round: 'int' })} {weightUnit}</span>
+                        <span>{formatDisplayVolume(session.totalVolume, weightUnit as WeightUnit, { round: 'int' })} {weightUnit}</span>
                       </span>
                       {prevSession && (
                         <span className="flex-none overflow-visible hidden sm:block">
@@ -638,8 +656,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                             const hoveredEl = (ev.target as Element | null)?.closest('g[id]');
                             const rect = hoveredEl?.getBoundingClientRect();
                             if (!rect) return;
-                            const sets = sessionHeatmap.volumes.get(muscleId) || 0;
                             const label = SVG_MUSCLE_NAMES[muscleId] || muscleId;
+                            const sets = sessionAggregated.get(label) || 0;
                             const setsText = Number.isInteger(sets) ? `${sets}` : `${sets.toFixed(1)}`;
                             setTooltip({ rect, title: label, body: `${setsText} sets`, status: 'info' });
                           }}
@@ -778,13 +796,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                           // Count working sets for proper numbering (warmup = W, working = 1,2,3...)
                           let workingSetNumber = 0;
                           return group.sets.map((set, sIdx) => {
+                          // Get set type configuration for display
+                          const setConfig = getSetTypeConfig(set);
                           // Check if this is a warmup set (based on set_type field only)
                           const isWarmup = isWarmupSet(set);
+                          // Check if this is a working set (counts toward numbering)
+                          const isWorking = isWorkingSet(set);
                           // Track working set number for display
-                          if (!isWarmup) workingSetNumber++;
-                          // Only show insights for non-warmup sets (insights array is for working sets only)
-                          const workingSetIdx = group.sets.slice(0, sIdx).filter(s => !isWarmupSet(s)).length;
-                          const insight = !isWarmup && workingSetIdx > 0 ? insights[workingSetIdx - 1] : undefined;
+                          if (isWorking) workingSetNumber++;
+                          // Only show insights for working sets (insights array is for working sets only)
+                          const workingSetIdx = group.sets.slice(0, sIdx).filter(s => isWorkingSet(s)).length;
+                          const insight = isWorking && workingSetIdx > 0 ? insights[workingSetIdx - 1] : undefined;
                           
                           // Determine row color based on status or PR
                           let rowStatusClass = "border-transparent";
@@ -832,9 +854,21 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                               className={`relative z-10 flex items-center gap-2 sm:gap-3 p-1.5 sm:p-2 rounded-lg border ${rowStatusClass} transition-all hover:bg-black/60 group overflow-visible`}
                               style={prShimmerStyle}
                             >
-                              {/* Set Number Bubble - W for warmup, 1,2,3... for working sets */}
-                              <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold border-2 transition-all ${dotClass} text-white`}>
-                                {isWarmup ? 'W' : workingSetNumber}
+                              {/* Set Number Bubble - Shows set type letter or working set number */}
+                              {/* For special set types (warmup, left, right, etc.), show the letter indicator */}
+                              {/* For normal working sets, show the set number (1, 2, 3...) */}
+                              <div 
+                                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold border-2 transition-all text-white ${
+                                  set.isPr 
+                                    ? dotClass  // PR styling takes priority
+                                    : isWorking && !setConfig.shortLabel
+                                      ? dotClass  // Normal working set
+                                      : `${setConfig.bgColor} ${setConfig.borderColor}`  // Special set type color
+                                }`}
+                                title={setConfig.description}
+                              >
+                                {/* Show letter for special sets, number for normal working sets */}
+                                {setConfig.shortLabel || (isWorking ? workingSetNumber : '?')}
                               </div>
 
                               {/* Set Data */}
@@ -963,8 +997,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                                     const hoveredEl = (ev.target as Element | null)?.closest('g[id]');
                                     const rect = hoveredEl?.getBoundingClientRect();
                                     if (!rect) return;
-                                    const sets = volumes.get(muscleId) || 0;
                                     const label = SVG_MUSCLE_NAMES[muscleId] || muscleId;
+                                    const sets = aggregated.get(label)?.sets || 0;
                                     const setsText = Number.isInteger(sets) ? `${sets}` : `${sets.toFixed(1)}`;
                                     setTooltip({ rect, title: label, body: `${setsText} sets`, status: 'info' });
                                   }}

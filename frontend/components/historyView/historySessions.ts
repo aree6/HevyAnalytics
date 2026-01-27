@@ -1,5 +1,5 @@
 import type { WorkoutSet } from '../../types';
-import { isWarmupSet } from '../../utils/analysis/masterAlgorithm';
+import { isWarmupSet, countSets } from '../../utils/analysis/setClassification';
 import { getSessionKey } from '../../utils/date/dateUtils';
 
 export interface GroupedExercise {
@@ -34,7 +34,6 @@ export const buildHistorySessions = (data: WorkoutSet[]): Session[] => {
 
       let totalVolume = 0;
       let totalPRs = 0;
-      let totalSets = 0;
 
       sets.forEach((set) => {
         const exerciseName = set.exercise_title || 'Unknown';
@@ -45,11 +44,13 @@ export const buildHistorySessions = (data: WorkoutSet[]): Session[] => {
         setsByExercise.get(exerciseName)!.push(set);
 
         if (!isWarmupSet(set)) {
-          totalSets += 1;
           totalVolume += (set.weight_kg || 0) * (set.reps || 0);
           if (set.isPr) totalPRs += 1;
         }
       });
+
+      // Count total working sets
+      const totalSets = countSets(sets);
 
       for (const exerciseName of exerciseOrder) {
         const exerciseSets = setsByExercise.get(exerciseName) || [];
