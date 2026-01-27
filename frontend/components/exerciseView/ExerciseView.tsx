@@ -532,7 +532,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
           TOP SECTION: GRID LAYOUT 
           Grid items default to stretch, so columns will be equal height.
       */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 items-stretch">
+      <div className="grid grid-cols-1 lg:[grid-template-columns:40%_60%] gap-2 items-stretch">
         
         {/* --- LEFT: SIDEBAR --- */}
         {/* 
@@ -599,20 +599,20 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                     <div className="flex items-center gap-2 min-w-0 pr-2">
                       {(() => {
                         if (!asset) return (
-                          <div className="w-6 h-6 rounded bg-black/50 flex items-center justify-center text-slate-500 flex-shrink-0">
-                            <Dumbbell className="w-3.5 h-3.5" />
+                          <div className="flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-md bg-black/50 flex items-center justify-center text-slate-500">
+                            <Dumbbell className="w-5 h-5" />
                           </div>
                         );
                         const imgUrl = asset.sourceType === 'video' ? asset.thumbnail : (asset.thumbnail || asset.source);
                         return imgUrl ? (
-                          <img src={imgUrl} alt="" className="w-6 h-6 rounded object-cover flex-shrink-0 bg-white" loading="lazy" decoding="async" />
+                          <img src={imgUrl} alt="" className="flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-md object-cover bg-white" loading="lazy" decoding="async" />
                         ) : (
-                          <div className="w-6 h-6 rounded bg-black/50 flex items-center justify-center text-slate-500 flex-shrink-0">
-                            <Dumbbell className="w-3.5 h-3.5" />
+                          <div className="flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-md bg-black/50 flex items-center justify-center text-slate-500">
+                            <Dumbbell className="w-5 h-5" />
                           </div>
                         );
                       })()}
-                      <div className="flex flex-col min-w-0">
+                      <div className="flex flex-col min-w-0 h-12 sm:h-16 justify-between py-1">
                         <span className={`truncate text-xs ${isSelected ? 'text-slate-200 font-semibold' : 'text-slate-300 group-hover:text-white'}`}>
                           {ex.name}
                         </span>
@@ -645,7 +645,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
         </div>
 
         {/* --- RIGHT: HEADER & METRICS --- */}
-        <div className="lg:col-span-2 flex flex-col gap-2 h-full min-h-0">
+        <div className="lg:col-span-1 flex flex-col gap-2 h-full min-h-0">
           {selectedStats && currentStatus ? (
             <div className="flex flex-col h-full gap-2">
               
@@ -696,7 +696,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                                 className="px-2 py-0.5 rounded-md text-[10px] font-semibold border border-slate-900/10"
                                 style={{
                                   backgroundColor: getVolumeColor(t.sets, selectedExerciseMuscleInfo.maxVolume),
-                                  color: getTargetTextColor(t.sets, selectedExerciseMuscleInfo.maxVolume),
+                                  color: '#ffffff',
                                 }}
                               >
                                 {t.label}
