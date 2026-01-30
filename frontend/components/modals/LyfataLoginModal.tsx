@@ -54,7 +54,7 @@ export const LyfataLoginModal: React.FC<LyfataLoginModalProps> = ({
           </div>
 
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-white inline-flex items-center justify-center gap-2">
+            <h2 className="text-2xl font-bold text-slate-200 inline-flex items-center justify-center gap-2">
               <Key className="w-5 h-5 text-slate-200" />
               <span>Login with Lyfta</span>
             </h2>
@@ -101,7 +101,7 @@ export const LyfataLoginModal: React.FC<LyfataLoginModalProps> = ({
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             disabled={isLoading}
-            className="mt-1 w-full h-10 rounded-md bg-black/50 border border-slate-700/60 px-3 text-sm text-slate-100 outline-none focus:border-purple-500/60"
+            className="mt-1 w-full h-10 rounded-md bg-slate-900/20 border border-slate-700/60 px-3 text-sm text-slate-200 placeholder:text-slate-500 outline-none focus:border-purple-500/60"
             placeholder="Enter your Lyfta API key"
             autoComplete="off"
             required

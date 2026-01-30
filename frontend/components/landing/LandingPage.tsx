@@ -50,7 +50,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform }) =>
       initial={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-black text-white font-sans"
+      className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-slate-950 text-slate-200 font-sans"
     >
       <ThemedBackground />
       {/* Light Rays Effect */}
@@ -106,7 +106,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform }) =>
       <section id="how-it-works" className="relative z-10 px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
         <div className="max-w-6xl mx-auto">
           <div className="text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white" style={FANCY_FONT}>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-200" style={FANCY_FONT}>
               How it works
             </h2>
             <p className="mt-3 text-slate-400 max-w-2xl mx-auto">

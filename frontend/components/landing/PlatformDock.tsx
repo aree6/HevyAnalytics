@@ -95,7 +95,7 @@ function DockItem({ item, mouseX, onHoverStart, onHoverEnd, index = 0, totalItem
         className={`relative inline-flex items-center justify-center rounded-2xl overflow-hidden transition-all duration-100 ${
           item.disabled 
             ? 'opacity-40 cursor-not-allowed border border-slate-700/30 bg-slate-900/50' 
-            : `cursor-pointer bg-black/70 shadow-lg ${isHovered ? 'border-2 border-emerald-400 shadow-emerald-400/40' : 'border border-emerald-500/40 shadow-emerald-500/20'}`
+            : `cursor-pointer bg-slate-950/75 shadow-lg ${isHovered ? 'border-2 border-emerald-400 shadow-emerald-400/40' : 'border border-emerald-500/40 shadow-emerald-500/20'}`
         }`}
       >
         <img
@@ -146,14 +146,14 @@ export default function PlatformDock({ items, className = '' }: PlatformDockProp
           {/* Choose your platform text (crossfades to hovered platform name) */}
           <div className="relative h-5 w-full select-none">
             <span
-              className={`absolute inset-0 flex items-center justify-center text-xs ${FANCY_FONT} text-emerald-400/80 transition-all duration-300 mix-blend-difference drop-shadow-lg ${activeName ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}`}
+              className={`absolute inset-0 flex items-center justify-center text-xs ${FANCY_FONT} text-emerald-400/80 transition-all duration-300 drop-shadow-lg ${activeName ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}`}
               aria-hidden={!!activeName}
             >
               Choose your platform
             </span>
 
             <span
-              className={`absolute inset-0 flex items-center justify-center text-xs ${FANCY_FONT} text-emerald-400/80 transition-all duration-300 delay-75 mix-blend-difference drop-shadow-lg ${activeName ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1'}`}
+              className={`absolute inset-0 flex items-center justify-center text-xs ${FANCY_FONT} text-emerald-400/80 transition-all duration-300 delay-75 drop-shadow-lg ${activeName ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1'}`}
               aria-live="polite"
             >
               {activeName ?? ''}
