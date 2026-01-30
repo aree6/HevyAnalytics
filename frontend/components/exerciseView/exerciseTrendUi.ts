@@ -4,7 +4,7 @@ import { ExerciseHistoryEntry, ExerciseStats } from '../../types';
 import { analyzeExerciseTrendCore, ExerciseTrendStatus, MIN_SESSIONS_FOR_TREND } from '../../utils/analysis/exerciseTrend';
 import { pickDeterministic } from '../../utils/analysis/messageVariations';
 import { convertWeight, getStandardWeightIncrementKg } from '../../utils/format/units';
-import { WeightUnit } from '../../utils/storage/localStorage';
+import type { ExerciseTrendMode, WeightUnit } from '../../utils/storage/localStorage';
 
 const getLatestHistoryKey = (history: ExerciseHistoryEntry[]): string => {
   let maxTs = -Infinity;
@@ -28,10 +28,15 @@ export interface StatusResult {
   evidence?: string[];
   label: string;
   isBodyweightLike: boolean;
+  prematurePr?: boolean;
 }
 
-export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUnit): StatusResult => {
-  const core = analyzeExerciseTrendCore(stats);
+export const analyzeExerciseTrend = (
+  stats: ExerciseStats,
+  weightUnit: WeightUnit,
+  options?: { trendMode?: ExerciseTrendMode }
+): StatusResult => {
+  const core = analyzeExerciseTrendCore(stats, { trendMode: options?.trendMode });
   const seedBase = `${stats.name}|${core.status}|${getLatestHistoryKey(stats.history)}`;
 
   const progressRate = core.diffPct ? Math.abs(core.diffPct) : 0;
@@ -43,7 +48,8 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
   if (core.status === 'new') {
     const sessionsCount = stats.history.length;
     const title = pickDeterministic(`${seedBase}|title`, [
-      'Just getting started', 'First timer', 'Rookie numbers', 'Building your base', 'Day one energy'
+      'Just getting started', 'First timer', 'Rookie numbers', 'Building your base', 'Day one energy',
+      'Fresh slate', 'Warm-up phase', 'Foundation loading', 'Calibration mode', 'New chapter'
     ] as const);
     const description = pickDeterministic(`${seedBase}|desc`, [
       'First session in the books! We\'re figuring out what you\'ve got.',
@@ -58,6 +64,10 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       `Almost there! ${MIN_SESSIONS_FOR_TREND - sessionsCount} session${MIN_SESSIONS_FOR_TREND - sessionsCount === 1 ? '' : 's'} left to impress me.`,
       `Keep logging - the algorithm gets hungry after ${MIN_SESSIONS_FOR_TREND}+ snacks.`,
       `Don\'t ghost me now! ${MIN_SESSIONS_FOR_TREND}+ sessions and I\'ll reveal your secrets.`,
+      'Early data looks clean. Keep it consistent and we\'ll dial this in fast.',
+      'We\'re still learning your baseline. Keep the setup consistent and let the trend form.',
+      'Too early to judge - but the habit is forming. Stack a few more sessions.',
+      'We\'re collecting signal. Same movement, same intent, better insights soon.'
     ] as const);
     const subtext = pickDeterministic(`${seedBase}|sub`, [
       'Perfect form first, champ. Pick something you can actually finish without crying.',
@@ -70,6 +80,10 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       'Master the basics first, then we can play with the fancy toys.',
       'No rush to be a hero. Learn the movement before you try to be Instagram famous.',
       'Walk before you run, lift before you ego-lift. The basics are boring for a reason.',
+      'Keep the variables boring: same tempo, same depth, same rest. Let progress be the novelty.',
+      'Treat every rep like practice. Skill first, strength next.',
+      'Pick a repeatable load and own it. Consistency now buys freedom later.',
+      'Stay honest with form. Clean reps today become PRs later.'
     ] as const);
     return {
       status: 'new',
@@ -84,6 +98,7 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       evidence: core.evidence,
       label: 'baseline',
       isBodyweightLike: core.isBodyweightLike,
+      prematurePr: core.prematurePr,
     };
   }
 
@@ -99,7 +114,8 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
     const sessionsAtPlateau = Math.min(6, Math.max(1, stats.history.length));
 
     const title = pickDeterministic(`${seedBase}|title`, [
-      'Stuck in neutral', 'Holding steady', 'Plateau city', 'Flatlined', 'Time for a shakeup'
+      'Stuck in neutral', 'Holding steady', 'Plateau city', 'Flatlined', 'Time for a shakeup',
+      'Comfort zone detected', 'Same song, same verse', 'Cruise control', 'Pattern locked', 'Stability era'
     ] as const);
 
     const description = pickDeterministic(`${seedBase}|desc`, [
@@ -113,6 +129,10 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       `Consistent pattern: ${plateauWeight}${weightUnit} × ${minReps}-${maxReps}. Your muscles need variety.`,
       `Progress is steady but not growing. Time to spice things up!`,
       `Everything\'s consistent: ${plateauWeight}${weightUnit} × ${minReps}-${maxReps}. Let\'s mix it up!`,
+      `You\'re repeating the same outcome: ${plateauWeight}${weightUnit} × ${minReps}-${maxReps}. Great control, now chase growth.`,
+      `Strong and steady, but not climbing. Time to nudge the system with a new demand.`,
+      `You\'ve stabilized at ${plateauWeight}${weightUnit}. Now it\'s time to earn the next level.`,
+      `This is a true plateau: consistent output, limited change. Perfect moment for a small, strategic push.`
     ] as const);
 
     const subtext = pickDeterministic(`${seedBase}|sub`, [
@@ -126,6 +146,10 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       `If weight jumps feel scary, repeat ${plateauWeight}${weightUnit} and hunt for +1 rep like it\'s the last donut.`,
       `Mix it up! If doing push-ups, try incline/decline or resistance bands. Keep it tight and controlled.`,
       `Same weight, add reps, then increase load. If bar speed is slower than a turtle, deload 10% for 2 weeks.`,
+      `Stay at ${plateauWeight}${weightUnit} and earn a bigger rep buffer. Then jump to ${suggestedNext}${weightUnit} with confidence.`,
+      `Add one variable: +1 rep, +1 set, or +5–10% rest reduction. Tiny change, big signal.`,
+      `Pick one set to push (without failing), then bring the rest up to match over the next sessions.`,
+      `If reps are inconsistent, lock a target rep count and hold it across every set for 2-3 sessions.`
     ] as const);
 
     return {
@@ -141,12 +165,15 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       evidence: core.evidence,
       label: 'plateauing',
       isBodyweightLike: core.isBodyweightLike,
+      prematurePr: core.prematurePr,
     };
   }
 
   if (core.status === 'overload') {
     const title = pickDeterministic(`${seedBase}|title`, [
-      'Getting stronger', 'Beast mode', 'On fire', 'Making gains', 'Leveling up'
+      'Getting stronger', 'Beast mode', 'On fire', 'Making gains', 'Leveling up',
+      'Momentum unlocked', 'Dialed in', 'Power building', 'Trend looks great', 'Quietly crushing it',
+      'Strength stacking', 'Progress engine', 'Climbing phase'
     ] as const);
 
     const description = pickDeterministic(`${seedBase}|desc`, [
@@ -160,6 +187,10 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       'Hello, improvement! Nice to see you moving forward.',
       'Rep performance is improving! Keep that energy.',
       'Strength is looking good! The consistency is paying off.',
+      'Clean sessions and steady progress. This is what sustainable looks like.',
+      'You\'re building something real here. Keep stacking quality work.',
+      'Upward drift confirmed. Stay patient and keep the form tight.',
+      'This is the good kind of boring: consistent work, consistent results.'
     ] as const);
 
     const subtext = pickDeterministic(`${seedBase}|sub`, [
@@ -176,6 +207,10 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       'If this feels too easy, either you\'re holding back or it\'s time to level up.',
       'Recovery is your secret weapon. Don\'t sabotage with poor sleep.',
       'Film yourself improving. Future you will appreciate the journey.',
+      'Hold the standard: same setup, same depth, cleaner reps. Let strength accumulate.',
+      'Add difficulty with intent: +1 rep, +1 set, or a small load jump — not all at once.',
+      'Keep sessions repeatable. The goal is momentum, not chaos.',
+      'Ride the wave: keep the effort consistent and don\'t force max attempts.'
     ] as const);
 
     return {
@@ -191,12 +226,14 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       evidence: core.evidence,
       label: 'gaining',
       isBodyweightLike: core.isBodyweightLike,
+      prematurePr: core.prematurePr,
     };
   }
 
   if (core.status === 'regression') {
     const title = pickDeterministic(`${seedBase}|title`, [
-      'Taking a break', 'Fatigue showing', 'Recovery mode', 'Backing off', 'Time to reset'
+      'Taking a break', 'Fatigue showing', 'Recovery mode', 'Backing off', 'Time to reset',
+      'Recovery needed', 'Battery low', 'Time to reload', 'Deload vibes', 'System stressed'
     ] as const);
 
     const description = pickDeterministic(`${seedBase}|desc`, [
@@ -207,6 +244,10 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       'Performance is down. Don\'t panic - this is your body asking for a break.',
       'Things are dipping a bit. Time to adjust before it becomes a problem.',
       'Small regression happens. Use it as an excuse to perfect your form.',
+      'Your recent output is lower than your usual. That\'s a recovery signal, not a character flaw.',
+      'This looks like accumulated fatigue. The fix is usually sleep + smart volume, not rage lifting.',
+      'Performance dipped. Treat this as feedback and adjust the next 1-2 sessions.',
+      'You\'re underperforming relative to baseline. Let\'s get you back to neutral first.'
     ] as const);
 
     const subtext = pickDeterministic(`${seedBase}|sub`, [
@@ -219,6 +260,10 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       'Film yourself. Maybe your form slipped without you noticing.',
       'Stop training so close to failure! Leave 2-3 reps in reserve. This is marathon, not sprint.',
       'Small dips happen. Sleep 7-9 hours and don\'t overthink it.',
+      'Do one "easy win" session: lighter load, crisp reps, leave 3 reps in reserve. Build confidence back.',
+      'Reduce intensity for a session and focus on range of motion and bar path. Make it feel good again.',
+      'Pick one lever to pull: less volume, more rest, or a small deload. Don\'t change everything at once.',
+      'If joints feel cranky, keep the movement but scale the load. Consistency without punishment.'
     ] as const);
 
     return {
@@ -234,56 +279,14 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       evidence: core.evidence,
       label: 'losing',
       isBodyweightLike: core.isBodyweightLike,
-    };
-  }
-
-  if (core.status === 'fake_pr') {
-    const title = pickDeterministic(`${seedBase}|title`, [
-      'Unsustainable PR', 'Premature jump', 'PR too soon', 'Jumped too fast', 'Not ready yet'
-    ] as const);
-
-    const description = pickDeterministic(`${seedBase}|desc`, [
-      'That PR jump was too ambitious. Your body wasn\'t ready for that weight.',
-      'Nice PR attempt, but the follow-up performance tells the real story.',
-      'That performance jump looks premature. Your body needs more foundation work.',
-      'Big spike detected! But the subsequent drop shows it was too much, too soon.',
-      'That PR was followed by reality. Your body needs more time at this level.',
-      'Massive jump! But the follow-up performance shows it wasn\'t sustainable.',
-      'That PR looks premature. The data suggests you jumped ahead of your capabilities.',
-    ] as const);
-
-    const subtext = pickDeterministic(`${seedBase}|sub`, [
-      'Build foundation first. PRs should come from consistent work, not desperate jumps.',
-      'That PR was followed by regression. Focus on sustainable progress, not peak performances.',
-      'Build a solid base first. PRs should be the result of accumulated work, not big jumps.',
-      'Focus on volume and consistency. Real PRs come from gradual progression, not max attempts.',
-      'That PR might have been too ambitious. Don\'t chase numbers - build strength gradually.',
-      'Next session: aim for 90% of that PR with perfect form. Build sustainable strength.',
-      'Train consistently, not for PR moments. The trend matters more than the peak.',
-      'Focus on the process, not the outcome. Strength builds through consistent work.',
-      'That PR was premature. Spend more time at current weights before jumping up.',
-      'Build work capacity first. Your body needs more volume before handling that weight.',
-    ] as const);
-
-    return {
-      status: 'fake_pr',
-      color: 'text-orange-400',
-      bgColor: 'bg-orange-500/10',
-      borderColor: 'border-orange-500/20',
-      icon: AlertTriangle,
-      title,
-      description,
-      subtext,
-      confidence: core.confidence,
-      evidence: core.evidence,
-      label: 'Premature PR',
-      isBodyweightLike: core.isBodyweightLike,
+      prematurePr: core.prematurePr,
     };
   }
 
   if (core.status === 'neutral') {
     const title = pickDeterministic(`${seedBase}|title`, [
-      'Cruising along', 'Holding steady', 'Maintenance mode', 'Stable vibes', 'Chill but building'
+      'Cruising along', 'Holding steady', 'Maintenance mode', 'Stable vibes', 'Chill but building',
+      'Steady state', 'Consistent output', 'Solid baseline', 'In the pocket', 'Holding the line'
     ] as const);
     const description = pickDeterministic(`${seedBase}|desc`, [
       'Performance is stable. This is your launch pad for the next breakthrough.',
@@ -293,6 +296,10 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       'Not a setback, just strategic patience. Choose your next move wisely, grasshopper.',
       'You\'ve found your current level. Now optimize it before you level up again.',
       'Current strength level achieved. Time to master this before chasing more.',
+      'You\'re maintaining well. Small, consistent nudges will turn this into progress.',
+      'Stable trend. This is where good programming turns into great results.',
+      'Nothing dramatic, which is good. Now you can choose a deliberate progression path.',
+      'You\'re holding steady. If you want growth, add a tiny challenge and repeat.'
     ] as const);
     const subtext = pickDeterministic(`${seedBase}|sub`, [
       'Play with tempo: add 2-second pauses or painfully slow eccentrics (3-4 seconds). Feel the burn!',
@@ -303,6 +310,10 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       'If weight feels manageable, increase intensity: train closer to failure or add partial movements.',
       'Perfect your technique: film yourself, connect mind to muscle, own your range of motion.',
       'Technique check: film yourself, nail your bracing, make every rep identical.',
+      'Add structure: pick a rep target and beat it by +1 next session, then repeat.',
+      'Make one change at a time: slightly shorter rest, slightly higher reps, or a small load jump.',
+      'Aim for smoother reps and a stronger finish. Consistency now makes progress easier later.',
+      'If you want movement, set a micro-goal: +1 rep across sets or +0.5–1kg next week.'
     ] as const);
     return {
       status: 'neutral',
@@ -317,6 +328,7 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
       evidence: core.evidence,
       label: 'maintaining',
       isBodyweightLike: core.isBodyweightLike,
+      prematurePr: core.prematurePr,
     };
   }
 
@@ -332,5 +344,6 @@ export const analyzeExerciseTrend = (stats: ExerciseStats, weightUnit: WeightUni
     evidence: core.evidence,
     label: 'unknown',
     isBodyweightLike: core.isBodyweightLike,
+    prematurePr: core.prematurePr,
   };
 };

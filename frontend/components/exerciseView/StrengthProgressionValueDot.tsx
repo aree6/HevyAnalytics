@@ -62,12 +62,43 @@ export const StrengthProgressionValueDot = (props: any) => {
     (isBodyweightLike ? value >= globalPrValue - 1e-6 : Math.abs(value - globalPrValue) <= 0.05);
   const dotColor = isPr ? prGold : color;
 
+  let firstPrIndex: number | null = null;
+  if (isPr && Number.isFinite(globalPrValue) && Array.isArray(data)) {
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const v = row?.[valueKey];
+      if (typeof v !== 'number') continue;
+      const isPrAtI = isBodyweightLike ? v >= globalPrValue - 1e-6 : Math.abs(v - globalPrValue) <= 0.05;
+      if (isPrAtI) {
+        firstPrIndex = i;
+        break;
+      }
+    }
+  }
+
   const n = Array.isArray(data) ? data.length : 0;
   const step = Number.isFinite(everyNth) && everyNth > 0 ? everyNth : showEveryOther ? 2 : 1;
   const shouldShowByIndexMap = showAtIndexMap && typeof showAtIndexMap === 'object' ? !!showAtIndexMap[index] : null;
-  const shouldShowLabel =
-    isPr ||
-    (shouldShowByIndexMap !== null
+
+  // Label rules:
+  // - Always show the first occurrence of the current (global) PR value.
+  // - For repeated hits of the same PR value, only show the label when this point is also an X-axis tick.
+  const shouldShowRepeatedPrLabel =
+    shouldShowByIndexMap !== null
+      ? shouldShowByIndexMap
+      : step <= 1 || index % step === 0 || index === n - 1 || index === 0;
+
+  const shouldShowPrLabel =
+    isPr &&
+    (firstPrIndex === null
+      ? true
+      : index === firstPrIndex
+        ? true
+        : shouldShowRepeatedPrLabel);
+
+  const shouldShowLabel = isPr
+    ? shouldShowPrLabel
+    : (shouldShowByIndexMap !== null
       ? shouldShowByIndexMap || index === n - 1 || index === 0
       : step <= 1 || index % step === 0 || index === n - 1 || index === 0);
 
@@ -87,19 +118,6 @@ export const StrengthProgressionValueDot = (props: any) => {
   const trophyOnLeft = index === n - 1 || index === n - 2;
   const trophyX = trophyOnLeft ? cx - approxHalfWidth - 14 : cx + approxHalfWidth + 4;
 
-  let firstPrIndex: number | null = null;
-  if (isPr && Number.isFinite(globalPrValue) && Array.isArray(data)) {
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      const v = row?.[valueKey];
-      if (typeof v !== 'number') continue;
-      const isPrAtI = isBodyweightLike ? v >= globalPrValue - 1e-6 : Math.abs(v - globalPrValue) <= 0.05;
-      if (isPrAtI) {
-        firstPrIndex = i;
-        break;
-      }
-    }
-  }
   const showTrophy = isPr && firstPrIndex !== null && index === firstPrIndex;
 
   return (

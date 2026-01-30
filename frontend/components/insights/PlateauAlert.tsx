@@ -1,10 +1,10 @@
 import React from 'react';
 
-import { differenceInCalendarDays } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
 
 import type { ExerciseAsset } from '../../utils/data/exerciseAssets';
 import type { WeightUnit } from '../../utils/storage/localStorage';
+import { formatRelativeDuration } from '../../utils/date/dateUtils';
 import { convertWeight } from '../../utils/format/units';
 
 // Compact Alert Card for Plateaus
@@ -40,18 +40,8 @@ export const PlateauAlert: React.FC<PlateauAlertProps> = ({
   const imgSrc = asset?.sourceType === 'video' ? asset.thumbnail : (asset?.thumbnail || asset?.source);
   const clickable = typeof onClick === 'function';
 
-  const formatTimeAgo = (date: Date, now: Date): string => {
-    const diffDays = Math.abs(differenceInCalendarDays(now, date));
-    if (diffDays === 0) return 'today';
-    if (diffDays === 1) return 'yesterday';
-    if (diffDays < 7) return `${diffDays} days`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months`;
-    return `${Math.floor(diffDays / 365)} years`;
-  };
-
   const formatProgressMessage = (date: Date, now: Date): string => {
-    const timeAgo = formatTimeAgo(date, now);
+    const timeAgo = formatRelativeDuration(date, now);
     if (timeAgo === 'today') return 'No progress today';
     if (timeAgo === 'yesterday') return 'No progress since yesterday';
     return `No progress since ${timeAgo}`;

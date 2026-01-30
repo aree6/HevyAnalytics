@@ -90,6 +90,29 @@ export const formatRelativeDay = (d: Date, now: Date): string => {
   return `in ${Math.abs(diffDays)} days`;
 };
 
+export const formatRelativeDuration = (d: Date, now: Date): string => {
+  if (!isPlausibleDate(d)) return '—';
+  if (!isPlausibleDate(now)) return formatDayYearContraction(d);
+
+  const diffDays = Math.abs(differenceInCalendarDays(now, d));
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'}`;
+
+  if (diffDays < 30) {
+    const weeks = Math.max(1, Math.floor(diffDays / 7));
+    return `${weeks} week${weeks === 1 ? '' : 's'}`;
+  }
+
+  if (diffDays < 365) {
+    const months = Math.max(1, Math.floor(diffDays / 30));
+    return `${months} month${months === 1 ? '' : 's'}`;
+  }
+
+  const years = Math.max(1, Math.floor(diffDays / 365));
+  return `${years} year${years === 1 ? '' : 's'}`;
+};
+
 export const formatRelativeTime = (d: Date, now: Date): string => {
   if (!isPlausibleDate(d)) return '—';
   if (!isPlausibleDate(now)) return formatDayYearContraction(d);

@@ -1,7 +1,8 @@
 import { format } from 'date-fns';
+import type { ExerciseTrendMode } from '../storage/localStorage';
 import { ExerciseHistoryEntry, ExerciseStats } from '../../types';
 
-export type ExerciseTrendStatus = 'overload' | 'stagnant' | 'regression' | 'neutral' | 'new' | 'fake_pr';
+export type ExerciseTrendStatus = 'overload' | 'stagnant' | 'regression' | 'neutral' | 'new';
 
 export const MIN_SESSIONS_FOR_TREND = 4;
 
@@ -24,6 +25,7 @@ export interface ExerciseTrendCoreResult {
   diffPct?: number;
   confidence?: 'low' | 'medium' | 'high';
   evidence?: string[];
+  prematurePr?: boolean;
   plateau?: {
     weight: number;
     minReps: number;
@@ -61,6 +63,23 @@ const fmtSignedPct = (pct: number): string => {
   if (!Number.isFinite(pct)) return '0.0%';
   const sign = pct > 0 ? '+' : '';
   return `${sign}${pct.toFixed(1)}%`;
+};
+
+const getTrendThresholds = (
+  trendMode: ExerciseTrendMode
+): { pct: number; abs1rmKg: number; absReps: number } => {
+  if (trendMode === 'reactive') {
+    return {
+      pct: 0.6,
+      abs1rmKg: 0.25,
+      absReps: 1,
+    };
+  }
+  return {
+    pct: TREND_PCT_THRESHOLD,
+    abs1rmKg: TREND_MIN_ABS_1RM_KG,
+    absReps: TREND_MIN_ABS_REPS,
+  };
 };
 
 const getConfidence = (historyLen: number, windowSize: number): 'low' | 'medium' | 'high' => {
@@ -117,7 +136,11 @@ export const summarizeExerciseHistory = (
   return Array.from(bySession.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
 };
 
-export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCoreResult => {
+export const analyzeExerciseTrendCore = (
+  stats: ExerciseStats,
+  options?: { trendMode?: ExerciseTrendMode }
+): ExerciseTrendCoreResult => {
+  const trendMode: ExerciseTrendMode = options?.trendMode ?? 'reactive';
   const history = summarizeExerciseHistory(stats.history);
 
   // No usable history yet.
@@ -194,8 +217,10 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
     };
   }
 
-  // Trend: compare a recent window vs a previous window (3v3 if possible, else 2v2).
-  const windowSize = history.length >= 6 ? 6 : 4;
+  // Trend: compare a recent window vs a previous window.
+  // Default mode: 3v3 if possible, else 2v2.
+  // Reactive mode: always prefer a shorter window (2v2) to reflect recent changes sooner.
+  const windowSize = trendMode === 'reactive' ? 4 : (history.length >= 6 ? 6 : 4);
   const window = history.slice(0, windowSize);
 
   const metric = isBodyweightLike
@@ -208,6 +233,8 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
   const diffAbs = currentMetric - previousMetric;
   const diffPct = previousMetric > 0 ? (diffAbs / previousMetric) * 100 : 0;
 
+  const thresholds = getTrendThresholds(trendMode);
+
   if (currentMetric <= 0 || previousMetric <= 0) {
     return {
       status: 'new',
@@ -218,21 +245,147 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
   }
 
   const meetsOverload = isBodyweightLike
-    ? diffAbs >= TREND_MIN_ABS_REPS && diffPct >= TREND_PCT_THRESHOLD
-    : diffAbs >= TREND_MIN_ABS_1RM_KG && diffPct >= TREND_PCT_THRESHOLD;
+    ? diffAbs >= thresholds.absReps && diffPct >= thresholds.pct
+    : diffAbs >= thresholds.abs1rmKg && diffPct >= thresholds.pct;
   const meetsRegression = isBodyweightLike
-    ? diffAbs <= -TREND_MIN_ABS_REPS && diffPct <= -TREND_PCT_THRESHOLD
-    : diffAbs <= -TREND_MIN_ABS_1RM_KG && diffPct <= -TREND_PCT_THRESHOLD;
+    ? diffAbs <= -thresholds.absReps && diffPct <= -thresholds.pct
+    : diffAbs <= -thresholds.abs1rmKg && diffPct <= -thresholds.pct;
 
-  if (meetsOverload) {
+  const latestSession = history[0];
+  const previousSession = history[1];
+  const latestMetric = latestSession ? (isBodyweightLike ? latestSession.maxReps : latestSession.oneRepMax) : 0;
+  const previousSessionMetric = previousSession ? (isBodyweightLike ? previousSession.maxReps : previousSession.oneRepMax) : 0;
+  const recentDeltaAbs = latestMetric - previousSessionMetric;
+  const recentDeltaPct = previousSessionMetric > 0 ? (recentDeltaAbs / previousSessionMetric) * 100 : 0;
+
+  const recentDirectionTag = (overall: number, recent: number): string | undefined => {
+    // We only surface "recent" callouts when there is a meaningful change.
+    const overallSign = overall > 0 ? 1 : overall < 0 ? -1 : 0;
+    const recentSign = recent > 0 ? 1 : recent < 0 ? -1 : 0;
+    if (recentSign === 0) return undefined;
+
+    const absOverall = Math.abs(overall);
+    const absRecent = Math.abs(recent);
+
+    // If overall is flat/neutral, just describe the recent direction.
+    if (overallSign === 0) return recentSign > 0 ? 'improving' : 'worsening';
+
+    // Same-direction: is it accelerating or easing?
+    if (overallSign === recentSign) {
+      // Add some hysteresis so we don't spam "accelerating".
+      if (absRecent >= absOverall + 1.0) return recentSign > 0 ? 'accelerating' : 'getting worse';
+      if (absRecent <= Math.max(0, absOverall - 1.0)) return recentSign > 0 ? 'steady progress' : 'easing';
+      return recentSign > 0 ? 'still improving' : 'still declining';
+    }
+
+    // Opposite-direction: call out rebound/slip.
+    return recentSign > 0 ? 'rebound' : 'slipping';
+  };
+
+  const recentEvidence = (() => {
+    if (!latestSession || !previousSession) return undefined;
+    if (isBodyweightLike) {
+      const deltaReps = Math.round(recentDeltaAbs);
+      if (Math.abs(deltaReps) < 1) return undefined;
+      const sign = deltaReps > 0 ? '+' : '';
+      const tag = recentDirectionTag(diffAbs, deltaReps);
+      return tag ? `Recent reps: ${sign}${deltaReps} (${tag})` : `Recent reps: ${sign}${deltaReps}`;
+    }
+    if (Math.abs(recentDeltaPct) < 0.5) return undefined;
+
+    const tag = recentDirectionTag(diffPct, recentDeltaPct);
+    return tag ? `Recent: ${fmtSignedPct(recentDeltaPct)} (${tag})` : `Recent: ${fmtSignedPct(recentDeltaPct)}`;
+  })();
+
+  // Premature PR detection: secondary signal only.
+  // Heuristic: a PR spike that is *followed* by one or more sessions that can't get back near that PR.
+  // Important: if the PR is in the latest session, we do NOT have follow-up data, so we should not flag it.
+  const prEvidence: Array<string | undefined> = [];
+  let prematurePr = false;
+  {
+    const lookback = Math.min(6, history.length);
+    const sessions = history.slice(0, lookback);
+    const m = sessions.map((s) => (isBodyweightLike ? s.maxReps : s.oneRepMax));
+
+    // Find the most recent PR that has at least one follow-up session.
+    // (Index 0 is latest; if that's the PR we skip because there's no follow-up.)
+    let prIndex = -1;
+    for (let i = 1; i < m.length - 1; i += 1) {
+      const prMetric = m[i] ?? 0;
+      const olderMax = Math.max(0, ...m.slice(i + 1));
+      if (prMetric > olderMax + (isBodyweightLike ? 0.25 : 0.001)) {
+        prIndex = i;
+        break;
+      }
+    }
+
+    if (prIndex >= 1) {
+      const prMetric = m[prIndex] ?? 0;
+      const priorMetric = m[prIndex + 1] ?? 0;
+
+      const prSession = sessions[prIndex];
+      const prWeight = prSession?.weight ?? 0;
+
+      // Require the PR to be a meaningful jump.
+      const spikePct = priorMetric > 0 ? ((prMetric - priorMetric) / priorMetric) * 100 : 0;
+      const spikeAbs = prMetric - priorMetric;
+      const meaningfulSpike = isBodyweightLike ? spikeAbs >= 1 : spikePct >= 2.0;
+
+      // "After PR" = sessions that happened after the PR (more recent entries).
+      const afterPr = m.slice(0, prIndex);
+      const bestAfterPr = Math.max(0, ...afterPr);
+      const dropPct = prMetric > 0 ? ((bestAfterPr - prMetric) / prMetric) * 100 : 0;
+      const dropAbs = bestAfterPr - prMetric;
+
+      // Recovery rule: if they re-hit the PR level in >= 2 later sessions, we treat it as validated.
+      // This avoids keeping the badge around once the athlete proves they can reproduce the performance.
+      const afterPrSessions = sessions.slice(0, prIndex);
+      const rehitCount = isBodyweightLike
+        ? afterPrSessions.filter((s) => (s.maxReps ?? 0) >= prMetric).length
+        : afterPrSessions.filter((s) => (s.weight ?? 0) >= prWeight - WEIGHT_STATIC_EPSILON_KG).length;
+      const isValidated = rehitCount >= 2;
+
+      // If the best follow-up still can't get close, it's a premature PR.
+      const sustainedFailure = isBodyweightLike
+        ? dropAbs <= -1
+        : dropPct <= FAKE_PR_POST_PR_DROP_THRESHOLD;
+
+      prematurePr = Boolean(!isValidated && meaningfulSpike && sustainedFailure);
+      if (prematurePr) {
+        if (isBodyweightLike) {
+          prEvidence.push(`PR spike: +${Math.round(spikeAbs)} rep(s)`);
+          prEvidence.push(`After PR: ${Math.round(dropAbs)} rep(s)`);
+        } else {
+          prEvidence.push(`PR spike: +${spikePct.toFixed(1)}%`);
+          prEvidence.push(`After PR: ${fmtSignedPct(dropPct)}`);
+        }
+      }
+    }
+  }
+
+  const historyMaxLookback = Math.min(6, history.length);
+  const priorLocalMax = historyMaxLookback >= 2
+    ? Math.max(...history.slice(1, historyMaxLookback).map(s => (isBodyweightLike ? s.maxReps : s.oneRepMax)))
+    : 0;
+  const isLocalPr = latestSession && latestMetric > priorLocalMax;
+
+  // In reactive mode, a meaningful local PR should move you out of stagnant/neutral/regression quickly.
+  const shouldPromoteToOverload = trendMode === 'reactive'
+    && isLocalPr
+    && (isBodyweightLike ? recentDeltaAbs >= 1 : recentDeltaPct >= 0.6);
+
+  if (meetsOverload || shouldPromoteToOverload) {
     const confidence = getConfidence(history.length, windowSize);
     return {
       status: 'overload',
       isBodyweightLike,
       diffPct,
       confidence,
+      prematurePr,
       evidence: keepDynamicEvidence(clampEvidence([
         isBodyweightLike ? `Reps: ${fmtSignedPct(diffPct)}` : `Strength: ${fmtSignedPct(diffPct)}`,
+        recentEvidence,
+        ...prEvidence,
       ])),
     };
   }
@@ -244,53 +397,13 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
       isBodyweightLike,
       diffPct,
       confidence,
+      prematurePr,
       evidence: keepDynamicEvidence(clampEvidence([
         isBodyweightLike ? `Reps: ${fmtSignedPct(diffPct)}` : `Strength: ${fmtSignedPct(diffPct)}`,
+        recentEvidence,
+        ...prEvidence,
       ])),
     };
-  }
-
-  // Fake PR detection: check for unsustainable spikes followed by regression
-  if (history.length >= 3) {
-    const latestSession = history[0];
-    const previousSession = history[1];
-    
-    // Check if latest session was a big spike
-    const latestMetric = isBodyweightLike ? latestSession.maxReps : latestSession.oneRepMax;
-    const previousMetric = isBodyweightLike ? previousSession.maxReps : previousSession.oneRepMax;
-    const spikePct = previousMetric > 0 ? ((latestMetric - previousMetric) / previousMetric) * 100 : 0;
-    
-    // Check if the session after the spike shows regression
-    const hasFollowupRegression = diffPct <= FAKE_PR_FOLLOWUP_REGRESSION;
-    
-    // Check for post-PR drop pattern (PR followed by significant drop)
-    let hasPostPRDrop = false;
-    let postPRDropPct = 0;
-    
-    if (history.length >= 4 && spikePct >= 2.0) { // Reduced from 3% to 2% - catch smaller PRs
-      const sessionAfterPR = history[1]; // Session right after the PR
-      const sessionAfterPRMetric = isBodyweightLike ? sessionAfterPR.maxReps : sessionAfterPR.oneRepMax;
-      postPRDropPct = latestMetric > 0 ? ((sessionAfterPRMetric - latestMetric) / latestMetric) * 100 : 0;
-      hasPostPRDrop = postPRDropPct <= FAKE_PR_POST_PR_DROP_THRESHOLD;
-    }
-    
-    const isFakePR = (spikePct >= FAKE_PR_SPIKE_THRESHOLD && hasFollowupRegression) ||
-                     (spikePct >= 2.0 && hasPostPRDrop); // Focus on unsustainable PRs only
-    
-    if (isFakePR) {
-      const confidence = getConfidence(history.length, windowSize);
-      return {
-        status: 'fake_pr',
-        isBodyweightLike,
-        diffPct: spikePct,
-        confidence,
-        evidence: keepDynamicEvidence(clampEvidence([
-          `Spike: +${spikePct.toFixed(1)}%`,
-          hasFollowupRegression ? `Follow-up: ${fmtSignedPct(diffPct)}` : undefined,
-          hasPostPRDrop ? `Post-PR drop: ${fmtSignedPct(postPRDropPct)}` : undefined,
-        ])),
-      };
-    }
   }
 
   const confidence = getConfidence(history.length, windowSize);
@@ -299,6 +412,10 @@ export const analyzeExerciseTrendCore = (stats: ExerciseStats): ExerciseTrendCor
     isBodyweightLike,
     diffPct,
     confidence,
-    evidence: undefined,
+    prematurePr,
+    evidence: keepDynamicEvidence(clampEvidence([
+      recentEvidence,
+      ...prEvidence,
+    ])),
   };
 };

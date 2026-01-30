@@ -1,5 +1,4 @@
 import React, { useState, useEffect, memo } from 'react';
-import { differenceInCalendarDays } from 'date-fns';
 import { 
   TrendingUp, TrendingDown, Activity, Trophy, 
   Calendar, AlertTriangle, Dumbbell, Brain, Check, Copy
@@ -15,7 +14,7 @@ import {
 import { getExerciseAssets, ExerciseAsset } from '../../utils/data/exerciseAssets';
 import { WeightUnit } from '../../utils/storage/localStorage';
 import { convertWeight } from '../../utils/format/units';
-import { formatHumanReadableDate } from '../../utils/date/dateUtils';
+import { formatHumanReadableDate, formatRelativeDuration } from '../../utils/date/dateUtils';
 import { useIsMobile } from './useIsMobile';
 import { Sparkline } from './Sparkline';
 import { StreakBadge } from './StreakBadge';
@@ -490,21 +489,9 @@ const PlateauAlert: React.FC<PlateauAlertProps> = ({
 }) => {
   const imgSrc = asset?.sourceType === 'video' ? asset.thumbnail : (asset?.thumbnail || asset?.source);
   const clickable = typeof onClick === 'function';
-  
-  // Custom relative time formatter
-  const formatTimeAgo = (date: Date, now: Date): string => {
-    const diffDays = Math.abs(differenceInCalendarDays(now, date));
-    if (diffDays === 0) return 'today';
-    if (diffDays === 1) return 'yesterday';
-    if (diffDays < 7) return `${diffDays} days`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months`;
-    return `${Math.floor(diffDays / 365)} years`;
-  };
-  
-  // Format progress message with correct grammar
+
   const formatProgressMessage = (date: Date, now: Date): string => {
-    const timeAgo = formatTimeAgo(date, now);
+    const timeAgo = formatRelativeDuration(date, now);
     if (timeAgo === 'today') return 'No progress today';
     if (timeAgo === 'yesterday') return 'No progress since yesterday';
     return `No progress since ${timeAgo}`;

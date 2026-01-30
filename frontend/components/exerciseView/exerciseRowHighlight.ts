@@ -26,14 +26,6 @@ export const getSelectedHighlightClasses = (
             : 'bg-rose-500/10 border-rose-400/70 shadow-[0_0_0_1px_rgba(251,113,133,0.25),0_0_18px_rgba(244,63,94,0.12)]',
         thumbBorder: intensity === 'soft' ? 'border-rose-400/40' : 'border-rose-400/70',
       };
-    case 'fake_pr':
-      return {
-        button:
-          intensity === 'soft'
-            ? 'bg-orange-500/5 border-orange-400/40'
-            : 'bg-orange-500/10 border-orange-400/70 shadow-[0_0_0_1px_rgba(251,146,60,0.25),0_0_18px_rgba(249,115,22,0.12)]',
-        thumbBorder: intensity === 'soft' ? 'border-orange-400/40' : 'border-orange-400/70',
-      };
     case 'stagnant':
       return {
         button:

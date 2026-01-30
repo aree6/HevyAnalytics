@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Settings, Moon, Sun, Sparkles, Palette, Scale, Users, Calendar, AlertTriangle } from 'lucide-react';
-import { WeightUnit, DateMode, ThemeMode } from '../../utils/storage/localStorage';
+import { WeightUnit, DateMode, ThemeMode, ExerciseTrendMode } from '../../utils/storage/localStorage';
 import { BodyMapGender } from '../bodyMap/BodyMap';
 import type { DataAgeInfo } from '../../hooks/usePreferences';
 
@@ -23,6 +23,10 @@ interface UserPreferencesModalProps {
   // Date mode preference
   dateMode: DateMode;
   onDateModeChange: (mode: DateMode) => void;
+
+  // Exercise trend reactiveness
+  exerciseTrendMode: ExerciseTrendMode;
+  onExerciseTrendModeChange: (mode: ExerciseTrendMode) => void;
   
   // Data age info (for showing warning when using actual date with old data)
   dataAgeInfo?: DataAgeInfo;
@@ -65,6 +69,8 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
   onThemeModeChange,
   dateMode,
   onDateModeChange,
+  exerciseTrendMode,
+  onExerciseTrendModeChange,
   dataAgeInfo,
 }) => {
   if (!isOpen) return null;
@@ -87,6 +93,7 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
                   <Settings className="w-4 h-4 text-emerald-400" />
                 </div>
+
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">Preferences</h2>
               </div>
               <button
@@ -223,6 +230,54 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Trend Reactiveness Section */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
+                  <Sparkles className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                  <span className="text-xs font-medium">Trend Reactiveness</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onExerciseTrendModeChange('stable')}
+                    className={`flex items-center gap-2 p-2 rounded-lg border transition-all text-left ${
+                      exerciseTrendMode === 'stable'
+                        ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-slate-50 dark:bg-black/30 border-slate-200 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-black/50'
+                    }`}
+                  >
+                    <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${
+                      exerciseTrendMode === 'stable' ? 'bg-emerald-500/20' : 'bg-slate-200 dark:bg-slate-800'
+                    }`}>
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium truncate">Stable</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-500 truncate">More stable, slower to react</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onExerciseTrendModeChange('reactive')}
+                    className={`flex items-center gap-2 p-2 rounded-lg border transition-all text-left ${
+                      exerciseTrendMode === 'reactive'
+                        ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-slate-50 dark:bg-black/30 border-slate-200 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-black/50'
+                    }`}
+                  >
+                    <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${
+                      exerciseTrendMode === 'reactive' ? 'bg-emerald-500/20' : 'bg-slate-200 dark:bg-slate-800'
+                    }`}>
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium truncate">Reactive</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-500 truncate">Responds faster to recent sessions (recommended)</div>
+                    </div>
+                  </button>
+                </div>
               </div>
 
               {/* Theme Section - Compact 5-column grid */}

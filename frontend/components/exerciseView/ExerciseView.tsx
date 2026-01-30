@@ -23,7 +23,7 @@ import {
   SVG_MUSCLE_NAMES,
   lookupExerciseMuscleData,
 } from '../../utils/muscle/muscleMapping';
-import { WeightUnit, getSmartFilterMode, TimeFilterMode } from '../../utils/storage/localStorage';
+import { ExerciseTrendMode, WeightUnit, getSmartFilterMode, TimeFilterMode } from '../../utils/storage/localStorage';
 import { summarizeExerciseHistory, analyzeExerciseTrendCore, ExerciseSessionEntry, ExerciseTrendStatus, MIN_SESSIONS_FOR_TREND } from '../../utils/analysis/exerciseTrend';
 import { formatNumber } from '../../utils/format/formatters';
 import { 
@@ -51,12 +51,13 @@ interface ExerciseViewProps {
   onHighlightApplied?: () => void;
   onExerciseClick?: (exerciseName: string) => void;
   weightUnit?: WeightUnit;
+  exerciseTrendMode: ExerciseTrendMode;
   bodyMapGender?: BodyMapGender;
   stickyHeader?: boolean;
   now?: Date;
 }
 
-export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, highlightedExercise, onHighlightApplied, onExerciseClick, weightUnit = 'kg' as WeightUnit, bodyMapGender = 'male', stickyHeader = false, now }) => {
+export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, highlightedExercise, onHighlightApplied, onExerciseClick, weightUnit = 'kg' as WeightUnit, exerciseTrendMode, bodyMapGender = 'male', stickyHeader = false, now }) => {
   // Find the most recent exercise for auto-selection
   const mostRecentExerciseName = useMemo(() => {
     if (stats.length === 0) return "";
@@ -196,10 +197,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
   const statusMap = useMemo<Record<string, StatusResult>>(() => {
     const map: Record<string, StatusResult> = Object.create(null);
     for (const s of stats) {
-      map[s.name] = analyzeExerciseTrend(s, weightUnit);
+      map[s.name] = analyzeExerciseTrend(s, weightUnit, { trendMode: exerciseTrendMode });
     }
     return map;
-  }, [stats, weightUnit]);
+  }, [exerciseTrendMode, stats, weightUnit]);
 
   const lastSessionByName = useMemo(() => {
     const map = new Map<string, Date | null>();
@@ -262,7 +263,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     let overloadCount = 0;
     let plateauCount = 0;
     let regressionCount = 0;
-    let fakePrCount = 0;
     let neutralCount = 0;
     let newCount = 0;
 
@@ -286,12 +286,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       eligibleNames.add(stat.name);
 
       activeCount += 1;
-      const core = analyzeExerciseTrendCore(stat);
+      const core = analyzeExerciseTrendCore(stat, { trendMode: exerciseTrendMode });
       statusByName.set(stat.name, core.status);
       if (core.status === 'overload') overloadCount += 1;
       else if (core.status === 'stagnant') plateauCount += 1;
       else if (core.status === 'regression') regressionCount += 1;
-      else if (core.status === 'fake_pr') fakePrCount += 1;
       else if (core.status === 'neutral') neutralCount += 1;
       else newCount += 1;
     }
@@ -301,14 +300,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       overloadCount,
       plateauCount,
       regressionCount,
-      fakePrCount,
       neutralCount,
       newCount,
       statusByName,
       eligibleNames,
       eligibilityByName,
     };
-  }, [effectiveNow, stats]);
+  }, [effectiveNow, exerciseTrendMode, stats]);
 
   useEffect(() => {
     if (!trendFilter) return;
@@ -405,9 +403,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
           <button type="button" onClick={() => toggle('regression')} className={chipCls('regression', 'bad')}>
             {trainingStructure.regressionCount} Losing
           </button>
-          <button type="button" onClick={() => toggle('fake_pr')} className={chipCls('fake_pr', 'warn')}>
-            {trainingStructure.fakePrCount} Premature PR
-          </button>
           <button type="button" onClick={() => toggle('neutral')} className={chipCls('neutral', 'neutral')}>
             {trainingStructure.neutralCount} Maintaining
           </button>
@@ -417,10 +412,15 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
         </div>
       </div>
     );
-  }, [filtersSlot, trainingStructure.activeCount, trainingStructure.neutralCount, trainingStructure.newCount, trainingStructure.overloadCount, trainingStructure.plateauCount, trainingStructure.regressionCount, trainingStructure.fakePrCount, trendFilter]);
+  }, [filtersSlot, trainingStructure.activeCount, trainingStructure.neutralCount, trainingStructure.newCount, trainingStructure.overloadCount, trainingStructure.plateauCount, trainingStructure.regressionCount, trendFilter]);
 
   const currentStatus = selectedStats ? statusMap[selectedStats.name] : null;
   const isBodyweightLike = currentStatus?.isBodyweightLike ?? false;
+
+  const currentCore = useMemo(() => {
+    if (!selectedStats) return null;
+    return analyzeExerciseTrendCore(selectedStats, { trendMode: exerciseTrendMode });
+  }, [exerciseTrendMode, selectedStats]);
 
   const chartData = useMemo(() => {
     return buildExerciseChartData({
@@ -507,9 +507,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
               </button>
               <button type="button" onClick={() => setTrendFilter(prev => (prev === 'regression' ? null : 'regression'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'regression' ? 'bg-rose-500/20 text-rose-200 border-rose-400/50 ring-2 ring-rose-500/30 shadow-lg shadow-rose-500/20' : trendFilter !== null ? 'bg-rose-500/5 text-rose-400/80 border-rose-500/15 hover:bg-rose-500/10 hover:text-rose-300/90 hover:border-rose-400/30' : 'bg-rose-500/10 text-rose-300 border-rose-500/20 hover:border-rose-400/40'}`}>
                 {trainingStructure.regressionCount} Losing
-              </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'fake_pr' ? null : 'fake_pr'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'fake_pr' ? 'bg-orange-500/20 text-orange-200 border-orange-400/50 ring-2 ring-orange-500/30 shadow-lg shadow-orange-500/20' : trendFilter !== null ? 'bg-orange-500/5 text-orange-400/80 border-orange-500/15 hover:bg-orange-500/10 hover:text-orange-300/90 hover:border-orange-400/30' : 'bg-orange-500/10 text-orange-300 border-orange-500/20 hover:border-orange-400/40'}`}>
-                {trainingStructure.fakePrCount} Premature PR
               </button>
               <button type="button" onClick={() => setTrendFilter(prev => (prev === 'neutral' ? null : 'neutral'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'neutral' ? 'bg-indigo-500/20 text-indigo-200 border-indigo-400/50 ring-2 ring-indigo-500/30 shadow-lg shadow-indigo-500/20' : trendFilter !== null ? 'bg-indigo-500/5 text-indigo-400/80 border-indigo-500/15 hover:bg-indigo-500/10 hover:text-indigo-300/90 hover:border-indigo-400/30' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20 hover:border-indigo-400/40'}`}>
                 {trainingStructure.neutralCount} Maintaining
@@ -796,6 +793,16 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
                         <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
                           <ConfidenceBadge confidence={currentStatus.confidence} />
+                          {currentCore?.prematurePr ? (
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-bold whitespace-nowrap bg-orange-500/10 text-orange-400 border-orange-500/20"
+                              title="This looks like a PR spike that may not be sustainable yet. Keep building consistency at this level."
+                              aria-label="Premature PR"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                              Premature PR
+                            </span>
+                          ) : null}
                         </div>
                       </div>
 

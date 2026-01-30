@@ -28,6 +28,9 @@ import {
   DateMode,
   getDateMode,
   saveDateMode,
+  ExerciseTrendMode,
+  getExerciseTrendMode,
+  saveExerciseTrendMode,
 } from '../utils/storage/localStorage';
 
 // Re-export DateMode for convenience
@@ -43,6 +46,7 @@ export interface UserPreferences {
   themeMode: ThemeMode;
   emaEnabled: boolean;
   dateMode: DateMode;
+  exerciseTrendMode: ExerciseTrendMode;
 }
 
 /**
@@ -55,6 +59,7 @@ export interface PreferencesActions {
   setThemeMode: (mode: ThemeMode) => void;
   setEmaEnabled: (enabled: boolean) => void;
   setDateMode: (mode: DateMode) => void;
+  setExerciseTrendMode: (mode: ExerciseTrendMode) => void;
 }
 
 /**
@@ -67,6 +72,7 @@ export const getAllPreferences = (): UserPreferences => ({
   themeMode: getThemeMode(),
   emaEnabled: getEmaEnabled(),
   dateMode: getDateMode(),
+  exerciseTrendMode: getExerciseTrendMode(),
 });
 
 /**
@@ -109,13 +115,18 @@ export const usePreferences = (): PreferencesActions => {
     saveDateMode(mode);
   }, []);
 
+  const setExerciseTrendMode = useCallback((mode: ExerciseTrendMode) => {
+    saveExerciseTrendMode(mode);
+  }, []);
+
   return useMemo(() => ({
     setWeightUnit,
     setBodyMapGender,
     setThemeMode,
     setEmaEnabled,
     setDateMode,
-  }), [setWeightUnit, setBodyMapGender, setThemeMode, setEmaEnabled, setDateMode]);
+    setExerciseTrendMode,
+  }), [setWeightUnit, setBodyMapGender, setThemeMode, setEmaEnabled, setDateMode, setExerciseTrendMode]);
 };
 
 /**

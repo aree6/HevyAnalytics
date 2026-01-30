@@ -60,6 +60,42 @@ export const getSmartFilterMode = (spanDays: number): TimeFilterMode => {
   return 'monthly';                      // 5+ months → monthly
 };
 
+export type ExerciseTrendMode = 'stable' | 'reactive';
+
+const EXERCISE_TREND_MODE_KEY = 'hevy_analytics_exercise_trend_mode';
+
+export const saveExerciseTrendMode = (mode: ExerciseTrendMode): void => {
+  try {
+    localStorage.setItem(EXERCISE_TREND_MODE_KEY, mode);
+  } catch (error) {
+    console.error('Failed to save exercise trend mode to local storage:', error);
+  }
+};
+
+export const getExerciseTrendMode = (): ExerciseTrendMode => {
+  try {
+    const mode = localStorage.getItem(EXERCISE_TREND_MODE_KEY);
+    // Migration:
+    // - Old version stored 'default' for the stable algorithm.
+    // - New version uses 'stable' and makes 'reactive' the default for new users.
+    if (mode === 'reactive') return 'reactive';
+    if (mode === 'stable') return 'stable';
+    if (mode === 'default') return 'stable';
+    return 'reactive';
+  } catch (error) {
+    console.error('Failed to retrieve exercise trend mode from local storage:', error);
+    return 'reactive';
+  }
+};
+
+export const clearExerciseTrendMode = (): void => {
+  try {
+    localStorage.removeItem(EXERCISE_TREND_MODE_KEY);
+  } catch (error) {
+    console.error('Failed to clear exercise trend mode from local storage:', error);
+  }
+};
+
 // Weight Unit Preference Storage
 export type WeightUnit = 'kg' | 'lbs';
 const WEIGHT_UNIT_KEY = 'hevy_analytics_weight_unit';

@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
 import type { DailySummary, ExerciseStats, WorkoutSet } from '../../types';
 import type { BodyMapGender } from '../bodyMap/BodyMap';
-import type { WeightUnit } from '../../utils/storage/localStorage';
+import type { ExerciseTrendMode, WeightUnit } from '../../utils/storage/localStorage';
 import { Tab } from '../../app/tabs';
 import { SupportLinks } from '../layout/SupportLinks';
 
@@ -50,6 +50,7 @@ interface AppTabContentProps {
 
   bodyMapGender: BodyMapGender;
   weightUnit: WeightUnit;
+  exerciseTrendMode: ExerciseTrendMode;
   now: Date;
 }
 
@@ -74,6 +75,7 @@ export const AppTabContent: React.FC<AppTabContentProps> = ({
   onInitialMuscleConsumed,
   bodyMapGender,
   weightUnit,
+  exerciseTrendMode,
   now,
 }) => {
   return (
@@ -105,6 +107,7 @@ export const AppTabContent: React.FC<AppTabContentProps> = ({
             onHighlightApplied={onHighlightApplied}
             onExerciseClick={onExerciseClick}
             weightUnit={weightUnit}
+            exerciseTrendMode={exerciseTrendMode}
             bodyMapGender={bodyMapGender}
             stickyHeader={hasActiveCalendarFilter}
             now={now}

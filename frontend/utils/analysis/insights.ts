@@ -3,7 +3,7 @@ import { format, differenceInDays, differenceInCalendarWeeks, startOfDay, endOfD
 import { analyzeExerciseTrendCore, summarizeExerciseHistory, WEIGHT_STATIC_EPSILON_KG } from './exerciseTrend';
 import { formatDayContraction, formatWeekContraction, getSessionKey } from '../date/dateUtils';
 import { isWarmupSet } from './setClassification';
-import { WeightUnit } from '../storage/localStorage';
+import { ExerciseTrendMode, WeightUnit } from '../storage/localStorage';
 import { convertWeight, getStandardWeightIncrementKg } from '../format/units';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../format/deltaFormat';
 
@@ -405,13 +405,14 @@ export const detectPlateaus = (
   data: WorkoutSet[],
   exerciseStats: ExerciseStats[],
   now: Date = new Date(0),
-  weightUnit: WeightUnit = 'kg'
+  weightUnit: WeightUnit = 'kg',
+  trendMode: ExerciseTrendMode = 'reactive'
 ): PlateauAnalysis => {
   const plateauedExercises: ExercisePlateauInfo[] = [];
   const improvingExercises: string[] = [];
 
   for (const stat of exerciseStats) {
-    const core = analyzeExerciseTrendCore(stat);
+    const core = analyzeExerciseTrendCore(stat, { trendMode });
 
     if (core.status === 'overload') {
       improvingExercises.push(stat.name);

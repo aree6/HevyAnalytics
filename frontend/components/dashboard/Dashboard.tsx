@@ -219,7 +219,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     return computationCache.getOrCompute(
       'plateauAnalysis',
       fullData,
-      () => detectPlateaus(fullData, exerciseStats, effectiveNow, weightUnit),
+      () => detectPlateaus(fullData, exerciseStats, effectiveNow, weightUnit, 'reactive'),
       { ttl: 10 * 60 * 1000 }
     );
   }, [fullData, exerciseStats, effectiveNow, weightUnit]);

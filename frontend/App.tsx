@@ -23,6 +23,9 @@ import {
   getWeightUnit,
   clearWeightUnit,
   WeightUnit,
+  ExerciseTrendMode,
+  getExerciseTrendMode,
+  saveExerciseTrendMode,
   getBodyMapGender,
   saveBodyMapGender,
   getPreferencesConfirmed,
@@ -302,6 +305,14 @@ const App: React.FC = () => {
   useEffect(() => {
     saveDateMode(dateMode);
   }, [dateMode]);
+
+  // Exercise trend mode state with localStorage persistence
+  const [exerciseTrendMode, setExerciseTrendMode] = useState<ExerciseTrendMode>(() => getExerciseTrendMode());
+
+  // Persist exercise trend mode to localStorage when it changes
+  useEffect(() => {
+    saveExerciseTrendMode(exerciseTrendMode);
+  }, [exerciseTrendMode]);
 
   // User Preferences Modal state
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
@@ -993,6 +1004,7 @@ const App: React.FC = () => {
             }}
             bodyMapGender={bodyMapGender}
             weightUnit={weightUnit}
+            exerciseTrendMode={exerciseTrendMode}
             now={filteredEffectiveNow}
           />
         </>
@@ -1010,6 +1022,8 @@ const App: React.FC = () => {
         onThemeModeChange={setMode}
         dateMode={dateMode}
         onDateModeChange={setDateMode}
+        exerciseTrendMode={exerciseTrendMode}
+        onExerciseTrendModeChange={setExerciseTrendMode}
         dataAgeInfo={dataAgeInfo}
       />
 
