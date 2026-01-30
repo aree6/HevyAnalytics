@@ -45,7 +45,7 @@ const CompactThemeOption: React.FC<{
     className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
       currentMode === mode
         ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
-        : 'bg-black/30 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-black/50'
+        : 'bg-slate-900/20 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-900/40'
     }`}
     title={label}
   >
@@ -75,17 +75,21 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  const isLightTheme = themeMode === 'light';
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/90 dark:bg-slate-950/90 backdrop-blur-sm overflow-y-auto overscroll-contain">
+    <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm overflow-y-auto overscroll-contain">
       <div className="min-h-full w-full px-3 sm:px-4 py-4 sm:py-6 flex items-center justify-center">
         <div className="w-full max-w-2xl mx-auto">
-          <div className="relative bg-white dark:bg-black/60 border border-slate-200 dark:border-slate-700/50 rounded-xl p-4 sm:p-5 overflow-hidden backdrop-blur-md shadow-lg">
+          <div className="relative bg-slate-950 border border-slate-700/50 rounded-xl p-4 sm:p-5 overflow-hidden backdrop-blur-md shadow-lg">
             {/* Background gradients - only in dark mode */}
-            <div className="absolute inset-0 pointer-events-none dark:block hidden">
-              <div className="absolute -top-24 -right-28 w-72 h-72 rounded-full blur-3xl bg-emerald-500/10" />
-              <div className="absolute -bottom-28 -left-28 w-72 h-72 rounded-full blur-3xl bg-violet-500/10" />
-              <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20" />
-            </div>
+            {!isLightTheme && (
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute -top-24 -right-28 w-72 h-72 rounded-full blur-3xl bg-emerald-500/10" />
+                <div className="absolute -bottom-28 -left-28 w-72 h-72 rounded-full blur-3xl bg-violet-500/10" />
+                <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20" />
+              </div>
+            )}
 
             {/* Header - More compact */}
             <div className="relative flex items-center justify-between mb-4">
@@ -94,12 +98,12 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                   <Settings className="w-4 h-4 text-emerald-400" />
                 </div>
 
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Preferences</h2>
+                <h2 className="text-lg font-bold text-slate-200">Preferences</h2>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-black/50 border border-slate-200 dark:border-slate-700/50 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600 transition-all"
+                className="w-8 h-8 rounded-lg bg-slate-900/20 border border-slate-700/50 flex items-center justify-center text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-all"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -111,8 +115,8 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Weight Unit Section */}
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-                    <Scale className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                  <div className="flex items-center gap-2 text-slate-200">
+                    <Scale className="w-3.5 h-3.5 text-slate-500" />
                     <span className="text-xs font-medium">Weight Unit</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -121,8 +125,8 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                       onClick={() => onWeightUnitChange('kg')}
                       className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border transition-all ${
                         weightUnit === 'kg'
-                          ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-slate-50 dark:bg-black/30 border-slate-200 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-black/50'
+                          ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                          : 'bg-slate-900/20 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-900/40'
                       }`}
                     >
                       <span className="text-sm font-bold">kg</span>
@@ -132,8 +136,8 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                       onClick={() => onWeightUnitChange('lbs')}
                       className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border transition-all ${
                         weightUnit === 'lbs'
-                          ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-slate-50 dark:bg-black/30 border-slate-200 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-black/50'
+                          ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                          : 'bg-slate-900/20 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-900/40'
                       }`}
                     >
                       <span className="text-sm font-bold">lbs</span>
@@ -143,8 +147,8 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
 
                 {/* Body Map Gender Section */}
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-                    <Users className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                  <div className="flex items-center gap-2 text-slate-200">
+                    <Users className="w-3.5 h-3.5 text-slate-500" />
                     <span className="text-xs font-medium">Body Map Style</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -153,8 +157,8 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                       onClick={() => onBodyMapGenderChange('male')}
                       className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border transition-all ${
                         bodyMapGender === 'male'
-                          ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-slate-50 dark:bg-black/30 border-slate-200 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-black/50'
+                          ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                          : 'bg-slate-900/20 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-900/40'
                       }`}
                     >
                       <span className="text-sm font-medium">Male</span>
@@ -164,8 +168,8 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                       onClick={() => onBodyMapGenderChange('female')}
                       className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border transition-all ${
                         bodyMapGender === 'female'
-                          ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-slate-50 dark:bg-black/30 border-slate-200 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-black/50'
+                          ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                          : 'bg-slate-900/20 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-900/40'
                       }`}
                     >
                       <span className="text-sm font-medium">Female</span>
@@ -176,8 +180,8 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
 
               {/* Date Reference Section */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-                  <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                <div className="flex items-center gap-2 text-slate-200">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
                   <span className="text-xs font-medium">Date Reference</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -186,18 +190,18 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     onClick={() => onDateModeChange('effective')}
                     className={`flex items-center gap-2 p-2 rounded-lg border transition-all text-left ${
                       dateMode === 'effective'
-                        ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-slate-50 dark:bg-black/30 border-slate-200 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-black/50'
+                        ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                        : 'bg-slate-900/20 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-900/40'
                     }`}
                   >
                     <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${
-                      dateMode === 'effective' ? 'bg-emerald-500/20' : 'bg-slate-200 dark:bg-slate-800'
+                      dateMode === 'effective' ? 'bg-emerald-500/20' : 'bg-slate-800'
                     }`}>
                       <Calendar className="w-3.5 h-3.5" />
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-medium truncate">Last Workout Date</div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-500 truncate">Use recent workout as "today"</div>
+                      <div className="text-[10px] text-slate-500 truncate">Use recent workout as "today"</div>
                     </div>
                   </button>
                   <button
@@ -205,26 +209,26 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     onClick={() => onDateModeChange('actual')}
                     className={`flex items-center gap-2 p-2 rounded-lg border transition-all text-left ${
                       dateMode === 'actual'
-                        ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-slate-50 dark:bg-black/30 border-slate-200 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-black/50'
+                        ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                        : 'bg-slate-900/20 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-900/40'
                     }`}
                   >
                     <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${
-                      dateMode === 'actual' ? 'bg-emerald-500/20' : 'bg-slate-200 dark:bg-slate-800'
+                      dateMode === 'actual' ? 'bg-emerald-500/20' : 'bg-slate-800'
                     }`}>
                       <Sun className="w-3.5 h-3.5" />
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-medium truncate">Actual Date</div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-500 truncate">Use real calendar date</div>
+                      <div className="text-[10px] text-slate-500 truncate">Use real calendar date</div>
                     </div>
                   </button>
                 </div>
                 {/* Warning when using actual date mode with old data */}
                 {dateMode === 'actual' && dataAgeInfo && dataAgeInfo.isStale && (
                   <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div className="text-[10px] text-amber-700 dark:text-amber-200/90">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-[10px] text-amber-200 opacity-90">
                       <span className="font-medium">{dataAgeInfo.ageDescription}.</span>
                       {' '}Recent charts may appear empty.
                     </div>
@@ -234,8 +238,8 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
 
               {/* Trend Reactiveness Section */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-                  <Sparkles className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                <div className="flex items-center gap-2 text-slate-200">
+                  <Sparkles className="w-3.5 h-3.5 text-slate-500" />
                   <span className="text-xs font-medium">Trend Reactiveness</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -244,18 +248,18 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     onClick={() => onExerciseTrendModeChange('stable')}
                     className={`flex items-center gap-2 p-2 rounded-lg border transition-all text-left ${
                       exerciseTrendMode === 'stable'
-                        ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-slate-50 dark:bg-black/30 border-slate-200 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-black/50'
+                        ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                        : 'bg-slate-900/20 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-900/40'
                     }`}
                   >
                     <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${
-                      exerciseTrendMode === 'stable' ? 'bg-emerald-500/20' : 'bg-slate-200 dark:bg-slate-800'
+                      exerciseTrendMode === 'stable' ? 'bg-emerald-500/20' : 'bg-slate-800'
                     }`}>
                       <Sparkles className="w-3.5 h-3.5" />
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-medium truncate">Stable</div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-500 truncate">More stable, slower to react</div>
+                      <div className="text-[10px] text-slate-500 truncate">More stable, slower to react</div>
                     </div>
                   </button>
                   <button
@@ -263,18 +267,18 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     onClick={() => onExerciseTrendModeChange('reactive')}
                     className={`flex items-center gap-2 p-2 rounded-lg border transition-all text-left ${
                       exerciseTrendMode === 'reactive'
-                        ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-slate-50 dark:bg-black/30 border-slate-200 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-black/50'
+                        ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                        : 'bg-slate-900/20 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-900/40'
                     }`}
                   >
                     <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${
-                      exerciseTrendMode === 'reactive' ? 'bg-emerald-500/20' : 'bg-slate-200 dark:bg-slate-800'
+                      exerciseTrendMode === 'reactive' ? 'bg-emerald-500/20' : 'bg-slate-800'
                     }`}>
                       <Sparkles className="w-3.5 h-3.5" />
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-medium truncate">Reactive</div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-500 truncate">Responds faster to recent sessions (recommended)</div>
+                      <div className="text-[10px] text-slate-500 truncate">Responds faster to recent sessions (recommended)</div>
                     </div>
                   </button>
                 </div>
@@ -282,8 +286,8 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
 
               {/* Theme Section - Compact 5-column grid */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-                  <Palette className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                <div className="flex items-center gap-2 text-slate-200">
+                  <Palette className="w-3.5 h-3.5 text-slate-500" />
                   <span className="text-xs font-medium">Theme</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
@@ -327,11 +331,11 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
             </div>
 
             {/* Footer - More compact */}
-            <div className="relative mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/50">
+            <div className="relative mt-4 pt-3 border-t border-slate-700/50">
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/50 text-emerald-600 dark:text-emerald-400 text-sm font-medium hover:bg-emerald-500/30 transition-all"
+                className="w-full py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 text-sm font-medium hover:bg-emerald-500/30 transition-all"
               >
                 Done
               </button>
