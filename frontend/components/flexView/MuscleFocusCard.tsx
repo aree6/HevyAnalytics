@@ -2,46 +2,34 @@ import React, { useMemo, useState } from 'react';
 import { Repeat2, Target } from 'lucide-react';
 import { FlexCard, type CardTheme, FlexCardFooter } from './FlexCard';
 import { FANCY_FONT } from '../../utils/ui/uiConstants';
-import { MUSCLE_GROUP_TO_SVG_IDS } from '../../utils/muscle/muscleMappingConstants';
 import { type NormalizedMuscleGroup } from '../../utils/muscle/muscleNormalization';
 import { BodyMap, type BodyMapGender } from '../bodyMap/BodyMap';
+import { HEADLESS_MUSCLE_NAMES } from '../../utils/muscle/muscleMappingConstants';
 
 // ============================================================================
 // CARD 6: Muscle Focus Card - Radar chart style
 // ============================================================================
 export const MuscleFocusCard: React.FC<{
   muscleData: { group: NormalizedMuscleGroup; sets: number }[];
+  headlessHeatmap: { volumes: Map<string, number>; maxVolume: number };
   theme: CardTheme;
   gender?: BodyMapGender;
-}> = ({ muscleData, theme, gender = 'male' }) => {
+}> = ({ muscleData, headlessHeatmap, theme, gender = 'male' }) => {
   const isDark = theme === 'dark';
   const textPrimary = isDark ? 'text-white' : 'text-slate-900';
 
   const [showHeatmap, setShowHeatmap] = useState(true);
 
-  const sorted = [...muscleData]
-    .filter((m) => m.group !== 'Cardio' && m.group !== 'Other')
-    .sort((a, b) => b.sets - a.sets);
-  const topMuscles = sorted.slice(0, 3).map((m) => m.group);
+  const topMuscles = useMemo(() => {
+    const pairs = Array.from(headlessHeatmap.volumes.entries());
+    pairs.sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
+    return pairs
+      .slice(0, 3)
+      .map(([id]) => (HEADLESS_MUSCLE_NAMES as any)[id] ?? id);
+  }, [headlessHeatmap.volumes]);
 
   const groups: NormalizedMuscleGroup[] = ['Back', 'Chest', 'Core', 'Legs', 'Shoulders', 'Arms'];
   const maxSets = Math.max(...muscleData.map((m) => m.sets), 1);
-
-  const heatmap = useMemo(() => {
-    const volumes = new Map<string, number>();
-    let maxVolume = 0;
-
-    for (const { group, sets } of muscleData) {
-      if (group === 'Other' || group === 'Cardio') continue;
-      const svgIds = MUSCLE_GROUP_TO_SVG_IDS[group] || [];
-      for (const id of svgIds) {
-        volumes.set(id, sets);
-      }
-      if (sets > maxVolume) maxVolume = sets;
-    }
-
-    return { volumes, maxVolume: Math.max(maxVolume, 1) };
-  }, [muscleData]);
 
   const centerX = 120;
   const centerY = 100;
@@ -88,11 +76,10 @@ export const MuscleFocusCard: React.FC<{
               e.stopPropagation();
               setShowHeatmap((v) => !v);
             }}
-            className={`p-2 rounded-full border transition-all ${
-              isDark
+            className={`p-2 rounded-full border transition-all ${isDark
                 ? 'bg-black/30 border-slate-700/50 text-slate-200 hover:border-slate-600'
                 : 'bg-white/70 border-slate-200 text-slate-700 hover:border-slate-300'
-            }`}
+              }`}
             title="Flip view"
           >
             <Repeat2 className="w-4 h-4" />
@@ -159,13 +146,13 @@ export const MuscleFocusCard: React.FC<{
           <div className="w-full flex justify-center mb-8">
             <div className="h-44 sm:h-56 flex items-center justify-center">
               <BodyMap
-                onPartClick={() => {}}
+                onPartClick={() => { }}
                 selectedPart={null}
-                muscleVolumes={heatmap.volumes}
-                maxVolume={heatmap.maxVolume}
+                muscleVolumes={headlessHeatmap.volumes}
+                maxVolume={headlessHeatmap.maxVolume}
                 compact
                 compactFill
-                viewMode="group"
+                viewMode="headless"
                 gender={gender}
               />
             </div>

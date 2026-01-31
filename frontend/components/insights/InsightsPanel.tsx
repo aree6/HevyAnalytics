@@ -44,16 +44,7 @@ interface InsightsPanelProps {
   totalSets: number;
   totalPRs: number;
   // AI Analysis props
-  onExportAction?: () => void;
-  exportCopied?: boolean;
-  showTimelineChips?: boolean;
-  setShowTimelineChips?: (show: boolean) => void;
-  exportWindow?: string;
-  performCopyForTimeline?: (k: string) => void;
-  timelineSelected?: string | null;
-  onGeminiAnalyze?: () => void;
-  onReCopy?: () => void;
-  reCopyCopied?: boolean;
+  onAIAnalyze?: () => void;
 }
 
 export const InsightsPanel: React.FC<InsightsPanelProps> = memo(function InsightsPanel(props) {
@@ -62,22 +53,13 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = memo(function Insight
     totalWorkouts,
     totalSets,
     totalPRs,
-    onExportAction,
-    exportCopied = false,
-    showTimelineChips = false,
-    setShowTimelineChips,
-    exportWindow = '1',
-    performCopyForTimeline,
-    timelineSelected,
-    onGeminiAnalyze,
-    onReCopy,
-    reCopyCopied = false,
+    onAIAnalyze,
   } = props;
   const { rolling7d, streakInfo, prInsights, volumeSparkline, workoutSparkline, prSparkline, setsSparkline, consistencySparkline } = insights;
 
   // Only show AI Analysis card on mobile (hidden on desktop where it's in the header)
   const isMobile = useIsMobile();
-  const showAICard = onExportAction && isMobile;
+  const showAICard = onAIAnalyze && isMobile;
 
   return (
     <div className={`grid gap-2 sm:gap-3 ${showAICard ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-3'}`}>
@@ -120,19 +102,8 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = memo(function Insight
       />
 
       {/* AI Analysis Card - Mobile Only */}
-      {showAICard && onExportAction && setShowTimelineChips && performCopyForTimeline && onGeminiAnalyze && onReCopy && (
-        <AIAnalysisCard
-          onExportAction={onExportAction}
-          exportCopied={exportCopied}
-          showTimelineChips={showTimelineChips}
-          setShowTimelineChips={setShowTimelineChips}
-          exportWindow={exportWindow}
-          performCopyForTimeline={performCopyForTimeline}
-          timelineSelected={timelineSelected}
-          onGeminiAnalyze={onGeminiAnalyze}
-          onReCopy={onReCopy}
-          reCopyCopied={reCopyCopied}
-        />
+      {showAICard && onAIAnalyze && (
+        <AIAnalysisCard onAIAnalyze={onAIAnalyze} />
       )}
     </div>
   );

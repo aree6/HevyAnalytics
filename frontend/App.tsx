@@ -29,6 +29,9 @@ import {
   getBodyMapGender,
   saveBodyMapGender,
   getPreferencesConfirmed,
+  HeatmapTheme,
+  getHeatmapTheme,
+  saveHeatmapTheme,
   DateMode,
   getDateMode,
   saveDateMode,
@@ -83,7 +86,7 @@ const App: React.FC = () => {
   const [lyfatLoginError, setLyfatLoginError] = useState<string | null>(null);
   const [csvImportError, setCsvImportError] = useState<string | null>(null);
   const [highlightedExercise, setHighlightedExercise] = useState<string | null>(null);
-  const [initialMuscleForAnalysis, setInitialMuscleForAnalysis] = useState<{ muscleId: string; viewMode: 'muscle' | 'group' } | null>(null);
+  const [initialMuscleForAnalysis, setInitialMuscleForAnalysis] = useState<{ muscleId: string; viewMode: 'muscle' | 'group' | 'headless' } | null>(null);
   const [initialWeeklySetsWindow, setInitialWeeklySetsWindow] = useState<'all' | '7d' | '30d' | '365d' | null>(null);
   const [targetHistoryDate, setTargetHistoryDate] = useState<Date | null>(null);
   const [loadingKind, setLoadingKind] = useState<'hevy' | 'lyfta' | 'csv' | null>(null);
@@ -228,7 +231,7 @@ const App: React.FC = () => {
       const viewMode = params.get('view');
       const weeklySetsWindow = params.get('window');
 
-      const isValidViewMode = viewMode === 'muscle' || viewMode === 'group';
+      const isValidViewMode = viewMode === 'muscle' || viewMode === 'group' || viewMode === 'headless';
       const isValidWindow = weeklySetsWindow === 'all' || weeklySetsWindow === '7d' || weeklySetsWindow === '30d' || weeklySetsWindow === '365d';
 
       if (muscleId && isValidViewMode) {
@@ -314,6 +317,34 @@ const App: React.FC = () => {
     saveExerciseTrendMode(exerciseTrendMode);
   }, [exerciseTrendMode]);
 
+  // Heatmap theme (palette) state with localStorage persistence
+  const [heatmapTheme, setHeatmapTheme] = useState<HeatmapTheme>(() => getHeatmapTheme());
+
+  useEffect(() => {
+    saveHeatmapTheme(heatmapTheme);
+    setContext({ heatmap_theme: heatmapTheme });
+    trackEvent('heatmap_theme_change', { heatmap_theme: heatmapTheme });
+  }, [heatmapTheme]);
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+
+    // Hover and selection colors depend on palette to keep them distinct.
+    // Red palette: hover=blue, select=blue
+    // Brown palette: hover=blue, select=blue
+    // Blue palette: hover=red, select=red
+    const preset =
+      heatmapTheme === 'blue'
+        ? { hue: 215, hoverRgb: '220 38 38', selectionRgb: '220 38 38' }
+        : heatmapTheme === 'brown'
+          ? { hue: 25, hoverRgb: '59 130 246', selectionRgb: '59 130 246' }
+          : { hue: 5, hoverRgb: '59 130 246', selectionRgb: '59 130 246' }; // red default
+
+    root.style.setProperty('--heatmap-hue', String(preset.hue));
+    root.style.setProperty('--bodymap-hover-rgb', preset.hoverRgb);
+    root.style.setProperty('--bodymap-selection-rgb', preset.selectionRgb);
+  }, [heatmapTheme]);
+
   // User Preferences Modal state
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
 
@@ -324,7 +355,7 @@ const App: React.FC = () => {
     const params = new URLSearchParams();
     params.set('exercise', exerciseName);
     pendingUrlNavKindRef.current = 'deep';
-    
+
     // If we're already on the Exercises tab, replace the current entry instead of pushing
     // This prevents exercise selections from polluting the browser history
     if (activeTab === Tab.EXERCISES) {
@@ -335,7 +366,7 @@ const App: React.FC = () => {
   };
 
   // Handler for navigating to MuscleAnalysis from Dashboard heatmap
-  const handleMuscleClick = (muscleId: string, viewMode: 'muscle' | 'group', weeklySetsWindow: 'all' | '7d' | '30d' | '365d') => {
+  const handleMuscleClick = (muscleId: string, viewMode: 'muscle' | 'group' | 'headless' = 'headless', weeklySetsWindow: 'all' | '7d' | '30d' | '365d') => {
     trackEvent('muscle_open', { view_mode: viewMode, window: weeklySetsWindow });
     setInitialMuscleForAnalysis({ muscleId, viewMode });
     setInitialWeeklySetsWindow(weeklySetsWindow);
@@ -514,11 +545,10 @@ const App: React.FC = () => {
 
   const filterControls = (
     <div
-      className={`relative flex items-center gap-2 rounded-lg px-3 py-2 h-10 shadow-sm transition-all duration-300 ${
-        hasActiveCalendarFilter
-          ? 'bg-black/70 border border-slate-600/60'
-          : 'bg-black/70 border border-slate-700/50'
-      }`}
+      className={`relative flex items-center gap-2 rounded-lg px-3 py-2 h-10 shadow-sm transition-all duration-300 ${hasActiveCalendarFilter
+        ? 'bg-black/70 border border-slate-600/60'
+        : 'bg-black/70 border border-slate-700/50'
+        }`}
     >
       <div className="flex-1 min-w-0 overflow-x-auto">
         <div className="flex items-center gap-2 flex-nowrap min-w-max">
@@ -1020,6 +1050,8 @@ const App: React.FC = () => {
         onBodyMapGenderChange={setBodyMapGender}
         themeMode={mode}
         onThemeModeChange={setMode}
+        heatmapTheme={heatmapTheme}
+        onHeatmapThemeChange={setHeatmapTheme}
         dateMode={dateMode}
         onDateModeChange={setDateMode}
         exerciseTrendMode={exerciseTrendMode}

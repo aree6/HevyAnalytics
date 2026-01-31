@@ -251,6 +251,41 @@ export const clearThemeMode = (): void => {
   }
 };
 
+export type HeatmapTheme = 'red' | 'brown' | 'blue';
+
+const HEATMAP_THEME_KEY = 'hevy_analytics_heatmap_theme';
+
+export const saveHeatmapTheme = (theme: HeatmapTheme): void => {
+  try {
+    localStorage.setItem(HEATMAP_THEME_KEY, theme);
+  } catch (error) {
+    console.error('Failed to save heatmap theme to local storage:', error);
+  }
+};
+
+export const getHeatmapTheme = (): HeatmapTheme => {
+  try {
+    const theme = localStorage.getItem(HEATMAP_THEME_KEY);
+
+    // Backward compatibility: previously supported themes (cyan/violet/emerald) map to red.
+    // This keeps existing users on a valid palette without breaking localStorage.
+    if (theme === 'blue') return 'blue';
+    if (theme === 'brown') return 'brown';
+    return 'red';
+  } catch (error) {
+    console.error('Failed to retrieve heatmap theme from local storage:', error);
+    return 'red';
+  }
+};
+
+export const clearHeatmapTheme = (): void => {
+  try {
+    localStorage.removeItem(HEATMAP_THEME_KEY);
+  } catch (error) {
+    console.error('Failed to clear heatmap theme from local storage:', error);
+  }
+};
+
 // Date Mode Preference Storage
 // 'effective' = use the latest workout date as "now" (default, better for relative time displays)
 // 'actual' = use the real current date as "now"

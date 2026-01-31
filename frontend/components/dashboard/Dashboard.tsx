@@ -1,14 +1,14 @@
-import React, { useMemo, useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useMemo, useState, useEffect, Suspense } from 'react';
 import { DailySummary, ExerciseStats, WorkoutSet } from '../../types';
-import { 
+import {
   getDayOfWeekShape
 } from '../../utils/analysis/analytics';
 import type { BodyMapGender } from '../bodyMap/BodyMap';
 import { getSmartFilterMode, TimeFilterMode, WeightUnit } from '../../utils/storage/localStorage';
 import { CHART_TOOLTIP_STYLE, CHART_COLORS, ANIMATION_KEYFRAMES } from '../../utils/ui/uiConstants';
 import { ActivityHeatmap } from './ActivityHeatmap';
-import { 
-  Clock, Dumbbell, Copy, Check, ExternalLink, Brain, AlertTriangle
+import {
+  Clock, Dumbbell, Brain, AlertTriangle
 } from 'lucide-react';
 import { subDays } from 'date-fns';
 import { getEffectiveNowFromWorkoutData, getSessionKey } from '../../utils/date/dateUtils';
@@ -24,13 +24,13 @@ import { MIN_SESSIONS_FOR_TREND, summarizeExerciseHistory } from '../../utils/an
 import { isWarmupSet } from '../../utils/analysis/setClassification';
 import { ChartSkeleton } from '../ui/ChartSkeleton';
 import { LazyRender } from '../ui/LazyRender';
-import { useDashboardExportClipboard } from './useDashboardExportClipboard';
 import { useDashboardIntensityEvolution } from './useDashboardIntensityEvolution';
 import { useDashboardMuscleTrend } from './useDashboardMuscleTrend';
 import { useDashboardPrTrend } from './useDashboardPrTrend';
 import { useDashboardTopExercises } from './useDashboardTopExercises';
 import { useDashboardVolumeDensity } from './useDashboardVolumeDensity';
 import { useDashboardWeeklySetsDashboard } from './useDashboardWeeklySetsDashboard';
+import { AIAnalyzeModal } from '../modals/AIAnalyzeModal';
 
 interface DashboardProps {
   dailyData: DailySummary[];
@@ -39,7 +39,7 @@ interface DashboardProps {
   onDayClick?: (date: Date) => void;
   onMuscleClick?: (
     muscleId: string,
-    viewMode: 'muscle' | 'group',
+    viewMode: 'muscle' | 'group' | 'headless',
     weeklySetsWindow: 'all' | '7d' | '30d' | '365d'
   ) => void;
   onExerciseClick?: (exerciseName: string) => void;
@@ -50,28 +50,6 @@ interface DashboardProps {
   /** Reference date for relative time calculations. Pass from App for centralized date mode control. */
   now?: Date;
 }
-
-// Simple monochrome SVG for Gemini (Google) that inherits color via currentColor
-const GeminiIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 32 32"
-    className={className}
-    role="img"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden="true"
-  >
-    <path
-      d="M31,14h-1h-6h-8v5h7c-1.3,2.7-3.8,5.1-7,5.1c-4.5,0-8.1-3.6-8.1-8.1s3.6-8.1,8.1-8.1c2,0,3.6,0.8,5,2.1l6.7-3.3 C25,3.2,20.8,1,16,1C7.7,1,1,7.7,1,16s6.7,15,15,15s15-6.7,15-15C31,15.2,31.1,14.8,31,14z"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 
 const safePct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
 
@@ -88,6 +66,8 @@ const TopExercisesCard = React.lazy(() => import('./TopExercisesCard').then((m) 
 export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, fullData, onDayClick, onMuscleClick, onExerciseClick, filtersSlot, stickyHeader = false, bodyMapGender = 'male' as BodyMapGender, weightUnit = 'kg' as WeightUnit, now }) => {
   // State to control animation retriggering on mount
   const [isMounted, setIsMounted] = useState(false);
+
+  const [aiAnalyzeOpen, setAiAnalyzeOpen] = useState(false);
 
   // Use centralized now if provided, otherwise fall back to data-based calculation
   const effectiveNow = useMemo(() => now ?? getEffectiveNowFromWorkoutData(fullData), [now, fullData]);
@@ -150,33 +130,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
   const [topExerciseMode, setTopExerciseMode] = useState<'all' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [topExercisesView, setTopExercisesView] = useState<'barh' | 'area'>('barh');
-  
+
   // Chart view type states (defaults keep existing chart types)
   const [prTrendView, setPrTrendView] = useState<'area' | 'bar'>('area');
   const [volumeView, setVolumeView] = useState<'area' | 'bar'>('area');
   const [intensityView, setIntensityView] = useState<'area' | 'stackedBar'>('area');
   const [weekShapeView, setWeekShapeView] = useState<'radar' | 'bar'>('radar');
-  
+
   const [muscleGrouping, setMuscleGrouping] = useState<'groups' | 'muscles'>('groups');
   const [musclePeriod, setMusclePeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'all'>('monthly');
   const [muscleTrendView, setMuscleTrendView] = useState<'area' | 'stackedBar'>('stackedBar');
-  const [muscleCompQuick, setMuscleCompQuick] = useState<'all'|'7d'|'30d'|'365d'>('30d');
-  const [compositionGrouping, setCompositionGrouping] = useState<'groups' | 'muscles'>('groups');
+  const [muscleCompQuick, setMuscleCompQuick] = useState<'all' | '7d' | '30d' | '365d'>('30d');
+  const [compositionGrouping, setCompositionGrouping] = useState<'groups' | 'muscles'>('muscles');
   const [weeklySetsView, setWeeklySetsView] = useState<'radar' | 'heatmap'>('heatmap');
-  
-  const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
 
-  const {
-    exportWindow,
-    timelineSelected,
-    showTimelineChips,
-    setShowTimelineChips,
-    exportCopied,
-    reCopyCopied,
-    handleExportAction,
-    performCopyForTimeline,
-    reCopy,
-  } = useDashboardExportClipboard({ fullData, dailyData, exerciseStats, effectiveNow });
+  const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
 
   const assetsLowerMap = useMemo(() => {
     if (!assetsMap) return null;
@@ -291,7 +259,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
       rhythmTone,
     };
   }, [weekShapeData]);
-  
+
   const {
     topExercisesBarData,
     topExercisesOverTimeData,
@@ -342,165 +310,90 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             rightSlot={
               <div className="flex items-center space-x-2">
                 <div className="flex items-center space-x-2">
-                  {!exportCopied && (
-                    <div className="relative inline-flex items-center justify-center">
-                      <div className="meteor-border-track">
-                        <div className="meteor-premium" />
-                        <div className="meteor-border-mask" />
-                      </div>
-                      <button
-                        onClick={handleExportAction}
-                        className="relative z-[2] inline-flex items-center gap-2 justify-center whitespace-nowrap rounded-md text-xs font-medium focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent text-slate-200 hover:text-white hover:bg-white/5 transition-all duration-200"
-                        title="AI Analyze"
-                      >
-                        <Brain className="w-4 h-4 text-purple-400" />
-                        <span className="hidden sm:inline">AI Analyze</span>
-                      </button>
+                  <div className="relative inline-flex items-center justify-center">
+                    <div className="meteor-border-track">
+                      <div className="meteor-premium" />
+                      <div className="meteor-border-mask" />
                     </div>
-                  )}
-
-                  {showTimelineChips && (
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowTimelineChips((s) => !s)}
-                        aria-expanded={showTimelineChips}
-                        className="inline-flex items-center gap-2 justify-center whitespace-nowrap rounded-md text-xs font-medium focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent border border-slate-700/50 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200"
-                        title="Choose timeframe"
-                      >
-                        <Clock className="w-3 h-3 text-slate-400" />
-                        <span className="text-sm">{exportWindow === 'all' ? 'All' : `${exportWindow}m`}</span>
-                        <svg className="w-3 h-3 text-slate-400 ml-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-
-                      {showTimelineChips && (
-                        <div className="absolute right-0 mt-2 w-40 bg-black/90 border border-slate-700/50 rounded-xl shadow-xl z-50 p-2">
-                          {(['1','3','6','all'] as const).map((k) => {
-                            const label = k === 'all' ? 'All' : `${k} month${k === '1' ? '' : 's'}`;
-                            return (
-                              <button
-                                key={k}
-                                onClick={() => { performCopyForTimeline(k); setShowTimelineChips(false); }}
-                                className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-white/5 rounded-md"
-                              >
-                                {label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {exportCopied && timelineSelected && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          const instruction = 'Paste the clipboard contents.';
-                          const url = `https://aistudio.google.com/prompts/new_chat?model=gemini-3-pro-preview&prompt=${encodeURIComponent(instruction)}`;
-                          window.open(url, '_blank');
-                        }}
-                        className="inline-flex items-center gap-2 justify-center whitespace-nowrap rounded-md text-xs font-medium focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent border border-slate-700/50 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200 ml-1"
-                        title="Analyse with Gemini"
-                      >
-                        <GeminiIcon className="w-4 h-4 text-slate-300" />
-                        <span className="hidden sm:inline">Analyse with Gemini</span>
-                      </button>
-
-                      <button
-                        onClick={reCopy}
-                        className="inline-flex items-center gap-2 justify-center whitespace-nowrap rounded-md text-xs font-medium focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent border border-slate-700/50 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200 ml-1"
-                        title="Copy export to clipboard"
-                      >
-                        {reCopyCopied ? <Check className="w-4 h-4 text-slate-300" /> : <Copy className="w-4 h-4 text-slate-300" />}
-                        <span className="hidden sm:inline">Copy</span>
-                      </button>
-                    </div>
-                  )}
+                    <button
+                      onClick={() => setAiAnalyzeOpen(true)}
+                      className="relative z-[2] inline-flex items-center gap-2 justify-center whitespace-nowrap rounded-md text-xs font-medium focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-9 px-3 py-1.5 bg-transparent text-slate-200 hover:text-white hover:bg-white/5 transition-all duration-200"
+                      title="AI Analyze"
+                    >
+                      <Brain className="w-4 h-4 text-purple-400" />
+                      <span className="hidden sm:inline">AI Analyze</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             }
           />
         </div>
 
-      {/* INSIGHTS PANEL - KPIs with Deltas & Sparklines */}
-      <InsightsPanel 
-        insights={dashboardInsights}
-        totalWorkouts={totalWorkouts}
-        totalSets={totalSets}
-        totalPRs={totalPrs}
-        onExportAction={handleExportAction}
-        exportCopied={exportCopied}
-        showTimelineChips={showTimelineChips}
-        setShowTimelineChips={setShowTimelineChips}
-        exportWindow={exportWindow}
-        performCopyForTimeline={performCopyForTimeline}
-        timelineSelected={timelineSelected}
-        onGeminiAnalyze={() => {
-          const instruction = 'Paste the clipboard contents.';
-          const url = `https://aistudio.google.com/prompts/new_chat?model=gemini-3-pro-preview&prompt=${encodeURIComponent(instruction)}`;
-          window.open(url, '_blank');
-        }}
-        onReCopy={reCopy}
-        reCopyCopied={reCopyCopied}
-      />
+        {/* INSIGHTS PANEL - KPIs with Deltas & Sparklines */}
+        <InsightsPanel
+          insights={dashboardInsights}
+          totalWorkouts={totalWorkouts}
+          totalSets={totalSets}
+          totalPRs={totalPrs}
+          onAIAnalyze={() => setAiAnalyzeOpen(true)}
+        />
 
-      {/* RECENT PRs TIMELINE */}
-      <RecentPRsPanel prInsights={dashboardInsights.prInsights} weightUnit={weightUnit} now={effectiveNow} onExerciseClick={onExerciseClick} />
+        {/* RECENT PRs TIMELINE */}
+        <RecentPRsPanel prInsights={dashboardInsights.prInsights} weightUnit={weightUnit} now={effectiveNow} onExerciseClick={onExerciseClick} />
 
-      {/* PLATEAU ALERTS */}
-      {activePlateauExercises.length > 0 && (
-        <div className="bg-black/70 border border-amber-500/20 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-amber-500/10">
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
-              </div>
-              <span className="text-sm font-semibold text-white">Plateaus</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-bold">
-                {activePlateauExercises.length} {activePlateauExercises.length === 1 ? 'exercise' : 'exercises'}
-              </span>
-            </div>
-          </div>
-          <div className="overflow-x-auto -mx-2 px-2 pb-2">
-            <div className="flex gap-2" style={{ minWidth: 'min-content' }}>
-              {activePlateauExercises.map((p) => (
-                <div key={p.exerciseName} className="min-w-[280px] flex-shrink-0">
-                  <PlateauAlert 
-                    exerciseName={p.exerciseName}
-                    suggestion={p.suggestion}
-                    weeksAtSameWeight={p.weeksAtSameWeight}
-                    currentMaxWeight={p.currentMaxWeight}
-                    lastProgressDate={p.lastProgressDate}
-                    lastWeight={p.lastWeight}
-                    lastReps={p.lastReps}
-                    isBodyweightLike={p.isBodyweightLike}
-                    asset={assetsMap?.get(p.exerciseName) || assetsLowerMap?.get(p.exerciseName.toLowerCase())}
-                    weightUnit={weightUnit}
-                    now={effectiveNow}
-                    onClick={() => onExerciseClick?.(p.exerciseName)}
-                  />
+        {/* PLATEAU ALERTS */}
+        {activePlateauExercises.length > 0 && (
+          <div className="bg-black/70 border border-amber-500/20 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-amber-500/10">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
                 </div>
-              ))}
+                <span className="text-sm font-semibold text-white">Plateaus</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-bold">
+                  {activePlateauExercises.length} {activePlateauExercises.length === 1 ? 'exercise' : 'exercises'}
+                </span>
+              </div>
+            </div>
+            <div className="overflow-x-auto -mx-2 px-2 pb-2">
+              <div className="flex gap-2" style={{ minWidth: 'min-content' }}>
+                {activePlateauExercises.map((p) => (
+                  <div key={p.exerciseName} className="min-w-[280px] flex-shrink-0">
+                    <PlateauAlert
+                      exerciseName={p.exerciseName}
+                      suggestion={p.suggestion}
+                      weeksAtSameWeight={p.weeksAtSameWeight}
+                      currentMaxWeight={p.currentMaxWeight}
+                      lastProgressDate={p.lastProgressDate}
+                      lastWeight={p.lastWeight}
+                      lastReps={p.lastReps}
+                      isBodyweightLike={p.isBodyweightLike}
+                      asset={assetsMap?.get(p.exerciseName) || assetsLowerMap?.get(p.exerciseName.toLowerCase())}
+                      weightUnit={weightUnit}
+                      now={effectiveNow}
+                      onClick={() => onExerciseClick?.(p.exerciseName)}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 1. HEATMAP (Full Width) */}
-      <ActivityHeatmap
-        dailyData={dailyData}
-        streakInfo={dashboardInsights.streakInfo}
-        consistencySparkline={dashboardInsights.consistencySparkline}
-        onDayClick={onDayClick}
-        now={effectiveNow}
-      />
+        {/* 1. HEATMAP (Full Width) */}
+        <ActivityHeatmap
+          dailyData={dailyData}
+          streakInfo={dashboardInsights.streakInfo}
+          consistencySparkline={dashboardInsights.consistencySparkline}
+          onDayClick={onDayClick}
+          now={effectiveNow}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-2">
-        
+
           {/* 2. PR TRENDS (Area/Bar) */}
           <Suspense fallback={<ChartSkeleton className="min-h-[400px] sm:min-h-[480px]" />}>
             <PrTrendCard
@@ -516,42 +409,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
             />
           </Suspense>
 
-        {/* 3. WEEKLY SETS (Radar/Heatmap) */}
-        <Suspense fallback={<ChartSkeleton className="min-h-[400px] sm:min-h-[480px]" />}>
-          <WeeklySetsCard
-            isMounted={isMounted}
-            weeklySetsView={weeklySetsView}
-            setWeeklySetsView={setWeeklySetsView}
-            compositionGrouping={compositionGrouping}
-            setCompositionGrouping={setCompositionGrouping}
-            muscleCompQuick={muscleCompQuick}
-            setMuscleCompQuick={setMuscleCompQuick}
-            compositionQuickData={compositionQuickData}
-            heatmap={weeklySetsDashboard.heatmap}
-            tooltipStyle={TooltipStyle as any}
-            onMuscleClick={(muscleId, viewMode) => onMuscleClick?.(muscleId, viewMode, muscleCompQuick)}
-            bodyMapGender={bodyMapGender}
-            windowStart={weeklySetsDashboard.windowStart}
-            now={effectiveNow}
-          />
-        </Suspense>
-      </div>
+          {/* 3. WEEKLY SETS (Radar/Heatmap) */}
+          <Suspense fallback={<ChartSkeleton className="min-h-[400px] sm:min-h-[480px]" />}>
+            <WeeklySetsCard
+              isMounted={isMounted}
+              weeklySetsView={weeklySetsView}
+              setWeeklySetsView={setWeeklySetsView}
+              compositionGrouping={compositionGrouping}
+              setCompositionGrouping={setCompositionGrouping}
+              muscleCompQuick={muscleCompQuick}
+              setMuscleCompQuick={setMuscleCompQuick}
+              compositionQuickData={compositionQuickData}
+              heatmap={weeklySetsDashboard.heatmap}
+              tooltipStyle={TooltipStyle as any}
+              onMuscleClick={(muscleId, viewMode) => onMuscleClick?.(muscleId, viewMode, muscleCompQuick)}
+              bodyMapGender={bodyMapGender}
+              windowStart={weeklySetsDashboard.windowStart}
+              now={effectiveNow}
+            />
+          </Suspense>
+        </div>
 
-      {/* 4. INTENSITY EVOLUTION (Area/Stacked Bar) */}
-      <LazyRender className="min-w-0" placeholder={<ChartSkeleton className="min-h-[400px] sm:min-h-[480px]" />}>
-        <Suspense fallback={<ChartSkeleton className="min-h-[400px] sm:min-h-[480px]" />}>
-          <IntensityEvolutionCard
-            isMounted={isMounted}
-            mode={chartModes.intensityEvo}
-            onToggle={(m) => toggleChartMode('intensityEvo', m)}
-            view={intensityView}
-            onViewToggle={setIntensityView}
-            intensityData={intensityData}
-            intensityInsight={intensityInsight}
-            tooltipStyle={TooltipStyle as any}
-          />
-        </Suspense>
-      </LazyRender>
+        {/* 4. INTENSITY EVOLUTION (Area/Stacked Bar) */}
+        <LazyRender className="min-w-0" placeholder={<ChartSkeleton className="min-h-[400px] sm:min-h-[480px]" />}>
+          <Suspense fallback={<ChartSkeleton className="min-h-[400px] sm:min-h-[480px]" />}>
+            <IntensityEvolutionCard
+              isMounted={isMounted}
+              mode={chartModes.intensityEvo}
+              onToggle={(m) => toggleChartMode('intensityEvo', m)}
+              view={intensityView}
+              onViewToggle={setIntensityView}
+              intensityData={intensityData}
+              intensityInsight={intensityInsight}
+              tooltipStyle={TooltipStyle as any}
+            />
+          </Suspense>
+        </LazyRender>
 
         {/* MUSCLE ANALYSIS (Unified) */}
         <LazyRender className="min-w-0" placeholder={<ChartSkeleton className="min-h-[400px] sm:min-h-[520px]" />}>
@@ -577,7 +470,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
 
       {/* 5. Weekly Rhythm + Muscle Composition */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-2">
-        
+
         {/* Weekly Rhythm: Radar/Bar */}
         <LazyRender className="min-w-0" placeholder={<ChartSkeleton className="min-h-[400px] sm:min-h-[520px]" />}>
           <Suspense fallback={<ChartSkeleton className="min-h-[400px] sm:min-h-[520px]" />}>
@@ -632,6 +525,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         </Suspense>
       </LazyRender>
 
-     </>
-   );
- };
+      <AIAnalyzeModal
+        isOpen={aiAnalyzeOpen}
+        onClose={() => setAiAnalyzeOpen(false)}
+        fullData={fullData}
+        dailyData={dailyData}
+        exerciseStats={exerciseStats}
+        effectiveNow={effectiveNow}
+      />
+
+    </>
+  );
+};

@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { WorkoutSet, AnalysisResult, SetWisdom, StructuredTooltip } from '../../types';
-import { 
+import {
   ChevronLeft, ChevronRight, Trophy, Hash,
   AlertTriangle, Info, TrendingUp, TrendingDown, Calendar, Clock, Dumbbell,
   Weight, Timer
@@ -10,12 +10,14 @@ import { analyzeSetProgression, analyzeProgression, getWisdomColor, isWarmupSet 
 import { getSetTypeConfig, isWorkingSet } from '../../utils/analysis/setClassification';
 import { getExerciseAssets, ExerciseAsset } from '../../utils/data/exerciseAssets';
 import { BodyMap, BodyMapGender } from '../bodyMap/BodyMap';
-import { 
-  loadExerciseMuscleData, 
-  ExerciseMuscleData, 
+import {
+  loadExerciseMuscleData,
+  ExerciseMuscleData,
   SVG_MUSCLE_NAMES,
   lookupExerciseMuscleData,
+  toHeadlessVolumeMap,
 } from '../../utils/muscle/muscleMapping';
+import { HEADLESS_MUSCLE_NAMES } from '../../utils/muscle/muscleMappingConstants';
 import { ViewHeader } from '../layout/ViewHeader';
 import { FANCY_FONT } from '../../utils/ui/uiConstants';
 import { format } from 'date-fns';
@@ -49,20 +51,20 @@ interface HistoryViewProps {
 }
 
 // Session comparison delta badge
-const SessionDeltaBadge: React.FC<{ current: number; previous: number; suffix?: string; label: string; context?: string }> = ({ 
+const SessionDeltaBadge: React.FC<{ current: number; previous: number; suffix?: string; label: string; context?: string }> = ({
   current, previous, suffix = '', label, context = 'vs lst'
 }) => {
   const delta = current - previous;
   if (delta === 0 || previous === 0) return null;
-  
+
   const isPositive = delta > 0;
   const Icon = isPositive ? TrendingUp : TrendingDown;
   const colorClass = isPositive ? 'text-emerald-400' : 'text-rose-400';
   const deltaPercent = Math.round((delta / previous) * 100);
-  
+
   // Use centralized formatting for better UX with large percentages
   const formattedPercent = formatDeltaPercentage(deltaPercent, getDeltaFormatPreset('badge'));
-  
+
   return (
     <span
       className={`relative -top-[2px] inline-flex items-center gap-0.5 ml-1 text-[10px] font-bold leading-none ${colorClass}`}
@@ -74,7 +76,7 @@ const SessionDeltaBadge: React.FC<{ current: number; previous: number; suffix?: 
   );
 };
 
-const ITEMS_PER_PAGE = 3; 
+const ITEMS_PER_PAGE = 3;
 
 const isSameCalendarDay = (a: Date, b: Date) => format(a, 'yyyy-MM-dd') === format(b, 'yyyy-MM-dd');
 
@@ -167,10 +169,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
 
   // Use centralized now if provided, otherwise fall back to data-based calculation
   const effectiveNow = useMemo(() => now ?? getEffectiveNowFromWorkoutData(data, new Date(0)), [now, data]);
-  
+
   // Exercise volume history for deltas
   const exerciseVolumeHistory = useExerciseVolumeHistory(data);
-  
+
   // Exercise best weights for PR tracking
   const { exerciseBests, currentBests } = useExerciseBestHistory(data);
 
@@ -205,14 +207,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
     if (!targetDate || sessions.length === 0) return;
 
     // Find the session that matches the target date
-    const targetSessionIndex = sessions.findIndex(session => 
+    const targetSessionIndex = sessions.findIndex(session =>
       session.date && isSameCalendarDay(session.date, targetDate)
     );
 
     if (targetSessionIndex !== -1) {
       // Calculate which page the target session is on
       const targetPage = Math.floor(targetSessionIndex / ITEMS_PER_PAGE) + 1;
-      
+
       // Navigate to the target page if different from current
       if (targetPage !== currentPage) {
         setCurrentPage(targetPage);
@@ -313,8 +315,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
   // Pagination controls for header
   const paginationControls = (
     <div className="flex items-center gap-2">
-      <button 
-        onClick={() => handlePageChange(Math.max(1, currentPage - 1))} 
+      <button
+        onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
         disabled={currentPage === 1}
         className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-9 w-9 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200"
       >
@@ -323,8 +325,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
       <span className="text-xs font-medium text-slate-400 min-w-[80px] text-center">
         Page {currentPage} of {totalPages}
       </span>
-      <button 
-        onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))} 
+      <button
+        onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
         disabled={currentPage === totalPages}
         className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 h-9 w-9 bg-transparent border border-black/70 text-slate-200 hover:border-white hover:text-white hover:bg-white/5 transition-all duration-200"
       >
@@ -370,7 +372,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
         {currentSessions.map((session, index) => {
           const allSessionSets = session.exercises.flatMap(e => e.sets);
           const sessionHeatmap = buildSessionMuscleHeatmap(allSessionSets, exerciseMuscleData);
-          
+
+          const sessionHeadlessVolumes = toHeadlessVolumeMap(sessionHeatmap.volumes);
+          const sessionHeadlessMaxVolume = Math.max(1, ...Array.from(sessionHeadlessVolumes.values()));
+
           // Aggregate session heatmap by display name for consistent tooltips.
           // Multiple SVG IDs can map to the same display name (e.g., anterior-deltoid,
           // lateral-deltoid, posterior-deltoid all map to "Shoulders").
@@ -385,7 +390,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
               sessionAggregated.set(label, sets);
             }
           });
-          
+
           const isCollapsed = collapsedSessions.has(session.key);
           const sessionDurationMs = getSessionDurationMs(session);
           const sessionDurationText = sessionDurationMs != null ? formatWorkoutDuration(sessionDurationMs) : null;
@@ -397,7 +402,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
             : null;
           const restText = restMs != null ? formatRestDuration(restMs) : null;
           const restIsDayBreak = !!(previousDisplayedSession?.date && session.date && !isSameCalendarDay(previousDisplayedSession.date, session.date));
-          
+
           // Find previous session for comparison
           const sessionIdx = sessions.findIndex(s => s.key === session.key);
           const prevSession = sessionIdx < sessions.length - 1 ? sessions[sessionIdx + 1] : null;
@@ -415,52 +420,171 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                   </div>
                 </div>
               )}
-              <div 
+              <div
                 className="space-y-1 sm:space-y-2"
                 style={{ animationDelay: `${index * 100}ms` }} // Staggered entrance
               >
-              
-              {/* --- Session Header Card --- */}
-              <div
-                id={`session-${session.key}`}
-                role="button"
-                tabIndex={0}
-                aria-expanded={!isCollapsed}
-                onKeyDown={(e) => {
-                  if (e.key !== 'Enter' && e.key !== ' ') return;
-                  e.preventDefault();
-                  setCollapsedSessions((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(session.key)) next.delete(session.key);
-                    else next.add(session.key);
-                    return next;
-                  });
-                }}
-                onClick={(e) => {
-                  const el = e.target as Element | null;
-                  if (el?.closest('button,a,input,select,textarea,[data-no-toggle]')) return;
-                  setCollapsedSessions((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(session.key)) next.delete(session.key);
-                    else next.add(session.key);
-                    return next;
-                  });
-                }}
-                className="border border-slate-700/50 rounded-2xl p-5 sm:p-7 sm:min-h-[168px] flex flex-row justify-between items-stretch gap-2 sm:gap-6 shadow-xl relative overflow-visible group transition-all duration-300 hover:border-slate-600/50 cursor-pointer active:scale-[0.99]"
-                style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.78)' }}
-              >
+
+                {/* --- Session Header Card --- */}
                 <div
-                  className="absolute inset-0 pointer-events-none rounded-2xl"
-                  style={{ backgroundColor: 'rgb(var(--mw-history-header-tint-rgb) / var(--mw-history-header-tint-alpha))' }}
-                />
-                <div className="absolute inset-0 bg-slate-700/10 pointer-events-none rounded-2xl" />
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none group-hover:bg-blue-500/10 transition-all duration-700"></div>
-                
-                {sessionHeatmap.volumes.size > 0 && (
-                  <div className={`relative z-10 w-full sm:hidden grid grid-cols-3 gap-x-3 gap-y-1 transition-all duration-300 ${isCollapsed ? 'grid-rows-[auto_auto]' : 'grid-rows-[auto_auto_1.75rem_1.75rem_1.75rem_1.75rem]'}`}>
-                    <div className="col-span-3 relative flex items-center justify-between gap-2 min-w-0">
+                  id={`session-${session.key}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={!isCollapsed}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    setCollapsedSessions((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(session.key)) next.delete(session.key);
+                      else next.add(session.key);
+                      return next;
+                    });
+                  }}
+                  onClick={(e) => {
+                    const el = e.target as Element | null;
+                    if (el?.closest('button,a,input,select,textarea,[data-no-toggle]')) return;
+                    setCollapsedSessions((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(session.key)) next.delete(session.key);
+                      else next.add(session.key);
+                      return next;
+                    });
+                  }}
+                  className="border border-slate-700/50 rounded-2xl p-5 sm:p-7 sm:min-h-[168px] flex flex-row justify-between items-stretch gap-2 sm:gap-6 shadow-xl relative overflow-visible group transition-all duration-300 hover:border-slate-600/50 cursor-pointer active:scale-[0.99]"
+                  style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.78)' }}
+                >
+                  <div
+                    className="absolute inset-0 pointer-events-none rounded-2xl"
+                    style={{ backgroundColor: 'rgb(var(--mw-history-header-tint-rgb) / var(--mw-history-header-tint-alpha))' }}
+                  />
+                  <div className="absolute inset-0 bg-slate-700/10 pointer-events-none rounded-2xl" />
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none group-hover:bg-blue-500/10 transition-all duration-700"></div>
+
+                  {sessionHeatmap.volumes.size > 0 && (
+                    <div className={`relative z-10 w-full sm:hidden grid grid-cols-3 gap-x-3 gap-y-1 transition-all duration-300 ${isCollapsed ? 'grid-rows-[auto_auto]' : 'grid-rows-[auto_auto_1.75rem_1.75rem_1.75rem_1.75rem]'}`}>
+                      <div className="col-span-3 relative flex items-center justify-between gap-2 min-w-0">
+                        <h3
+                          className="text-base text-slate-200 tracking-tight truncate capitalize"
+                          style={FANCY_FONT}
+                          title={session.title}
+                        >
+                          {session.title}
+                        </h3>
+                        {session.totalPRs > 0 && (
+                          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 text-[10px] font-bold flex-shrink-0">
+                            <Trophy className="w-3 h-3" />
+                            {session.totalPRs} PR{session.totalPRs > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          data-no-toggle
+                          onClick={() => {
+                            setCollapsedSessions((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(session.key)) next.delete(session.key);
+                              else next.add(session.key);
+                              return next;
+                            });
+                          }}
+                          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full shadow-lg flex items-center justify-center ${isLightMode ? 'bg-white/90 border-slate-300/80' : 'bg-black/75 border-slate-700/60'}`}
+                        >
+                          <ChevronRight
+                            className={`w-5 h-5 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'} ${isLightMode ? 'text-slate-700' : 'text-slate-200'}`}
+                            aria-hidden
+                          />
+                        </button>
+                      </div>
+
+                      <div className="col-span-3 flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="p-1.5 bg-blue-500/10 rounded-lg text-blue-400 flex-shrink-0">
+                            <Calendar className="w-4 h-4" />
+                          </div>
+                          <div className="text-[10px] text-slate-600 dark:text-slate-400 truncate">
+                            {session.date ? formatRelativeTime(session.date, effectiveNow) : '—'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {isCollapsed && (
+                        <div className="col-span-3" />
+                      )}
+
+                      {!isCollapsed && (
+                        <>
+                          <div className={`col-span-1 row-start-3 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 min-w-0 transition-all duration-300`}>
+                            <Clock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 flex-shrink-0" aria-hidden />
+                            <span className="truncate">
+                              {(() => {
+                                const d = session.date ?? parseHevyDateString(String(session.startTime ?? ''));
+                                return d ? format(d, 'h:mm a') : '—';
+                              })()}
+                            </span>
+                          </div>
+
+                          <div className={`col-span-1 row-start-4 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap transition-all duration-300`}>
+                            <Hash className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden />
+                            <span>{session.totalSets} Sets</span>
+                          </div>
+
+                          <div className={`col-span-1 row-start-5 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap transition-all duration-300`}>
+                            <Dumbbell className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden />
+                            <span>{exerciseCount} Exercise{exerciseCount === 1 ? '' : 's'}</span>
+                          </div>
+
+
+                          <div className={`col-span-1 row-start-6 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap transition-all duration-300`}>
+                            <Timer className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden />
+                            <span>{sessionDurationText ?? '—'}</span>
+                          </div>
+
+                          <div
+                            data-no-toggle
+                            className={`col-start-2 col-span-2 row-start-3 row-span-5 flex items-stretch pl-2 border-l border-slate-800/50 overflow-visible transition-all duration-300`}
+                          >
+                            <div className="w-full h-full flex items-center justify-center overflow-visible">
+                              <div className="w-full h-full overflow-visible">
+                                <BodyMap
+                                  onPartClick={() => { }}
+                                  selectedPart={null}
+                                  muscleVolumes={sessionHeadlessVolumes}
+                                  maxVolume={sessionHeadlessMaxVolume}
+                                  compact
+                                  compactFill
+                                  interactive
+                                  gender={bodyMapGender}
+                                  viewMode="headless"
+                                  onPartHover={(muscleId, ev) => {
+                                    if (!muscleId || !ev) {
+                                      setTooltip(null);
+                                      return;
+                                    }
+                                    const hoveredEl = (ev.target as Element | null)?.closest('g[id]');
+                                    const rect = hoveredEl?.getBoundingClientRect();
+                                    if (!rect) return;
+                                    const label = (HEADLESS_MUSCLE_NAMES as any)[muscleId] || muscleId;
+                                    const sets = sessionHeadlessVolumes.get(muscleId) || 0;
+                                    const setsText = Number.isInteger(sets) ? `${sets}` : `${sets.toFixed(1)}`;
+                                    setTooltip({ rect, title: label, body: `${setsText} sets`, status: 'info' });
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <div className={sessionHeatmap.volumes.size > 0 ? "relative z-10 hidden sm:flex flex-1 min-w-0 flex-col justify-between gap-2 md:gap-3" : "relative z-10 flex flex-1 min-w-0 flex-col justify-between gap-2 md:gap-3"}>
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="p-1.5 sm:p-2 bg-blue-500/10 rounded-lg text-blue-400 flex-shrink-0">
+                        <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </div>
                       <h3
-                        className="text-base text-slate-200 tracking-tight truncate capitalize"
+                        className="text-lg sm:text-2xl md:text-3xl text-slate-200 tracking-tight truncate capitalize"
                         style={FANCY_FONT}
                         title={session.title}
                       >
@@ -472,84 +596,68 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                           {session.totalPRs} PR{session.totalPRs > 1 ? 's' : ''}
                         </span>
                       )}
-                      <button
-                        type="button"
-                        data-no-toggle
-                        onClick={() => {
-                        setCollapsedSessions((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(session.key)) next.delete(session.key);
-                          else next.add(session.key);
-                          return next;
-                        });
-                      }}
-                        className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full shadow-lg flex items-center justify-center ${isLightMode ? 'bg-white/90 border-slate-300/80' : 'bg-black/75 border-slate-700/60'}`}
-                      >
-                        <ChevronRight
-                          className={`w-5 h-5 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'} ${isLightMode ? 'text-slate-700' : 'text-slate-200'}`}
-                          aria-hidden
-                        />
-                      </button>
                     </div>
 
-                    <div className="col-span-3 flex items-center gap-2 min-w-0">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div className="p-1.5 bg-blue-500/10 rounded-lg text-blue-400 flex-shrink-0">
-                          <Calendar className="w-4 h-4" />
-                        </div>
-                        <div className="text-[10px] text-slate-600 dark:text-slate-400 truncate">
-                          {session.date ? formatRelativeTime(session.date, effectiveNow) : '—'}
-                        </div>
-                      </div>
+                    <div className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 pl-1">
+                      {session.date ? formatRelativeTime(session.date, effectiveNow) : session.startTime}
                     </div>
 
-                    {isCollapsed && (
-                      <div className="col-span-3" />
-                    )}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-x-4 text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 pl-1 min-w-0">
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                        <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400" aria-hidden />
+                        <span>{session.totalSets} Sets</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                        <Dumbbell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400" aria-hidden />
+                        <span>{exerciseCount} Exercise{exerciseCount === 1 ? '' : 's'}</span>
+                      </span>
+                      {sessionDurationText && (
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                          <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400" aria-hidden />
+                          <span>{sessionDurationText}</span>
+                        </span>
+                      )}
 
-                    {!isCollapsed && (
-                      <>
-                    <div className={`col-span-1 row-start-3 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 min-w-0 transition-all duration-300`}>
-                      <Clock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 flex-shrink-0" aria-hidden />
-                      <span className="truncate">
-                        {(() => {
-                          const d = session.date ?? parseHevyDateString(String(session.startTime ?? ''));
-                          return d ? format(d, 'h:mm a') : '—';
-                        })()}
+                      <span className="flex items-baseline min-w-0">
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap min-w-0 truncate">
+                          <Weight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" aria-hidden />
+                          <span>{formatDisplayVolume(session.totalVolume, weightUnit as WeightUnit, { round: 'int' })} {weightUnit}</span>
+                        </span>
+                        {prevSession && (
+                          <span className="flex-none overflow-visible hidden sm:block">
+                            <SessionDeltaBadge
+                              current={session.totalVolume}
+                              previous={prevSession.totalVolume}
+                              label="volume"
+                              context="vs lst"
+                            />
+                          </span>
+                        )}
                       </span>
                     </div>
+                  </div>
 
-                    <div className={`col-span-1 row-start-4 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap transition-all duration-300`}>
-                      <Hash className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden />
-                      <span>{session.totalSets} Sets</span>
-                    </div>
+                  <div className={sessionHeatmap.volumes.size > 0 ? "hidden sm:flex items-center justify-center px-2 text-black dark:text-slate-300" : "flex items-center justify-center px-2 text-black dark:text-slate-300"}>
+                    <ChevronRight
+                      className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
+                      aria-hidden
+                    />
+                  </div>
 
-                    <div className={`col-span-1 row-start-5 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap transition-all duration-300`}>
-                      <Dumbbell className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden />
-                      <span>{exerciseCount} Exercise{exerciseCount === 1 ? '' : 's'}</span>
-                    </div>
-
-                    
-                    <div className={`col-span-1 row-start-6 h-7 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap transition-all duration-300`}>
-                      <Timer className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" aria-hidden />
-                      <span>{sessionDurationText ?? '—'}</span>
-                    </div>
-
-                    <div
-                      data-no-toggle
-                      className={`col-start-2 col-span-2 row-start-3 row-span-5 flex items-stretch pl-2 border-l border-slate-800/50 overflow-visible transition-all duration-300`}
-                    >
-                      <div className="w-full h-full flex items-center justify-center overflow-visible">
-                        <div className="w-full h-full overflow-visible">
+                  {sessionHeatmap.volumes.size > 0 && (
+                    <div data-no-toggle className="hidden sm:flex relative z-10 flex-shrink-0 items-stretch pl-1 sm:pl-4 py-1 sm:py-2 border-l border-slate-800/50 self-stretch overflow-visible">
+                      <div className="w-[50vw] h-[30vh] sm:w-32 sm:h-28 md:w-60 md:h-36 md:-mr-6 flex items-center justify-center overflow-visible">
+                        <div className="w-full h-full md:scale-[1.25] origin-center overflow-visible">
                           <BodyMap
-                            onPartClick={() => {}}
+                            onPartClick={() => { }}
                             selectedPart={null}
-                            muscleVolumes={sessionHeatmap.volumes}
-                            maxVolume={sessionHeatmap.maxVolume}
+                            muscleVolumes={sessionHeadlessVolumes}
+                            maxVolume={sessionHeadlessMaxVolume}
                             compact
                             compactFill
                             interactive
                             gender={bodyMapGender}
+                            viewMode="headless"
                             onPartHover={(muscleId, ev) => {
                               if (!muscleId || !ev) {
                                 setTooltip(null);
@@ -558,8 +666,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                               const hoveredEl = (ev.target as Element | null)?.closest('g[id]');
                               const rect = hoveredEl?.getBoundingClientRect();
                               if (!rect) return;
-                              const label = SVG_MUSCLE_NAMES[muscleId] || muscleId;
-                              const sets = sessionAggregated.get(label) || 0;
+                              const label = (HEADLESS_MUSCLE_NAMES as any)[muscleId] || muscleId;
+                              const sets = sessionHeadlessVolumes.get(muscleId) || 0;
                               const setsText = Number.isInteger(sets) ? `${sets}` : `${sets.toFixed(1)}`;
                               setTooltip({ rect, title: label, body: `${setsText} sets`, status: 'info' });
                             }}
@@ -567,456 +675,359 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                         </div>
                       </div>
                     </div>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                <div className={sessionHeatmap.volumes.size > 0 ? "relative z-10 hidden sm:flex flex-1 min-w-0 flex-col justify-between gap-2 md:gap-3" : "relative z-10 flex flex-1 min-w-0 flex-col justify-between gap-2 md:gap-3"}>
-                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                    <div className="p-1.5 sm:p-2 bg-blue-500/10 rounded-lg text-blue-400 flex-shrink-0">
-                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </div>
-                    <h3
-                      className="text-lg sm:text-2xl md:text-3xl text-slate-200 tracking-tight truncate capitalize"
-                      style={FANCY_FONT}
-                      title={session.title}
-                    >
-                      {session.title}
-                    </h3>
-                    {session.totalPRs > 0 && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 text-[10px] font-bold flex-shrink-0">
-                        <Trophy className="w-3 h-3" />
-                        {session.totalPRs} PR{session.totalPRs > 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 pl-1">
-                    {session.date ? formatRelativeTime(session.date, effectiveNow) : session.startTime}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-x-4 text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-400 pl-1 min-w-0">
-                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <Hash className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400" aria-hidden />
-                      <span>{session.totalSets} Sets</span>
-                    </span>
-                    <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                      <Dumbbell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400" aria-hidden />
-                      <span>{exerciseCount} Exercise{exerciseCount === 1 ? '' : 's'}</span>
-                    </span>
-                    {sessionDurationText && (
-                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                        <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400" aria-hidden />
-                        <span>{sessionDurationText}</span>
-                      </span>
-                    )}
-
-                    <span className="flex items-baseline min-w-0">
-                      <span className="inline-flex items-center gap-1 whitespace-nowrap min-w-0 truncate">
-                        <Weight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" aria-hidden />
-                        <span>{formatDisplayVolume(session.totalVolume, weightUnit as WeightUnit, { round: 'int' })} {weightUnit}</span>
-                      </span>
-                      {prevSession && (
-                        <span className="flex-none overflow-visible hidden sm:block">
-                          <SessionDeltaBadge
-                            current={session.totalVolume}
-                            previous={prevSession.totalVolume}
-                            label="volume"
-                            context="vs lst"
-                          />
-                        </span>
-                      )}
-                    </span>
-                  </div>
+                  )}
                 </div>
 
-                <div className={sessionHeatmap.volumes.size > 0 ? "hidden sm:flex items-center justify-center px-2 text-black dark:text-slate-300" : "flex items-center justify-center px-2 text-black dark:text-slate-300"}>
-                  <ChevronRight
-                    className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
-                    aria-hidden
-                  />
-                </div>
+                {/* --- Exercises Grid --- */}
+                {!isCollapsed && (
+                  <div className="grid grid-cols-1 gap-2 sm:gap-2 animate-in fade-in duration-300">
+                    {session.exercises.map((group, idx) => {
+                      const insights = analyzeSetProgression(group.sets);
+                      const macroInsight = analyzeProgression(group.sets);
 
-                {sessionHeatmap.volumes.size > 0 && (
-                  <div data-no-toggle className="hidden sm:flex relative z-10 flex-shrink-0 items-stretch pl-1 sm:pl-4 py-1 sm:py-2 border-l border-slate-800/50 self-stretch overflow-visible">
-                    <div className="w-[50vw] h-[30vh] sm:w-32 sm:h-28 md:w-60 md:h-36 md:-mr-6 flex items-center justify-center overflow-visible">
-                      <div className="w-full h-full md:scale-[1.25] origin-center overflow-visible">
-                        <BodyMap
-                          onPartClick={() => {}}
-                          selectedPart={null}
-                          muscleVolumes={sessionHeatmap.volumes}
-                          maxVolume={sessionHeatmap.maxVolume}
-                          compact
-                          compactFill
-                          interactive
-                          gender={bodyMapGender}
-                          onPartHover={(muscleId, ev) => {
-                            if (!muscleId || !ev) {
-                              setTooltip(null);
-                              return;
-                            }
-                            const hoveredEl = (ev.target as Element | null)?.closest('g[id]');
-                            const rect = hoveredEl?.getBoundingClientRect();
-                            if (!rect) return;
-                            const label = SVG_MUSCLE_NAMES[muscleId] || muscleId;
-                            const sets = sessionAggregated.get(label) || 0;
-                            const setsText = Number.isInteger(sets) ? `${sets}` : `${sets.toFixed(1)}`;
-                            setTooltip({ rect, title: label, body: `${setsText} sets`, status: 'info' });
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+                      // Get exercise best weight and check for PRs / Volume PRs in this session
+                      const exerciseBest = currentBests.get(group.exerciseName) || 0;
+                      const prEventsForSession = (exerciseBests.get(group.exerciseName) || []).filter((e) => e.sessionKey === session.key);
 
-              {/* --- Exercises Grid --- */}
-              {!isCollapsed && (
-              <div className="grid grid-cols-1 gap-2 sm:gap-2 animate-in fade-in duration-300">
-                {session.exercises.map((group, idx) => {
-                  const insights = analyzeSetProgression(group.sets);
-                  const macroInsight = analyzeProgression(group.sets);
-                  
-                  // Get exercise best weight and check for PRs / Volume PRs in this session
-                  const exerciseBest = currentBests.get(group.exerciseName) || 0;
-                  const prEventsForSession = (exerciseBests.get(group.exerciseName) || []).filter((e) => e.sessionKey === session.key);
+                      const volPrEventsForSession = (exerciseVolumePrBests.get(group.exerciseName) || []).filter((e) => e.sessionKey === session.key);
+                      const volPrEvent = volPrEventsForSession.reduce(
+                        (best, e) => (!best || e.volume > best.volume ? e : best),
+                        null as (typeof volPrEventsForSession)[number] | null
+                      );
 
-                  const volPrEventsForSession = (exerciseVolumePrBests.get(group.exerciseName) || []).filter((e) => e.sessionKey === session.key);
-                  const volPrEvent = volPrEventsForSession.reduce(
-                    (best, e) => (!best || e.volume > best.volume ? e : best),
-                    null as (typeof volPrEventsForSession)[number] | null
-                  );
-                  
-                  // Get volume trend for sparkline (last 6 sessions, reversed for chronological order)
-                  const volHistory = exerciseVolumeHistory.get(group.exerciseName) || [];
-                  const sparklineData = volHistory.slice(0, 6).map(v => v.volume).reverse();
+                      // Get volume trend for sparkline (last 6 sessions, reversed for chronological order)
+                      const volHistory = exerciseVolumeHistory.get(group.exerciseName) || [];
+                      const sparklineData = volHistory.slice(0, 6).map(v => v.volume).reverse();
 
-                  const volPrAnchorIndex = (() => {
-                    if (!volPrEvent) return -1;
+                      const volPrAnchorIndex = (() => {
+                        if (!volPrEvent) return -1;
 
-                    const idx = group.sets.findIndex(
-                      (s) =>
-                        !isWarmupSet(s) &&
-                        s.set_index === volPrEvent.setIndex &&
-                        s.weight_kg === volPrEvent.weight &&
-                        s.reps === volPrEvent.reps
-                    );
-                    if (idx >= 0) return idx;
+                        const idx = group.sets.findIndex(
+                          (s) =>
+                            !isWarmupSet(s) &&
+                            s.set_index === volPrEvent.setIndex &&
+                            s.weight_kg === volPrEvent.weight &&
+                            s.reps === volPrEvent.reps
+                        );
+                        if (idx >= 0) return idx;
 
-                    // Fallback: anchor to the highest-volume working set within this session.
-                    let bestIdx = -1;
-                    let bestVol = -Infinity;
-                    for (let i = 0; i < group.sets.length; i++) {
-                      const s = group.sets[i];
-                      if (isWarmupSet(s)) continue;
-                      const v = (s.weight_kg || 0) * (s.reps || 0);
-                      if (v > bestVol) {
-                        bestVol = v;
-                        bestIdx = i;
-                      }
-                    }
-                    return bestIdx;
-                  })();
-
-                  return (
-                    <LazyRender
-                      key={`${session.key}:${group.exerciseName}`}
-                      className="w-full"
-                      placeholder={<HistoryCardSkeleton minHeight={260} />}
-                      rootMargin="400px 0px"
-                    >
-                    <div className="bg-black/70 border border-slate-700/50 rounded-2xl p-4 sm:p-5 transition-all flex flex-col h-full">
-                      
-                      {/* Exercise Title with thumbnail */}
-                      <div
-                        className="grid grid-cols-[2.5rem_1fr] grid-rows-2 gap-x-3 gap-y-1 mb-4 cursor-pointer select-none sm:flex sm:items-center sm:gap-3"
-                        onClick={() => onExerciseClick?.(group.exerciseName)}
-                        title="Open exercise details"
-                      >
-                        {(() => {
-                          const asset = assetsMap?.get(group.exerciseName);
-                          if (asset && (asset.thumbnail || asset.source)) {
-                            return (
-                              <img
-                                src={asset.thumbnail || asset.source}
-                                alt=""
-                                className="w-10 h-10 rounded object-cover flex-shrink-0 row-span-2 bg-white"
-                                loading="lazy"
-                                decoding="async"
-                              />
-                            );
+                        // Fallback: anchor to the highest-volume working set within this session.
+                        let bestIdx = -1;
+                        let bestVol = -Infinity;
+                        for (let i = 0; i < group.sets.length; i++) {
+                          const s = group.sets[i];
+                          if (isWarmupSet(s)) continue;
+                          const v = (s.weight_kg || 0) * (s.reps || 0);
+                          if (v > bestVol) {
+                            bestVol = v;
+                            bestIdx = i;
                           }
-                          return (
-                            <div className="w-10 h-10 rounded bg-black/50 row-span-2" />
-                          );
-                        })()}
+                        }
+                        return bestIdx;
+                      })();
 
-                        <div className="flex items-center gap-2 min-w-0 col-start-2 row-start-1">
-                          <h4
-                            className="text-slate-200 text-sm sm:text-lg line-clamp-1 min-w-0 flex-1"
-                            style={FANCY_FONT}
-                            title={group.exerciseName}
-                          >
-                            {group.exerciseName}
-                          </h4>
+                      return (
+                        <LazyRender
+                          key={`${session.key}:${group.exerciseName}`}
+                          className="w-full"
+                          placeholder={<HistoryCardSkeleton minHeight={260} />}
+                          rootMargin="400px 0px"
+                        >
+                          <div className="bg-black/70 border border-slate-700/50 rounded-2xl p-4 sm:p-5 transition-all flex flex-col h-full">
 
-                          {/* Macro Badge (Promotion) */}
-                          {macroInsight && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleTooltipToggle(e, macroInsight, 'macro')}
-                              onMouseEnter={(e) => handleMouseEnter(e, macroInsight, 'macro')}
-                              onMouseLeave={() => setTooltip(null)}
-                              className={`p-1.5 rounded-lg cursor-help flex-shrink-0 ${getWisdomColor(macroInsight.type)} animate-in zoom-in duration-300`}
-                              aria-label={macroInsight.message}
+                            {/* Exercise Title with thumbnail */}
+                            <div
+                              className="grid grid-cols-[2.5rem_1fr] grid-rows-2 gap-x-3 gap-y-1 mb-4 cursor-pointer select-none sm:flex sm:items-center sm:gap-3"
+                              onClick={() => onExerciseClick?.(group.exerciseName)}
+                              title="Open exercise details"
                             >
-                              <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                            </button>
-                          )}
-                        </div>
+                              {(() => {
+                                const asset = assetsMap?.get(group.exerciseName);
+                                if (asset && (asset.thumbnail || asset.source)) {
+                                  return (
+                                    <img
+                                      src={asset.thumbnail || asset.source}
+                                      alt=""
+                                      className="w-10 h-10 rounded object-cover flex-shrink-0 row-span-2 bg-white"
+                                      loading="lazy"
+                                      decoding="async"
+                                    />
+                                  );
+                                }
+                                return (
+                                  <div className="w-10 h-10 rounded bg-black/50 row-span-2" />
+                                );
+                              })()}
 
-                        {/* Stats: placed after name, slightly larger */}
-                        <div className="min-w-0 col-start-2 row-start-2 sm:flex-1">
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-sm text-slate-400 overflow-visible">
-                            {sparklineData.length >= 2 && (
-                              <span className="inline-flex items-center opacity-70 pr-1" title="Volume trend (last 6 sessions)">
-                                <Sparkline data={sparklineData} width={62} height={20} />
-                              </span>
-                            )}
-                            <span className="text-slate-300">
-                              PR: <span className="font-semibold">{convertWeight(exerciseBest, weightUnit)}{weightUnit}</span>
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                              <div className="flex items-center gap-2 min-w-0 col-start-2 row-start-1">
+                                <h4
+                                  className="text-slate-200 text-sm sm:text-lg line-clamp-1 min-w-0 flex-1"
+                                  style={FANCY_FONT}
+                                  title={group.exerciseName}
+                                >
+                                  {group.exerciseName}
+                                </h4>
 
-                      {/* Main content: Sets on left, Muscle map on right */}
-                      <div className="flex gap-4 flex-1 items-stretch">
-                        {/* Sets Timeline */}
-                        <div className="relative flex-1 min-w-0 flex flex-col justify-center gap-2">
-                        {(() => {
-                          // Count working sets for proper numbering (warmup = W, working = 1,2,3...)
-                          let workingSetNumber = 0;
-                          return group.sets.map((set, sIdx) => {
-                          // Get set type configuration for display
-                          const setConfig = getSetTypeConfig(set);
-                          // Check if this is a warmup set (based on set_type field only)
-                          const isWarmup = isWarmupSet(set);
-                          // Check if this is a working set (counts toward numbering)
-                          const isWorking = isWorkingSet(set);
-                          // Track working set number for display
-                          if (isWorking) workingSetNumber++;
-                          // Only show insights for working sets (insights array is for working sets only)
-                          const workingSetIdx = group.sets.slice(0, sIdx).filter(s => isWorkingSet(s)).length;
-                          const insight = isWorking && workingSetIdx > 0 ? insights[workingSetIdx - 1] : undefined;
-                          
-                          // Determine row color based on status or PR
-                          let rowStatusClass = "border-transparent";
-                          let dotClass = "bg-black/50 border-slate-700";
-                          let isPrRow = false;
-
-                          const prDelta = (() => {
-                            if (!set.isPr || !set.parsedDate) return 0;
-                            const ev = prEventsForSession.find(
-                              (p) => p.date.getTime() === set.parsedDate!.getTime() && p.weight === set.weight_kg
-                            );
-                            if (!ev) return 0;
-                            const deltaKg = set.weight_kg - ev.previousBest;
-                            return deltaKg > 0 ? deltaKg : 0;
-                          })();
-                          
-                          // PR takes priority for color (show even for warmup - user may have mislabeled)
-                          if (set.isPr) {
-                              isPrRow = true;
-                              rowStatusClass = "border-yellow-500/30";
-                              dotClass = "bg-yellow-500 border-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.5)]";
-                          } 
-                          // If no PR, check insights (only for working sets)
-                          else if (insight?.status === 'danger') {
-                              rowStatusClass = "bg-rose-500/5 border-rose-500/20";
-                              dotClass = "bg-rose-500 border-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.4)]";
-                          } else if (insight?.status === 'success') {
-                              rowStatusClass = "bg-emerald-500/5 border-emerald-500/20";
-                              dotClass = "bg-emerald-500 border-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]";
-                          } else if (insight?.status === 'warning') {
-                              rowStatusClass = "bg-orange-500/5 border-orange-500/20";
-                              dotClass = "bg-orange-500 border-orange-400";
-                          }
-
-                          // PR row shimmer style
-                          const prShimmerStyle: React.CSSProperties = isPrRow ? {
-                            background: 'linear-gradient(90deg, transparent 0%, rgba(234,179,8,0.08) 25%, rgba(234,179,8,0.15) 50%, rgba(234,179,8,0.08) 75%, transparent 100%)',
-                            backgroundSize: '200% 100%',
-                            animation: 'prRowShimmer 3s ease-in-out infinite',
-                          } : {};
-
-                          return (
-                            <div 
-                              key={sIdx} 
-                              className={`relative z-10 flex items-center gap-2 sm:gap-3 p-1.5 sm:p-2 rounded-lg border ${rowStatusClass} transition-all hover:bg-black/60 group overflow-visible`}
-                              style={prShimmerStyle}
-                            >
-                              {/* Set Number Bubble - Shows set type letter or working set number */}
-                              {/* For special set types (warmup, left, right, etc.), show the letter indicator */}
-                              {/* For normal working sets, show the set number (1, 2, 3...) */}
-                              <div 
-                                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold border-2 transition-all text-white ${
-                                  set.isPr 
-                                    ? dotClass  // PR styling takes priority
-                                    : isWorking && !setConfig.shortLabel
-                                      ? dotClass  // Normal working set
-                                      : `${setConfig.bgColor} ${setConfig.borderColor}`  // Special set type color
-                                }`}
-                                title={setConfig.description}
-                              >
-                                {/* Show letter for special sets, number for normal working sets */}
-                                {setConfig.shortLabel || (isWorking ? workingSetNumber : '?')}
+                                {/* Macro Badge (Promotion) */}
+                                {macroInsight && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleTooltipToggle(e, macroInsight, 'macro')}
+                                    onMouseEnter={(e) => handleMouseEnter(e, macroInsight, 'macro')}
+                                    onMouseLeave={() => setTooltip(null)}
+                                    className={`p-1.5 rounded-lg cursor-help flex-shrink-0 ${getWisdomColor(macroInsight.type)} animate-in zoom-in duration-300`}
+                                    aria-label={macroInsight.message}
+                                  >
+                                    <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                  </button>
+                                )}
                               </div>
 
-                              {/* Set Data */}
-                              <div className="flex-1 flex justify-between items-center min-w-0">
-                                <div className="flex items-baseline gap-0.5 sm:gap-1 min-w-0">
-                                  <span className="text-[clamp(12px,4.2vw,20px)] font-bold text-white tabular-nums tracking-tight">
-                                    {convertWeight(set.weight_kg, weightUnit)}
-                                  </span>
-                                  <span className="text-[10px] sm:text-xs text-slate-500 font-medium">{weightUnit}</span>
-                                  <span className="text-slate-700 mx-0.5 sm:mx-1">×</span>
-                                  <span className="text-[clamp(12px,4.2vw,20px)] font-bold text-slate-200 tabular-nums tracking-tight">
-                                    {set.reps}
-                                  </span>
-                                  <span className="text-[10px] sm:text-xs text-slate-500 font-medium">reps</span>
-                                </div>
-
-                                {/* Right side: PR badge + Insight indicator */}
-                                <div className="flex items-center gap-1 sm:gap-2 flex-none pl-2">
-                                  {/* PR INDICATOR - positioned before tooltip */}
-                                  {(set.isPr || (volPrEvent && sIdx === volPrAnchorIndex)) && (
-                                    <span className="flex items-center gap-1 px-1 py-0.5 bg-amber-200/70 text-yellow-300 dark:bg-yellow-500/10 dark:text-yellow-400 rounded text-[7px] sm:text-[9px] font-bold uppercase tracking-wider border border-amber-300/80 dark:border-yellow-500/20 animate-pulse whitespace-nowrap leading-none">
-                                      <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-none" />
-
-                                      {set.isPr && (
-                                        <span className="inline-flex items-center leading-none">
-                                          <span>PR</span>
-                                          {prDelta > 0 && (
-                                            <span className="ml-0.5 text-[5px] sm:text-[8px] font-extrabold text-yellow-500 leading-none">
-                                              {formatSignedNumber(convertWeight(prDelta, weightUnit), { maxDecimals: 2 })}{weightUnit}
-                                            </span>
-                                          )}
-                                        </span>
-                                      )}
-
-                                      {volPrEvent && sIdx === volPrAnchorIndex && (
-                                        <span
-                                          className="inline-flex items-center leading-none"
-                                          title="Volume PR (best-ever single-set volume)"
-                                          aria-label="Volume PR (best-ever single-set volume)"
-                                        >
-                                          {set.isPr && <span className="hidden sm:inline text-slate-600 dark:text-slate-300 mx-1">·</span>}
-                                          <span>Vol PR</span>
-                                          {volPrEvent.previousBest > 0 && (
-                                            <span className="ml-0.5 text-[5px] sm:text-[8px] font-extrabold text-yellow-500 dark:text-yellow-300 leading-none">
-                                              {formatSignedNumber(((volPrEvent.volume - volPrEvent.previousBest) / volPrEvent.previousBest) * 100, { maxDecimals: 0 })}%
-                                            </span>
-                                          )}
-                                        </span>
-                                      )}
+                              {/* Stats: placed after name, slightly larger */}
+                              <div className="min-w-0 col-start-2 row-start-2 sm:flex-1">
+                                <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-sm text-slate-400 overflow-visible">
+                                  {sparklineData.length >= 2 && (
+                                    <span className="inline-flex items-center opacity-70 pr-1" title="Volume trend (last 6 sessions)">
+                                      <Sparkline data={sparklineData} width={62} height={20} />
                                     </span>
                                   )}
-                                  
-                                  {/* Insight Indicator */}
-                                  {insight && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => handleTooltipToggle(e, insight, 'set')}
-                                      onMouseEnter={(e) => handleMouseEnter(e, insight, 'set')}
-                                      onMouseLeave={() => setTooltip(null)}
-                                      className="cursor-help flex items-center justify-center w-6 h-6 rounded hover:bg-black/60 transition-colors"
-                                      aria-label={insight.shortMessage}
-                                    >
-                                      {insight.status === 'danger' && <AlertTriangle className="w-4 h-4 text-rose-500" />}
-                                      {insight.status === 'success' && <TrendingUp className="w-4 h-4 text-emerald-500" />}
-                                      {insight.status === 'warning' && <TrendingDown className="w-4 h-4 text-amber-500" />}
-                                      {insight.status === 'info' && <Info className="w-4 h-4 text-blue-500" />}
-                                    </button>
-                                  )}
+                                  <span className="text-slate-300">
+                                    PR: <span className="font-semibold">{convertWeight(exerciseBest, weightUnit)}{weightUnit}</span>
+                                  </span>
                                 </div>
                               </div>
                             </div>
-                          );
-                        })})()}
-                        </div>
 
-                        {/* Muscle Heat Map - Right Side */}
-                        {(() => {
-                          const exData = lookupExerciseMuscleData(group.exerciseName, exerciseMuscleData);
-                          const { volumes, maxVolume } = buildExerciseMuscleHeatmap(group.sets, exData);
-                          
-                          // Aggregate by display name
-                          const aggregated = new Map<string, { sets: number }>();
-                          volumes.forEach((sets, svgId) => {
-                            const label = SVG_MUSCLE_NAMES[svgId] || svgId;
-                            const prev = aggregated.get(label);
-                            if (!prev || sets > prev.sets) {
-                              aggregated.set(label, { sets });
-                            }
-                          });
+                            {/* Main content: Sets on left, Muscle map on right */}
+                            <div className="flex gap-4 flex-1 items-stretch">
+                              {/* Sets Timeline */}
+                              <div className="relative flex-1 min-w-0 flex flex-col justify-center gap-2">
+                                {(() => {
+                                  // Count working sets for proper numbering (warmup = W, working = 1,2,3...)
+                                  let workingSetNumber = 0;
+                                  return group.sets.map((set, sIdx) => {
+                                    // Get set type configuration for display
+                                    const setConfig = getSetTypeConfig(set);
+                                    // Check if this is a warmup set (based on set_type field only)
+                                    const isWarmup = isWarmupSet(set);
+                                    // Check if this is a working set (counts toward numbering)
+                                    const isWorking = isWorkingSet(set);
+                                    // Track working set number for display
+                                    if (isWorking) workingSetNumber++;
+                                    // Only show insights for working sets (insights array is for working sets only)
+                                    const workingSetIdx = group.sets.slice(0, sIdx).filter(s => isWorkingSet(s)).length;
+                                    const insight = isWorking && workingSetIdx > 0 ? insights[workingSetIdx - 1] : undefined;
 
-                          const primaryTargets: Array<{ label: string; sets: number }> = [];
-                          const secondaryTargets: Array<{ label: string; sets: number }> = [];
+                                    // Determine row color based on status or PR
+                                    let rowStatusClass = "border-transparent";
+                                    let dotClass = "bg-black/50 border-slate-700";
+                                    let isPrRow = false;
 
-                          for (const [label, { sets }] of aggregated.entries()) {
-                            if (sets >= 1) primaryTargets.push({ label, sets });
-                            else secondaryTargets.push({ label, sets });
-                          }
+                                    const prDelta = (() => {
+                                      if (!set.isPr || !set.parsedDate) return 0;
+                                      const ev = prEventsForSession.find(
+                                        (p) => p.date.getTime() === set.parsedDate!.getTime() && p.weight === set.weight_kg
+                                      );
+                                      if (!ev) return 0;
+                                      const deltaKg = set.weight_kg - ev.previousBest;
+                                      return deltaKg > 0 ? deltaKg : 0;
+                                    })();
 
-                          primaryTargets.sort((a, b) => a.label.localeCompare(b.label));
-                          secondaryTargets.sort((a, b) => a.label.localeCompare(b.label));
-
-                          const getTargetTextColor = (sets: number, maxSets: number): string => {
-                            const ratio = sets / Math.max(maxSets, 1);
-                            return ratio >= 0.55 ? '#ffffff' : '#0f172a';
-                          };
-
-                          if (volumes.size === 0) return null;
-
-                          return (
-                            <div className="hidden sm:flex flex-col flex-shrink-0 pl-3 py-2 border-l border-slate-800/50 self-stretch">
-                              <div className="flex-1 w-52 md:w-60 flex items-center justify-center">
-                                <BodyMap
-                                  onPartClick={() => {}}
-                                  selectedPart={null}
-                                  muscleVolumes={volumes}
-                                  maxVolume={maxVolume}
-                                  compact
-                                  compactFill
-                                  interactive
-                                  gender={bodyMapGender}
-                                  onPartHover={(muscleId, ev) => {
-                                    if (!muscleId || !ev) {
-                                      setTooltip(null);
-                                      return;
+                                    // PR takes priority for color (show even for warmup - user may have mislabeled)
+                                    if (set.isPr) {
+                                      isPrRow = true;
+                                      rowStatusClass = "border-yellow-500/30";
+                                      dotClass = "bg-yellow-500 border-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.5)]";
                                     }
-                                    const hoveredEl = (ev.target as Element | null)?.closest('g[id]');
-                                    const rect = hoveredEl?.getBoundingClientRect();
-                                    if (!rect) return;
-                                    const label = SVG_MUSCLE_NAMES[muscleId] || muscleId;
-                                    const sets = aggregated.get(label)?.sets || 0;
-                                    const setsText = Number.isInteger(sets) ? `${sets}` : `${sets.toFixed(1)}`;
-                                    setTooltip({ rect, title: label, body: `${setsText} sets`, status: 'info' });
-                                  }}
-                                />
+                                    // If no PR, check insights (only for working sets)
+                                    else if (insight?.status === 'danger') {
+                                      rowStatusClass = "bg-rose-500/5 border-rose-500/20";
+                                      dotClass = "bg-rose-500 border-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.4)]";
+                                    } else if (insight?.status === 'success') {
+                                      rowStatusClass = "bg-emerald-500/5 border-emerald-500/20";
+                                      dotClass = "bg-emerald-500 border-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]";
+                                    } else if (insight?.status === 'warning') {
+                                      rowStatusClass = "bg-orange-500/5 border-orange-500/20";
+                                      dotClass = "bg-orange-500 border-orange-400";
+                                    }
+
+                                    // PR row shimmer style
+                                    const prShimmerStyle: React.CSSProperties = isPrRow ? {
+                                      background: 'linear-gradient(90deg, transparent 0%, rgba(234,179,8,0.08) 25%, rgba(234,179,8,0.15) 50%, rgba(234,179,8,0.08) 75%, transparent 100%)',
+                                      backgroundSize: '200% 100%',
+                                      animation: 'prRowShimmer 3s ease-in-out infinite',
+                                    } : {};
+
+                                    return (
+                                      <div
+                                        key={sIdx}
+                                        className={`relative z-10 flex items-center gap-2 sm:gap-3 p-1.5 sm:p-2 rounded-lg border ${rowStatusClass} transition-all hover:bg-black/60 group overflow-visible`}
+                                        style={prShimmerStyle}
+                                      >
+                                        {/* Set Number Bubble - Shows set type letter or working set number */}
+                                        {/* For special set types (warmup, left, right, etc.), show the letter indicator */}
+                                        {/* For normal working sets, show the set number (1, 2, 3...) */}
+                                        <div
+                                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold border-2 transition-all text-white ${set.isPr
+                                            ? dotClass  // PR styling takes priority
+                                            : isWorking && !setConfig.shortLabel
+                                              ? dotClass  // Normal working set
+                                              : `${setConfig.bgColor} ${setConfig.borderColor}`  // Special set type color
+                                            }`}
+                                          title={setConfig.description}
+                                        >
+                                          {/* Show letter for special sets, number for normal working sets */}
+                                          {setConfig.shortLabel || (isWorking ? workingSetNumber : '?')}
+                                        </div>
+
+                                        {/* Set Data */}
+                                        <div className="flex-1 flex justify-between items-center min-w-0">
+                                          <div className="flex items-baseline gap-0.5 sm:gap-1 min-w-0">
+                                            <span className="text-[clamp(12px,4.2vw,20px)] font-bold text-white tabular-nums tracking-tight">
+                                              {convertWeight(set.weight_kg, weightUnit)}
+                                            </span>
+                                            <span className="text-[10px] sm:text-xs text-slate-500 font-medium">{weightUnit}</span>
+                                            <span className="text-slate-700 mx-0.5 sm:mx-1">×</span>
+                                            <span className="text-[clamp(12px,4.2vw,20px)] font-bold text-slate-200 tabular-nums tracking-tight">
+                                              {set.reps}
+                                            </span>
+                                            <span className="text-[10px] sm:text-xs text-slate-500 font-medium">reps</span>
+                                          </div>
+
+                                          {/* Right side: PR badge + Insight indicator */}
+                                          <div className="flex items-center gap-1 sm:gap-2 flex-none pl-2">
+                                            {/* PR INDICATOR - positioned before tooltip */}
+                                            {(set.isPr || (volPrEvent && sIdx === volPrAnchorIndex)) && (
+                                              <span className="flex items-center gap-1 px-1 py-0.5 bg-amber-200/70 text-yellow-300 dark:bg-yellow-500/10 dark:text-yellow-400 rounded text-[7px] sm:text-[9px] font-bold uppercase tracking-wider border border-amber-300/80 dark:border-yellow-500/20 animate-pulse whitespace-nowrap leading-none">
+                                                <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-none" />
+
+                                                {set.isPr && (
+                                                  <span className="inline-flex items-center leading-none">
+                                                    <span>PR</span>
+                                                    {prDelta > 0 && (
+                                                      <span className="ml-0.5 text-[5px] sm:text-[8px] font-extrabold text-yellow-500 leading-none">
+                                                        {formatSignedNumber(convertWeight(prDelta, weightUnit), { maxDecimals: 2 })}{weightUnit}
+                                                      </span>
+                                                    )}
+                                                  </span>
+                                                )}
+
+                                                {volPrEvent && sIdx === volPrAnchorIndex && (
+                                                  <span
+                                                    className="inline-flex items-center leading-none"
+                                                    title="Volume PR (best-ever single-set volume)"
+                                                    aria-label="Volume PR (best-ever single-set volume)"
+                                                  >
+                                                    {set.isPr && <span className="hidden sm:inline text-slate-600 dark:text-slate-300 mx-1">·</span>}
+                                                    <span>Vol PR</span>
+                                                    {volPrEvent.previousBest > 0 && (
+                                                      <span className="ml-0.5 text-[5px] sm:text-[8px] font-extrabold text-yellow-500 dark:text-yellow-300 leading-none">
+                                                        {formatSignedNumber(((volPrEvent.volume - volPrEvent.previousBest) / volPrEvent.previousBest) * 100, { maxDecimals: 0 })}%
+                                                      </span>
+                                                    )}
+                                                  </span>
+                                                )}
+                                              </span>
+                                            )}
+
+                                            {/* Insight Indicator */}
+                                            {insight && (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => handleTooltipToggle(e, insight, 'set')}
+                                                onMouseEnter={(e) => handleMouseEnter(e, insight, 'set')}
+                                                onMouseLeave={() => setTooltip(null)}
+                                                className="cursor-help flex items-center justify-center w-6 h-6 rounded hover:bg-black/60 transition-colors"
+                                                aria-label={insight.shortMessage}
+                                              >
+                                                {insight.status === 'danger' && <AlertTriangle className="w-4 h-4 text-rose-500" />}
+                                                {insight.status === 'success' && <TrendingUp className="w-4 h-4 text-emerald-500" />}
+                                                {insight.status === 'warning' && <TrendingDown className="w-4 h-4 text-amber-500" />}
+                                                {insight.status === 'info' && <Info className="w-4 h-4 text-blue-500" />}
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                })()}
                               </div>
+
+                              {/* Muscle Heat Map - Right Side */}
+                              {(() => {
+                                const exData = lookupExerciseMuscleData(group.exerciseName, exerciseMuscleData);
+                                const { volumes, maxVolume } = buildExerciseMuscleHeatmap(group.sets, exData);
+
+                                const headlessVolumes = toHeadlessVolumeMap(volumes);
+                                const headlessMaxVolume = Math.max(1, ...Array.from(headlessVolumes.values()));
+
+                                // Aggregate by display name
+                                const aggregated = new Map<string, { sets: number }>();
+                                volumes.forEach((sets, svgId) => {
+                                  const label = SVG_MUSCLE_NAMES[svgId] || svgId;
+                                  const prev = aggregated.get(label);
+                                  if (!prev || sets > prev.sets) {
+                                    aggregated.set(label, { sets });
+                                  }
+                                });
+
+                                const primaryTargets: Array<{ label: string; sets: number }> = [];
+                                const secondaryTargets: Array<{ label: string; sets: number }> = [];
+
+                                for (const [label, { sets }] of aggregated.entries()) {
+                                  if (sets >= 1) primaryTargets.push({ label, sets });
+                                  else secondaryTargets.push({ label, sets });
+                                }
+
+                                primaryTargets.sort((a, b) => a.label.localeCompare(b.label));
+                                secondaryTargets.sort((a, b) => a.label.localeCompare(b.label));
+
+                                const getTargetTextColor = (sets: number, maxSets: number): string => {
+                                  const ratio = sets / Math.max(maxSets, 1);
+                                  return ratio >= 0.55 ? '#ffffff' : '#0f172a';
+                                };
+
+                                if (volumes.size === 0) return null;
+
+                                return (
+                                  <div className="hidden sm:flex flex-col flex-shrink-0 pl-3 py-2 border-l border-slate-800/50 self-stretch">
+                                    <div className="flex-1 w-52 md:w-60 flex items-center justify-center">
+                                      <BodyMap
+                                        onPartClick={() => { }}
+                                        selectedPart={null}
+                                        muscleVolumes={headlessVolumes}
+                                        maxVolume={headlessMaxVolume}
+                                        compact
+                                        compactFill
+                                        interactive
+                                        gender={bodyMapGender}
+                                        viewMode="headless"
+                                        onPartHover={(muscleId, ev) => {
+                                          if (!muscleId || !ev) {
+                                            setTooltip(null);
+                                            return;
+                                          }
+                                          const hoveredEl = (ev.target as Element | null)?.closest('g[id]');
+                                          const rect = hoveredEl?.getBoundingClientRect();
+                                          if (!rect) return;
+                                          const label = (HEADLESS_MUSCLE_NAMES as any)[muscleId] || muscleId;
+                                          const sets = headlessVolumes.get(muscleId) || 0;
+                                          const setsText = Number.isInteger(sets) ? `${sets}` : `${sets.toFixed(1)}`;
+                                          setTooltip({ rect, title: label, body: `${setsText} sets`, status: 'info' });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                    </LazyRender>
-                  );
-                })}
-              </div>
-              )}
+                          </div>
+                        </LazyRender>
+                      );
+                    })}
+                  </div>
+                )}
 
               </div>
             </React.Fragment>

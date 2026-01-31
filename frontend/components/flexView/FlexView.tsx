@@ -12,6 +12,13 @@ import { getDailySummaries, getExerciseStats } from '../../utils/analysis/analyt
 import { getExerciseAssets, ExerciseAsset } from '../../utils/data/exerciseAssets';
 import { isWarmupSet, countSets } from '../../utils/analysis/setClassification';
 import { normalizeMuscleGroup, type NormalizedMuscleGroup } from '../../utils/muscle/muscleNormalization';
+import {
+  loadExerciseMuscleData,
+  type ExerciseMuscleData,
+  getExerciseMuscleVolumes,
+  lookupExerciseMuscleData,
+  toHeadlessVolumeMap,
+} from '../../utils/muscle/muscleMapping';
 import { type BodyMapGender } from '../bodyMap/BodyMap';
 import { getMonth } from 'date-fns';
 import { getEffectiveNowFromWorkoutData, getSessionKey } from '../../utils/date/dateUtils';
@@ -108,6 +115,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
 
   // Get exercise assets for thumbnails
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset>>(() => new Map());
+  const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
 
   useEffect(() => {
     let cancelled = false;
@@ -118,12 +126,45 @@ export const FlexView: React.FC<FlexViewProps> = ({
       .catch(() => {
         if (!cancelled) setAssetsMap(new Map());
       });
+    loadExerciseMuscleData()
+      .then((m) => {
+        if (!cancelled) setExerciseMuscleData(m);
+      })
+      .catch(() => {
+        if (!cancelled) setExerciseMuscleData(new Map());
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
   const effectiveNow = useMemo(() => now ?? getEffectiveNowFromWorkoutData(data), [now, data]);
+
+  const ytdHeadlessHeatmap = useMemo(() => {
+    const ytdStart = new Date(effectiveNow.getFullYear(), 0, 1);
+
+    // 1) Accumulate detailed SVG-id muscle volumes across Year-To-Date sets.
+    const detailed = new Map<string, number>();
+    for (const s of data) {
+      if (isWarmupSet(s)) continue;
+      const d = s.parsedDate;
+      if (!d) continue;
+      if (d < ytdStart || d > effectiveNow) continue;
+
+      const exerciseTitle = s.exercise_title || '';
+      const exData = lookupExerciseMuscleData(exerciseTitle, exerciseMuscleData);
+      const { volumes } = getExerciseMuscleVolumes(exData);
+
+      volumes.forEach((w, svgId) => {
+        detailed.set(svgId, (detailed.get(svgId) || 0) + w);
+      });
+    }
+
+    // 2) Convert to headless ids for the BodyMap headless regions.
+    const headlessVolumes = toHeadlessVolumeMap(detailed);
+    const maxVolume = Math.max(1, ...Array.from(headlessVolumes.values()));
+    return { volumes: headlessVolumes, maxVolume };
+  }, [data, effectiveNow, exerciseMuscleData]);
 
   // Calculate all stats from data
   const stats = useMemo(() => {
@@ -340,7 +381,14 @@ export const FlexView: React.FC<FlexViewProps> = ({
       case 'top-exercises':
         return <TopExercisesCard exercises={stats.topExercises} theme={cardTheme} />;
       case 'muscle-focus':
-        return <MuscleFocusCard muscleData={stats.muscleData} theme={cardTheme} gender={bodyMapGender} />;
+        return (
+          <MuscleFocusCard
+            muscleData={stats.muscleData}
+            headlessHeatmap={ytdHeadlessHeatmap}
+            theme={cardTheme}
+            gender={bodyMapGender}
+          />
+        );
       default:
         return null;
     }

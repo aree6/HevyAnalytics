@@ -11,7 +11,7 @@ const HistoryView = React.lazy(() => import('../historyView/HistoryView').then((
 const MuscleAnalysis = React.lazy(() => import('../muscleAnalysis/MuscleAnalysis').then((m) => ({ default: m.MuscleAnalysis })));
 const FlexView = React.lazy(() => import('../flexView/FlexView').then((m) => ({ default: m.FlexView })));
 
-type InitialMuscleForAnalysis = { muscleId: string; viewMode: 'muscle' | 'group' } | null;
+type InitialMuscleForAnalysis = { muscleId: string; viewMode: 'muscle' | 'group' | 'headless' } | null;
 
 type WeeklySetsWindow = 'all' | '7d' | '30d' | '365d';
 
@@ -35,7 +35,7 @@ interface AppTabContentProps {
   onDayClick: (date: Date) => void;
   onMuscleClick?: (
     muscleId: string,
-    viewMode: 'muscle' | 'group',
+    viewMode: 'muscle' | 'group' | 'headless',
     weeklySetsWindow: WeeklySetsWindow
   ) => void;
   onExerciseClick?: (exerciseName: string) => void;

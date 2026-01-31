@@ -145,9 +145,15 @@ export const computeWeeklySetsDashboardData = (
       const svgIds = getSvgIdsForCsvMuscleName(muscleName);
       if (svgIds.length === 0) continue;
       for (const svgId of svgIds) {
-        volumes.set(svgId, val);
+        // Multiple distinct subject keys can map to the same SVG id (e.g. synonyms like
+        // "Lats" vs "Latissimus Dorsi"). Accumulate so the heatmap reflects all work.
+        volumes.set(svgId, (volumes.get(svgId) ?? 0) + val);
       }
-      if (val > maxVolume) maxVolume = val;
+      // maxVolume is based on the final per-svg value after any accumulation.
+      for (const svgId of svgIds) {
+        const next = volumes.get(svgId) ?? 0;
+        if (next > maxVolume) maxVolume = next;
+      }
     }
   }
 

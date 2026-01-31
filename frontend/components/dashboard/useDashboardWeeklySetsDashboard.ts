@@ -33,7 +33,7 @@ export const useDashboardWeeklySetsDashboard = (args: {
       };
     }
 
-    const cacheKey = `weeklySetsDashboard:${muscleCompQuick}:${compositionGrouping}`;
+    const cacheKey = `weeklySetsDashboard:v2:${muscleCompQuick}:${compositionGrouping}`;
     return computationCache.getOrCompute(
       cacheKey,
       fullData,

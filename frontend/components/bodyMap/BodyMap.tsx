@@ -11,7 +11,7 @@ import FemaleFrontBodyMapGroup from './groups/FemaleFrontBodyMapGroup';
 import FemaleBackBodyMapGroup from './groups/FemaleBackBodyMapGroup';
 
 export type BodyMapGender = 'male' | 'female';
-export type BodyMapViewMode = 'muscle' | 'group';
+export type BodyMapViewMode = 'muscle' | 'group' | 'headless';
 
 interface BodyMapProps {
   onPartClick: (muscleGroup: string) => void;
@@ -80,18 +80,25 @@ export const BodyMap: React.FC<BodyMapProps> = ({
         
         el.querySelectorAll('path').forEach(path => {
           path.style.transition = 'all 0.15s ease';
-          path.style.stroke = '#000000';
-          path.style.strokeWidth = compact ? '0.6' : '1';
+          const baseStrokeWidth = compact ? 0.6 : 1;
+          path.style.stroke = 'rgb(var(--outline-rgb) / 1)';
+          path.style.strokeWidth = String(baseStrokeWidth);
           path.style.strokeOpacity = compact ? '0.55' : '0.7';
           
           if (isSelected) {
-            // Selected state - blend cyan highlight with volume color
+            // Selected state - should be clearly distinguishable from hover.
             path.style.fill = SELECTION_HIGHLIGHT;
-            path.style.filter = 'brightness(1.2)';
+            path.style.stroke = SELECTION_HIGHLIGHT;
+            path.style.strokeWidth = String(baseStrokeWidth + (compact ? 0.35 : 0.8));
+            path.style.strokeOpacity = '1';
+            path.style.filter = 'brightness(1.12)';
           } else if (isHovered) {
-            // Hover state - light cyan highlight blend
+            // Hover state - uses a distinct (non-palette) hover color.
             path.style.fill = HOVER_HIGHLIGHT;
-            path.style.filter = 'brightness(1.1)';
+            path.style.stroke = HOVER_HIGHLIGHT;
+            path.style.strokeWidth = String(baseStrokeWidth + (compact ? 0.2 : 0.45));
+            path.style.strokeOpacity = compact ? '0.9' : '0.95';
+            path.style.filter = 'brightness(1.08)';
           } else {
             // Default state - volume-based color
             path.style.fill = color;
@@ -152,12 +159,12 @@ export const BodyMap: React.FC<BodyMapProps> = ({
   const svgClass = compact ? (compactFill ? 'h-full w-auto' : 'h-28 w-auto') : 'h-[60vh] md:h-[70vh] w-auto -mb-10 -mt-5 sm:-mb-3';
 
   const FrontSvg = gender === 'female' 
-    ? (viewMode === 'group' ? FemaleFrontBodyMapGroup : FemaleFrontBodyMapMuscle)
-    : (viewMode === 'group' ? MaleFrontBodyMapGroup : MaleFrontBodyMapMuscle);
+    ? (viewMode === 'group' || viewMode === 'headless' ? FemaleFrontBodyMapGroup : FemaleFrontBodyMapMuscle)
+    : (viewMode === 'group' || viewMode === 'headless' ? MaleFrontBodyMapGroup : MaleFrontBodyMapMuscle);
   
   const BackSvg = gender === 'female'
-    ? (viewMode === 'group' ? FemaleBackBodyMapGroup : FemaleBackBodyMapMuscle)
-    : (viewMode === 'group' ? MaleBackBodyMapGroup : MaleBackBodyMapMuscle);
+    ? (viewMode === 'group' || viewMode === 'headless' ? FemaleBackBodyMapGroup : FemaleBackBodyMapMuscle)
+    : (viewMode === 'group' || viewMode === 'headless' ? MaleBackBodyMapGroup : MaleBackBodyMapMuscle);
 
   return (
     <div 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Settings, Moon, Sun, Sparkles, Palette, Scale, Users, Calendar, AlertTriangle } from 'lucide-react';
-import { WeightUnit, DateMode, ThemeMode, ExerciseTrendMode } from '../../utils/storage/localStorage';
+import { WeightUnit, DateMode, ThemeMode, ExerciseTrendMode, HeatmapTheme } from '../../utils/storage/localStorage';
 import { BodyMapGender } from '../bodyMap/BodyMap';
 import type { DataAgeInfo } from '../../hooks/usePreferences';
 
@@ -19,6 +19,10 @@ interface UserPreferencesModalProps {
   // Theme preference
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
+
+  // Heatmap theme preference
+  heatmapTheme: HeatmapTheme;
+  onHeatmapThemeChange: (theme: HeatmapTheme) => void;
 
   // Date mode preference
   dateMode: DateMode;
@@ -67,6 +71,8 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
   onBodyMapGenderChange,
   themeMode,
   onThemeModeChange,
+  heatmapTheme,
+  onHeatmapThemeChange,
   dateMode,
   onDateModeChange,
   exerciseTrendMode,
@@ -175,6 +181,42 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                       <span className="text-sm font-medium">Female</span>
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* Heatmap Theme Section */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-slate-200">
+                  <Palette className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="text-xs font-medium">Heatmap Palette</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {([
+                    { key: 'red', label: 'Red', swatch: 'hsl(5, 75%, 50%)' },
+                    { key: 'brown', label: 'Brown', swatch: 'hsl(25, 70%, 45%)' },
+                    { key: 'blue', label: 'Blue', swatch: 'hsl(215, 90%, 65%)' },
+                  ] as const).map(({ key, label, swatch }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => onHeatmapThemeChange(key as HeatmapTheme)}
+                      className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                        heatmapTheme === key
+                          ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                          : 'bg-slate-900/20 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-900/40'
+                      }`}
+                      title={label}
+                    >
+                      <div
+                        className={`w-6 h-6 rounded flex items-center justify-center ${
+                          heatmapTheme === key ? 'bg-emerald-500/20' : 'bg-slate-800'
+                        }`}
+                      >
+                        <div className="w-3.5 h-3.5 rounded" style={{ backgroundColor: swatch }} />
+                      </div>
+                      <div className="text-xs font-medium">{label}</div>
+                    </button>
+                  ))}
                 </div>
               </div>
 

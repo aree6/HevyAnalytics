@@ -96,7 +96,7 @@ export const FemaleFrontBodyMapGroupPart1: React.FC = () => (
         data-darkreader-inline-fill=""
       />
     </g>
-    <g id="hands" className="bodymap bodymap text-mw-gray">
+    <g id="hands-disabled" className="bodymap bodymap text-mw-gray">
       <path
         d="M645.78,579.04c0,.89-.44,2.07-1.36,4.43-1.41,3.63-4.05,10.38-2.34,12.97.12.18.4.59,1.2.88.06-.27.15-.56.24-.84,2.41-7.38,2.43-10.86,2.44-15.27,0-1.39,0-2.83.09-4.5-.25-.82-1.1-3.41-2.29-5.94,1.13,3.32,2.01,6.37,2.02,8.26Z"
         fill="currentColor"
@@ -199,7 +199,7 @@ export const FemaleFrontBodyMapGroupPart1: React.FC = () => (
         data-darkreader-inline-fill=""
       />
     </g>
-    <g id="front-shoulders" className="bodymap bodymap text-mw-gray">
+    <g id="shoulders" className="bodymap bodymap text-mw-gray">
       <path
         d="M492.35,309.68c-12.28-13.25-22.58-19.56-29.7-22.55h0c-29.32-31.51-51.01-51.53-61.48-60.8.08-.05.2-.1.36-.12,21.23-2.86,27.56-3.57,29.36-3.75.18-.02.36-.03.55-.04.04,0,.07,0,.11,0,8.02-.48,19.08.57,28.22,11.34,11,13.34,16.9,33.09,21.64,48.96,1.72,5.75,3.35,11.19,4.98,15.46,1.83,4.77,3.78,8.16,5.97,11.52Z"
         fill="currentColor"

@@ -97,7 +97,7 @@ export const MaleFrontBodyMapGroupPart1: React.FC = () => (
         data-darkreader-inline-fill=""
       />
     </g>
-    <g id="hands" className="bodymap bodymap text-mw-gray">
+    <g id="hands-disabled" className="bodymap bodymap text-mw-gray">
       <path
         d="M641.72,606.51c-.72-3.08-1.76-4.39-3.21-6.2-1.2-1.5-2.6-3.25-4-6.33.39,3.69,1.45,5.88,2.44,7.89,1.11,2.27,2.25,4.62,2.18,8.39-.07,3.27.15,5.48.38,7.62.33,3.14.62,6.1-.21,11.37-.3,1.91-.05,3.3.75,4.16.73.78,1.89,1.09,2.88,1.21,0-1.21.15-2.5.39-3.88,1.61-9.13,1.28-10.51.27-14.63-.51-2.08-1.2-4.91-1.87-9.61Z"
         fill="currentColor"
@@ -168,7 +168,7 @@ export const MaleFrontBodyMapGroupPart1: React.FC = () => (
         data-darkreader-inline-fill=""
       />
     </g>
-    <g id="front-shoulders" className="bodymap bodymap text-mw-gray">
+    <g id="shoulders" className="bodymap bodymap text-mw-gray">
       <path
         d="M510.6,303.91c-1.61-.91-3.25-1.75-4.94-2.53-7.64-3.49-14.56-4.88-19.19-5.42-7.44-1.87-13.18-4.12-16.62-6.5-12.81-8.87-22.9-20.97-27.79-26.83-4.59-5.52-7.95-10.07-10.92-14.08-6.46-8.74-11.12-15.05-22.12-22.2-5.2-3.37-11.11-5.94-15.09-7.49,8.34-2.74,26.96-7.7,44.59-4.11.97.24,1.99.51,3.04.78,1.25.32,2.34.6,3.08.8.34.09.84.17,1.59.3,32.54,5.37,45.89,28.26,51.36,46.48.75,2.74,1.56,4.76,2.58,7.33,2.02,5.07,5.06,12.69,10.42,33.46Z"
         fill="currentColor"

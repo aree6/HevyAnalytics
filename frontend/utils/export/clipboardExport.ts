@@ -178,7 +178,12 @@ interface ExportMeta {
 
 const AI_PROMPT = `I am a {} in gym. Here are my workout logs. Analyze them deeply, beyond surface-level stats. Identify hidden patterns, habits, and blind spots that standard analysis misses. Give clear, actionable suggestions to improve them, with a balanced and practical approach. Don't limit yourself to my ask, go beyond it.`;
 
-const formatSetsAsText = (sets: WorkoutSet[], meta?: ExportMeta, fullDatasetForExperience?: WorkoutSet[]): string => {
+const formatSetsAsText = (
+  sets: WorkoutSet[],
+  meta?: ExportMeta,
+  fullDatasetForExperience?: WorkoutSet[],
+  promptTemplate: string = AI_PROMPT
+): string => {
   if (!sets || sets.length === 0) return '';
 
   // Get the user's preferred weight unit
@@ -199,7 +204,7 @@ const formatSetsAsText = (sets: WorkoutSet[], meta?: ExportMeta, fullDatasetForE
   const parts: string[] = [];
 
   // Prompt first with experience level
-  const promptWithExperience = AI_PROMPT.replace('I am a {}', `I am a ${experience.level}`);
+  const promptWithExperience = promptTemplate.replace('I am a {}', `I am a ${experience.level}`);
   parts.push(promptWithExperience);
   parts.push('');
 
@@ -271,11 +276,12 @@ export const exportPackageAndCopyText = async (
   exerciseStats: ExerciseStats[],
   months: number | 'all' = 1,
   now = new Date(),
-  effectiveNow?: Date
+  effectiveNow?: Date,
+  promptTemplate: string = AI_PROMPT
 ): Promise<void> => {
   const pkg = gatherLastNMonthsPackage(fullData, dailyData, exerciseStats, months, now, effectiveNow);
   const meta: ExportMeta = { generatedAt: pkg.meta.generatedAt, scope: months === 'all' ? 'all' : `${pkg.meta.months}m`, countSets: pkg.meta.countSets };
-  const text = formatSetsAsText(pkg.rawSets, meta, fullData);
+  const text = formatSetsAsText(pkg.rawSets, meta, fullData, promptTemplate);
   try {
     if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(text);

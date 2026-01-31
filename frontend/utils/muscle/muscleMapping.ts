@@ -4,6 +4,8 @@ import { getEffectiveNowFromWorkoutData, formatWeekContraction } from '../date/d
 import {
   INTERACTIVE_MUSCLE_IDS,
   FULL_BODY_TARGET_GROUPS,
+  DETAILED_SVG_ID_TO_HEADLESS_ID,
+  HEADLESS_MUSCLE_NAMES,
 } from './muscleMappingConstants';
 import { createExerciseNameResolver, type ExerciseNameResolver } from '../exercise/exerciseNameResolver';
 import { isUnilateralSet } from '../analysis/setClassification';
@@ -33,14 +35,14 @@ export const CSV_TO_SVG_MUSCLE_MAP: Record<string, string[]> = {
   'Triceps': ['medial-head-triceps', 'long-head-triceps', 'lateral-head-triceps'],
   'Upper Back': ['lats', 'upper-trapezius', 'lower-trapezius', 'traps-middle', 'posterior-deltoid'],
   'Obliques': ['obliques'],
-  
+
   // Anatomical muscle names (from Lyfta/detailed datasets)
   // Chest
   'chest_clavicular_head': ['upper-pectoralis'],
   'chest_sternal_head': ['mid-lower-pectoralis'],
   'pectoralis_major': ['mid-lower-pectoralis', 'upper-pectoralis'],
   'pectoralis_minor': ['mid-lower-pectoralis'],
-  
+
   // Shoulders / Deltoids
   'deltoid_anterior': ['anterior-deltoid'],
   'deltoid_lateral': ['lateral-deltoid'],
@@ -49,13 +51,13 @@ export const CSV_TO_SVG_MUSCLE_MAP: Record<string, string[]> = {
   'anterior_deltoid': ['anterior-deltoid'],
   'lateral_deltoid': ['lateral-deltoid'],
   'posterior_deltoid': ['posterior-deltoid'],
-  
+
   // Arms
   'biceps_brachii': ['long-head-bicep', 'short-head-bicep'],
   'triceps_brachii': ['medial-head-triceps', 'long-head-triceps', 'lateral-head-triceps'],
   'brachialis': ['long-head-bicep', 'short-head-bicep'],
   'brachioradialis': ['wrist-flexors'],
-  
+
   // Back
   'latissimus_dorsi': ['lats'],
   'trapezius': ['upper-trapezius', 'lower-trapezius', 'traps-middle'],
@@ -67,7 +69,7 @@ export const CSV_TO_SVG_MUSCLE_MAP: Record<string, string[]> = {
   'teres_major': ['lats'],
   'teres_minor': ['posterior-deltoid'],
   'erector_spinae': ['lowerback'],
-  
+
   // Legs
   'gluteus_maximus': ['gluteus-maximus'],
   'gluteus_medius': ['gluteus-medius'],
@@ -88,7 +90,7 @@ export const CSV_TO_SVG_MUSCLE_MAP: Record<string, string[]> = {
   'gracilis': ['inner-thigh'],
   'iliopsoas': ['lower-abdominals'],
   'psoas': ['lower-abdominals'],
-  
+
   // Core
   'rectus_abdominis': ['lower-abdominals', 'upper-abdominals'],
   'transverse_abdominis': ['lower-abdominals'],
@@ -243,18 +245,18 @@ let exerciseMuscleCache: Map<string, ExerciseMuscleData> | null = null;
 
 export const loadExerciseMuscleData = async (): Promise<Map<string, ExerciseMuscleData>> => {
   if (exerciseMuscleCache) return exerciseMuscleCache;
-  
+
   try {
     const response = await fetch(`${import.meta.env.BASE_URL}exercises_muscles_and_thumbnail_data.csv`);
     const text = await response.text();
     const lines = text.split('\n');
     const map = new Map<string, ExerciseMuscleData>();
-    
+
     // Skip header
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
-      
+
       // Parse CSV line (handling commas in values)
       const parts = parseCSVLine(line);
       if (parts.length >= 4) {
@@ -267,7 +269,7 @@ export const loadExerciseMuscleData = async (): Promise<Map<string, ExerciseMusc
         });
       }
     }
-    
+
     exerciseMuscleCache = map;
     return map;
   } catch (error) {
@@ -300,19 +302,19 @@ export const lookupExerciseMuscleData = (
   muscleData: Map<string, ExerciseMuscleData>
 ): ExerciseMuscleData | undefined => {
   if (!exerciseTitle) return undefined;
-  
+
   // Try exact lowercase match first (fast path)
   const exactMatch = muscleData.get(exerciseTitle.toLowerCase());
   if (exactMatch) return exactMatch;
-  
+
   // Use fuzzy resolver for non-exact matches
   const resolver = getExerciseResolver(muscleData);
   const resolution = resolver.resolve(exerciseTitle);
-  
+
   if (resolution.method !== 'none' && resolution.name) {
     return muscleData.get(resolution.name.toLowerCase());
   }
-  
+
   return undefined;
 };
 
@@ -320,7 +322,7 @@ function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let current = '';
   let inQuotes = false;
-  
+
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
     if (char === '"') {
@@ -356,7 +358,7 @@ export const calculateMuscleVolume = async (
   exerciseMuscleData: Map<string, ExerciseMuscleData>
 ): Promise<Map<string, MuscleVolumeEntry>> => {
   const muscleVolume = new Map<string, MuscleVolumeEntry>();
-  
+
   // Initialize all muscles
   for (const svgId of ALL_SVG_MUSCLES) {
     muscleVolume.set(svgId, {
@@ -366,24 +368,24 @@ export const calculateMuscleVolume = async (
       exercises: new Map(),
     });
   }
-  
+
   for (const set of data) {
     if (!set.exercise_title || !set.parsedDate) continue;
-    
+
     // Use fuzzy lookup for better matching across different CSV sources
     const exerciseData = lookupExerciseMuscleData(set.exercise_title, exerciseMuscleData);
     if (!exerciseData) continue;
-    
+
     const primaryMuscle = exerciseData.primary_muscle;
     const secondaryMuscles = String(exerciseData.secondary_muscle ?? '')
       .split(',')
       .map(m => m.trim())
       .filter(m => m && m.toLowerCase() !== 'none');
     const primaryKey = String(primaryMuscle ?? '').trim().toLowerCase();
-    
+
     // Skip Cardio entirely
     if (primaryKey === 'cardio') continue;
-    
+
     // Handle Full Body - add 1 set to every muscle group (0.5 for L/R sets)
     if (primaryKey === 'full body' || primaryKey === 'full-body') {
       // L/R sets count as 0.5 each (pair = 1 set)
@@ -403,7 +405,7 @@ export const calculateMuscleVolume = async (
       }
       continue;
     }
-    
+
     // Handle primary muscle (counts as 1 set, or 0.5 for L/R sets)
     // L/R sets count as 0.5 each so a L+R pair = 1 bilateral set equivalent
     const setIncrement = isUnilateralSet(set) ? 0.5 : 1;
@@ -417,7 +419,7 @@ export const calculateMuscleVolume = async (
       exerciseEntry.primarySets += setIncrement;
       entry.exercises.set(set.exercise_title, exerciseEntry);
     }
-    
+
     // Handle secondary muscles (each counts as 0.5 sets, or 0.25 for L/R sets)
     const secondaryIncrement = isUnilateralSet(set) ? 0.25 : 0.5;
     for (const secondaryMuscle of secondaryMuscles) {
@@ -435,7 +437,7 @@ export const calculateMuscleVolume = async (
       }
     }
   }
-  
+
   return muscleVolume;
 };
 
@@ -448,28 +450,28 @@ export const computeWeeklyMuscleVolume = async (
   const effectiveNow = now ?? getEffectiveNowFromWorkoutData(data);
   const startDate = subWeeks(startOfWeek(effectiveNow, { weekStartsOn: 1 }), weeksBack - 1);
   const endDate = endOfWeek(effectiveNow, { weekStartsOn: 1 });
-  
+
   const weeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 });
-  
+
   const weeklyData: WeeklyMuscleVolume[] = [];
-  
+
   for (const weekStart of weeks) {
     const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
     const weekLabel = formatWeekContraction(weekStart);
-    
+
     // Filter data for this week
     const weekData = data.filter(set => {
       if (!set.parsedDate) return false;
       return set.parsedDate >= weekStart && set.parsedDate <= weekEnd;
     });
-    
+
     const muscles = await calculateMuscleVolume(weekData, exerciseMuscleData);
-    
+
     let totalSets = 0;
     muscles.forEach(entry => {
       totalSets += entry.sets;
     });
-    
+
     weeklyData.push({
       weekStart,
       weekEnd,
@@ -478,7 +480,7 @@ export const computeWeeklyMuscleVolume = async (
       totalSets,
     });
   }
-  
+
   return weeklyData;
 };
 
@@ -495,9 +497,11 @@ export const getVolumeIntensity = (sets: number, maxSets: number): string => {
 
 
 export const getVolumeColor = (sets: number, maxSets: number): string => {
-  if (sets === 0) return 'hsla(0, 0%, 100%, 1)';
+  // Zero-volume muscles should always render as pure white across all themes/views.
+  if (sets === 0) return '#ffffff';
 
-  const ratio = sets / Math.max(maxSets, 1);
+  const ratioRaw = sets / Math.max(maxSets, 1);
+  const ratio = Math.max(0, Math.min(1, ratioRaw));
   const lightness = 84 - ratio * 64; // 84% → 20%
 
   return `hsl(var(--heatmap-hue), 75%, ${lightness}%)`;
@@ -508,17 +512,17 @@ export const getExerciseMuscleVolumes = (
   exerciseData: ExerciseMuscleData | undefined
 ): { volumes: Map<string, number>; maxVolume: number } => {
   const volumes = new Map<string, number>();
-  
+
   if (!exerciseData) {
     return { volumes, maxVolume: 1 };
   }
-  
+
   // Parse primary muscles (may be comma-separated, e.g., "biceps, brachialis")
   const primaries = String(exerciseData.primary_muscle ?? '')
     .split(',')
     .map(m => m.trim())
     .filter(m => m && m.toLowerCase() !== 'none');
-  
+
   // Parse secondary muscles
   let secondaries = String(exerciseData.secondary_muscle ?? '')
     .split(',')
@@ -553,7 +557,7 @@ export const getExerciseMuscleVolumes = (
     }
     return { volumes, maxVolume: 1 };
   }
-  
+
   // Primary muscles get 1
   for (const primary of primaries) {
     const primaryKey = primary.toLowerCase();
@@ -562,7 +566,7 @@ export const getExerciseMuscleVolumes = (
       volumes.set(svgId, 1);
     }
   }
-  
+
   // Secondary muscles get 0.5
   for (const secondary of secondaries) {
     const secondarySvgIds = CSV_TO_SVG_MUSCLE_MAP_LOWER[secondary.toLowerCase()] || [];
@@ -572,7 +576,7 @@ export const getExerciseMuscleVolumes = (
       }
     }
   }
-  
+
   // Propagate volume across muscle groups - if any part of a group is hit, all parts should light up
   // This ensures e.g. all 3 deltoid heads light up when any one is targeted
   const muscleGroups: Record<string, string[]> = {
@@ -588,7 +592,7 @@ export const getExerciseMuscleVolumes = (
     'Abdominals': ['lower-abdominals', 'upper-abdominals'],
     'Forearms': ['wrist-extensors', 'wrist-flexors'],
   };
-  
+
   for (const groupParts of Object.values(muscleGroups)) {
     // Find max volume in this group
     let maxGroupVolume = 0;
@@ -605,7 +609,50 @@ export const getExerciseMuscleVolumes = (
       }
     }
   }
-  
+
   return { volumes, maxVolume: 1 };
 };
 
+
+// Convert detailed muscle volumes to headless volumes.
+// IMPORTANT: many upstream generators already propagate the same value across multiple
+// detailed SVG parts for a single anatomical muscle (e.g. chest -> both pec heads).
+// Summing would double-count and can push the value above maxVolume, producing invalid
+// HSL lightness values (and visually black regions). For UI bodymaps, we want the
+// per-muscle intensity, so we take the MAX across detailed parts.
+export const toHeadlessVolumeMap = (volumes: Map<string, number>): Map<string, number> => {
+  const headlessVolumes = new Map<string, number>();
+
+  volumes.forEach((val, key) => {
+    // If key is already a headless ID, use it directly (e.g. valid group IDs)
+    // Otherwise try to map from detailed -> headless
+    const headlessId = (HEADLESS_MUSCLE_NAMES as any)[key]
+      ? key
+      : DETAILED_SVG_ID_TO_HEADLESS_ID[key];
+
+    if (!headlessId) return;
+
+    const prev = headlessVolumes.get(headlessId) ?? 0;
+    if (val > prev) headlessVolumes.set(headlessId, val);
+  });
+
+  return headlessVolumes;
+};
+
+// Sum-aggregation variant for cases where detailed SVG volumes represent independent
+// contributions per head/part (i.e. not propagated duplicates).
+export const toHeadlessVolumeMapSum = (volumes: Map<string, number>): Map<string, number> => {
+  const headlessVolumes = new Map<string, number>();
+
+  volumes.forEach((val, key) => {
+    const headlessId = (HEADLESS_MUSCLE_NAMES as any)[key]
+      ? key
+      : DETAILED_SVG_ID_TO_HEADLESS_ID[key];
+
+    if (!headlessId) return;
+
+    headlessVolumes.set(headlessId, (headlessVolumes.get(headlessId) ?? 0) + val);
+  });
+
+  return headlessVolumes;
+};

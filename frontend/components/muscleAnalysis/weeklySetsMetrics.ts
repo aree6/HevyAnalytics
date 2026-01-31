@@ -7,8 +7,26 @@ import {
   computeDailySvgMuscleVolumes,
 } from '../../utils/muscle/rollingVolumeCalculator';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../../utils/format/deltaFormat';
+import { getHeadlessIdForDetailedSvgId } from '../../utils/muscle/muscleMappingConstants';
 
-export type MuscleAnalysisViewMode = 'muscle' | 'group';
+export type MuscleAnalysisViewMode = 'muscle' | 'group' | 'headless';
+
+export const aggregateDailyToHeadless = (daily: ReturnType<typeof computeDailySvgMuscleVolumes>) => {
+  return daily.map((d) => {
+    const muscles = new Map<string, number>();
+    for (const [k, v] of d.muscles.entries()) {
+      const headless = getHeadlessIdForDetailedSvgId(k);
+      if (!headless) continue;
+      // computeDailySvgMuscleVolumes can assign the same set contribution to multiple detailed
+      // SVG parts for a single anatomical muscle (e.g. Chest -> both pec parts). In headless
+      // mode we want the per-muscle intensity, so we take MAX across detailed parts.
+      const prev = muscles.get(headless) ?? 0;
+      const next = v ?? 0;
+      if (next > prev) muscles.set(headless, next);
+    }
+    return { ...d, muscles };
+  });
+};
 
 export const computeWeeklySetsSummary = (args: {
   assetsMap: Map<string, ExerciseAsset> | null;
@@ -48,7 +66,9 @@ export const computeWeeklySetsSummary = (args: {
   const daily =
     viewMode === 'group'
       ? computeDailyMuscleVolumes(data, assetsMap, true)
-      : computeDailySvgMuscleVolumes(data, assetsMap);
+      : viewMode === 'headless'
+        ? aggregateDailyToHeadless(computeDailySvgMuscleVolumes(data, assetsMap))
+        : computeDailySvgMuscleVolumes(data, assetsMap);
 
   const getDaySum = (day: { muscles: ReadonlyMap<string, number> }) => {
     if (selectedSubjectKeys.length > 0) {
@@ -119,7 +139,9 @@ export const computeWeeklySetsDelta = (args: {
   const daily =
     viewMode === 'group'
       ? computeDailyMuscleVolumes(data, assetsMap, true)
-      : computeDailySvgMuscleVolumes(data, assetsMap);
+      : viewMode === 'headless'
+        ? aggregateDailyToHeadless(computeDailySvgMuscleVolumes(data, assetsMap))
+        : computeDailySvgMuscleVolumes(data, assetsMap);
 
   const sumInRange = (start: Date, end: Date) => {
     const total = daily.reduce((acc, day) => {
