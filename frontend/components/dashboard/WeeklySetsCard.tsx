@@ -10,6 +10,7 @@ import {
   Tooltip,
 } from 'recharts';
 import { formatDeltaPercentage } from '../../utils/format/deltaFormat';
+import { RADAR_TICK_FILL } from '../../utils/ui/uiConstants';
 import { BodyMap, type BodyMapGender } from '../bodyMap/BodyMap';
 import { LazyRender } from '../ui/LazyRender';
 import { ChartSkeleton } from '../ui/ChartSkeleton';
@@ -249,7 +250,7 @@ export const WeeklySetsCard = ({
                       const ty = cx != null && cy != null ? cy + (py - cy) * outward : py;
                       return (
                         <g transform={`translate(${tx},${ty})`}>
-                          <text fill="#94a3b8" fontSize={11} textAnchor="middle" dominantBaseline="middle">
+                          <text fill={RADAR_TICK_FILL} fontSize={11} textAnchor="middle" dominantBaseline="middle">
                             {label}
                           </text>
                         </g>

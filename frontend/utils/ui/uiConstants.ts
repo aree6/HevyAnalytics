@@ -21,6 +21,9 @@ export const FANCY_FONT_NUMBERS: Readonly<React.CSSProperties> = {
   fontStyle: 'normal',
 };
 
+/** Radar chart axis tick fill – theme-aware via CSS variable (--text-muted) */
+export const RADAR_TICK_FILL = 'var(--text-muted)';
+
 /** Standard Recharts tooltip styling */
 export const CHART_TOOLTIP_STYLE: Readonly<React.CSSProperties> = {
   backgroundColor: 'rgb(var(--panel-rgb) / 0.88)',

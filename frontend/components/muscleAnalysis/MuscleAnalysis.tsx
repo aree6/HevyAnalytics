@@ -41,7 +41,7 @@ import { type NormalizedMuscleGroup } from '../../utils/muscle/muscleNormalizati
 import { LazyRender } from '../ui/LazyRender';
 import { ChartSkeleton } from '../ui/ChartSkeleton';
 import { Tooltip as HoverTooltip, TooltipData } from '../ui/Tooltip';
-import { CHART_TOOLTIP_STYLE } from '../../utils/ui/uiConstants';
+import { CHART_TOOLTIP_STYLE, RADAR_TICK_FILL } from '../../utils/ui/uiConstants';
 import { addEmaSeries, DEFAULT_EMA_HALF_LIFE_DAYS } from '../../utils/analysis/ema';
 import { formatNumber } from '../../utils/format/formatters';
 import { computationCache } from '../../utils/storage/computationCache';
@@ -794,7 +794,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
                         const ty = cx != null && cy != null ? cy + (py - cy) * outward : py;
                         return (
                           <g transform={`translate(${tx},${ty})`}>
-                            <text fill="#94a3b8" fontSize={11} textAnchor="middle" dominantBaseline="middle">
+                            <text fill={RADAR_TICK_FILL} fontSize={11} textAnchor="middle" dominantBaseline="middle">
                               {label}
                             </text>
                           </g>

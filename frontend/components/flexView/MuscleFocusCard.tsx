@@ -1,10 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { Repeat2, Target } from 'lucide-react';
+import {
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
+  Tooltip,
+} from 'recharts';
 import { FlexCard, type CardTheme, FlexCardFooter } from './FlexCard';
-import { FANCY_FONT } from '../../utils/ui/uiConstants';
+import { FANCY_FONT, RADAR_TICK_FILL } from '../../utils/ui/uiConstants';
 import { type NormalizedMuscleGroup } from '../../utils/muscle/muscleNormalization';
 import { BodyMap, type BodyMapGender } from '../bodyMap/BodyMap';
-import { HEADLESS_MUSCLE_NAMES } from '../../utils/muscle/muscleMappingConstants';
+import { getHeadlessRadarSeries } from '../../utils/muscle/muscleMappingConstants';
 
 // ============================================================================
 // CARD 6: Muscle Focus Card - Radar chart style
@@ -20,46 +29,22 @@ export const MuscleFocusCard: React.FC<{
 
   const [showHeatmap, setShowHeatmap] = useState(true);
 
+  const radarData = useMemo(() => getHeadlessRadarSeries(headlessHeatmap.volumes), [headlessHeatmap.volumes]);
+
   const topMuscles = useMemo(() => {
-    const pairs = Array.from(headlessHeatmap.volumes.entries());
-    pairs.sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
-    return pairs
-      .slice(0, 3)
-      .map(([id]) => (HEADLESS_MUSCLE_NAMES as any)[id] ?? id);
-  }, [headlessHeatmap.volumes]);
+    const sorted = [...radarData].filter((d) => (d.value ?? 0) > 0).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    return sorted.slice(0, 3).map((d) => d.subject);
+  }, [radarData]);
 
-  const groups: NormalizedMuscleGroup[] = ['Back', 'Chest', 'Core', 'Legs', 'Shoulders', 'Arms'];
-  const maxSets = Math.max(...muscleData.map((m) => m.sets), 1);
-
-  const centerX = 120;
-  const centerY = 100;
-  const maxRadius = 70;
-
-  const getPoint = (index: number, value: number) => {
-    const angle = (Math.PI * 2 * index) / groups.length - Math.PI / 2;
-    const radius = (value / maxSets) * maxRadius;
-    return {
-      x: centerX + radius * Math.cos(angle),
-      y: centerY + radius * Math.sin(angle),
-    };
-  };
-
-  const dataPoints = groups.map((group, idx) => {
-    const data = muscleData.find((m) => m.group === group);
-    return getPoint(idx, data?.sets || 0);
-  });
-
-  const pathData = dataPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z';
-
-  const gridLevels = [0.25, 0.5, 0.75, 1];
-  const getHexPath = (scale: number) => {
-    const points = groups.map((_, idx) => {
-      const angle = (Math.PI * 2 * idx) / groups.length - Math.PI / 2;
-      const radius = maxRadius * scale;
-      return { x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) };
-    });
-    return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z';
-  };
+  const tooltipStyle = useMemo(
+    () => ({
+      backgroundColor: isDark ? 'rgba(15,23,42,0.95)' : 'rgba(255,255,255,0.95)',
+      border: `1px solid ${isDark ? 'rgba(71,85,105,0.5)' : 'rgba(226,232,240,0.8)'}`,
+      borderRadius: '8px',
+      padding: '8px 12px',
+    }),
+    [isDark]
+  );
 
   return (
     <FlexCard theme={theme} className="min-h-[500px] flex flex-col">
@@ -91,57 +76,56 @@ export const MuscleFocusCard: React.FC<{
         </h2>
 
         {!showHeatmap ? (
-          <div className="relative mb-8">
-            <svg width="240" height="220" viewBox="0 0 240 220" className="drop-shadow-lg">
-              {gridLevels.map((level, idx) => (
-                <path
-                  key={idx}
-                  d={getHexPath(level)}
-                  fill="none"
-                  stroke={isDark ? 'rgba(148,163,184,0.15)' : 'rgba(148,163,184,0.3)'}
-                  strokeWidth="1"
-                />
-              ))}
-
-              <path
-                d={pathData}
-                fill={isDark ? 'rgba(59,130,246,0.25)' : 'rgba(59,130,246,0.18)'}
-                stroke={isDark ? 'rgba(59,130,246,0.8)' : 'rgba(37,99,235,0.75)'}
-                strokeWidth="2"
-              />
-
-              {dataPoints.map((point, idx) => (
-                <circle
-                  key={idx}
-                  cx={point.x}
-                  cy={point.y}
-                  r="4"
-                  fill={isDark ? '#60a5fa' : '#2563eb'}
-                  stroke={isDark ? '#0f172a' : '#ffffff'}
-                  strokeWidth="2"
-                />
-              ))}
-
-              {groups.map((group, idx) => {
-                const angle = (Math.PI * 2 * idx) / groups.length - Math.PI / 2;
-                const labelRadius = maxRadius + 25;
-                const x = centerX + labelRadius * Math.cos(angle);
-                const y = centerY + labelRadius * Math.sin(angle);
-                return (
-                  <text
-                    key={group}
-                    x={x}
-                    y={y}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    className={`text-[10px] font-semibold ${isDark ? 'fill-slate-300' : 'fill-slate-700'}`}
-                  >
-                    {group}
-                  </text>
-                );
-              })}
-            </svg>
-          </div>
+          radarData.some((d) => (d.value ?? 0) > 0) ? (
+            <div className="w-full max-w-[280px] h-[220px] mb-8">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                  <PolarGrid stroke={isDark ? '#334155' : '#cbd5e1'} />
+                  <PolarAngleAxis
+                    dataKey="subject"
+                    tick={({ payload, x, y, index, cx, cy }: { payload?: { subject?: string }; x?: number; y?: number; index?: number; cx?: number; cy?: number }) => {
+                      const label = radarData[index ?? 0]?.subject ?? payload?.subject ?? '';
+                      const px = x ?? 0;
+                      const py = y ?? 0;
+                      const outward = 1.18;
+                      const tx = cx != null && cy != null ? cx + (px - cx) * outward : px;
+                      const ty = cx != null && cy != null ? cy + (py - cy) * outward : py;
+                      return (
+                        <g transform={`translate(${tx},${ty})`}>
+                          <text
+                            fill={RADAR_TICK_FILL}
+                            fontSize={10}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                          >
+                            {label}
+                          </text>
+                        </g>
+                      );
+                    }}
+                  />
+                  <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+                  <Radar
+                    name="Sets"
+                    dataKey="value"
+                    stroke={isDark ? '#06b6d4' : '#0891b2'}
+                    strokeWidth={2}
+                    fill={isDark ? '#06b6d4' : '#0891b2'}
+                    fillOpacity={0.35}
+                    animationDuration={1500}
+                  />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(value: number) => [Number(value).toFixed(1), 'Sets/wk']}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className={`flex items-center justify-center min-h-[220px] text-xs rounded-lg border border-dashed ${isDark ? 'text-slate-500 border-slate-800' : 'text-slate-500 border-slate-300'}`}>
+              No muscle data yet.
+            </div>
+          )
         ) : (
           <div className="w-full flex justify-center mb-8">
             <div className="h-44 sm:h-56 flex items-center justify-center">
