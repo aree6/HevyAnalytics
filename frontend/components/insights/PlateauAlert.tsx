@@ -6,6 +6,7 @@ import type { ExerciseAsset } from '../../utils/data/exerciseAssets';
 import type { WeightUnit } from '../../utils/storage/localStorage';
 import { formatRelativeDuration } from '../../utils/date/dateUtils';
 import { convertWeight } from '../../utils/format/units';
+import { ExerciseThumbnail } from '../common/ExerciseThumbnail';
 
 // Compact Alert Card for Plateaus
 interface PlateauAlertProps {
@@ -37,7 +38,6 @@ export const PlateauAlert: React.FC<PlateauAlertProps> = ({
   now,
   onClick,
 }) => {
-  const imgSrc = asset?.sourceType === 'video' ? asset.thumbnail : (asset?.thumbnail || asset?.source);
   const clickable = typeof onClick === 'function';
 
   const formatProgressMessage = (date: Date, now: Date): string => {
@@ -52,16 +52,14 @@ export const PlateauAlert: React.FC<PlateauAlertProps> = ({
       type="button"
       onClick={onClick}
       disabled={!clickable}
-      className={`w-full flex items-center gap-3 p-2 rounded-lg text-left bg-amber-500/10 border border-amber-500/20 ${clickable ? 'cursor-pointer hover:bg-amber-500/15 transition-colors' : 'cursor-default'}`}
+      className={`w-full flex items-center gap-3 p-2 rounded-lg text-left bg-amber-500/10 border border-amber-500/20 ${clickable ? 'cursor-pointer border border-transparent hover:border-slate-600/40 transition-all' : 'cursor-default'}`}
     >
       <div className="flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-md overflow-hidden">
-        {imgSrc ? (
-          <img src={imgSrc} alt="" className="w-full h-full object-cover bg-white" loading="lazy" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-amber-500/20">
-            <AlertTriangle className="w-5 h-5 text-amber-400" />
-          </div>
-        )}
+        <ExerciseThumbnail
+          asset={asset}
+          className="w-full h-full"
+          imageClassName="w-full h-full object-cover bg-white"
+        />
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-white truncate">{exerciseName}</div>

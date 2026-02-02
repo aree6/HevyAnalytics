@@ -207,8 +207,8 @@ export const HevyLoginModal: React.FC<HevyLoginModalProps> = ({
                 <ArrowRight className="w-4 h-4" />
               </button>
 
-              <div className="pt-2 ">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-center mt-10">
+              <div className="pt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-center">
                   <div className="flex">
                     {onClearCache ? (
                       <button
@@ -307,7 +307,7 @@ export const HevyLoginModal: React.FC<HevyLoginModalProps> = ({
                 />
               </div>
               <div className="text-xs text-slate-400 text-center">
-                Support is English-only right now. If you use quick login, use the same email/username here. If you don’t have a password, set one in your Hevy account first.
+                Support is English-only right now. If you use quick login, use the same email/username here. If you don't have a password, set one in your Hevy account first.
               </div>
             </>
           ) : (

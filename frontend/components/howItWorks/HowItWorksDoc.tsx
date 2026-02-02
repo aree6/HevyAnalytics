@@ -205,37 +205,36 @@ export const HowItWorksDoc: React.FC<Props> = ({ className = '', showTitle = tru
       </details>
 
       <div className="grid gap-6 lg:grid-cols-[280px,minmax(0,1fr)] px-5 sm:px-6 h-[70vh] min-h-0">
-          <aside className="hidden lg:block pr-2 h-full min-h-0">
-            <div className="h-full min-h-0 overflow-y-auto pr-1">
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-400">On this page</div>
-              <nav className="mt-3 space-y-1 pb-6">
-                {navItems.map((i) => {
-                  const isActive = i.id === activeId;
-                  const pad = i.depth === 0 ? 'pl-0' : i.depth === 1 ? 'pl-3' : 'pl-6';
-                  return (
-                    <a
-                      key={i.id}
-                      href={`#${i.id}`}
-                      onClick={(e) => handleNavClick(e, i.id)}
-                      className={`block rounded-lg px-2 py-1.5 text-sm ${pad} transition-colors border border-transparent ${
-                        isActive
-                          ? 'bg-emerald-500/15 text-emerald-200 border-emerald-500/20'
-                          : 'text-slate-300 hover:bg-white/5 hover:text-white'
+        <aside className="hidden lg:block pr-2 h-full min-h-0">
+          <div className="h-full min-h-0 overflow-y-auto pr-1">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400">On this page</div>
+            <nav className="mt-3 space-y-1 pb-6">
+              {navItems.map((i) => {
+                const isActive = i.id === activeId;
+                const pad = i.depth === 0 ? 'pl-0' : i.depth === 1 ? 'pl-3' : 'pl-6';
+                return (
+                  <a
+                    key={i.id}
+                    href={`#${i.id}`}
+                    onClick={(e) => handleNavClick(e, i.id)}
+                    className={`block rounded-lg px-2 py-1.5 text-sm ${pad} transition-colors border border-transparent ${isActive
+                      ? 'bg-emerald-500/15 text-emerald-200 border-emerald-500/20'
+                      : 'text-slate-300 hover:bg-white/5 hover:text-white'
                       }`}
-                    >
-                      {i.title}
-                    </a>
-                  );
-                })}
-              </nav>
-            </div>
-          </aside>
-
-          <div ref={contentRef} className="space-y-10 overflow-y-auto pr-2 h-full min-h-0 scroll-pt-16">
-            {HOW_IT_WORKS_SECTIONS.map((s) => (
-              <SectionView key={s.id} section={s} level={2} linkTarget={linkTarget} />
-            ))}
+                  >
+                    {i.title}
+                  </a>
+                );
+              })}
+            </nav>
           </div>
+        </aside>
+
+        <div ref={contentRef} className="space-y-10 overflow-y-auto pr-2 h-full min-h-0 scroll-pt-16 pb-32">
+          {HOW_IT_WORKS_SECTIONS.map((s) => (
+            <SectionView key={s.id} section={s} level={2} linkTarget={linkTarget} />
+          ))}
+        </div>
       </div>
     </div>
   );

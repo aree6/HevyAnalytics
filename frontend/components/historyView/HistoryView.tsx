@@ -28,6 +28,7 @@ import { formatDisplayVolume } from '../../utils/format/volumeDisplay';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../../utils/format/deltaFormat';
 import { formatRelativeTime, getEffectiveNowFromWorkoutData, getSessionKey } from '../../utils/date/dateUtils';
 import { parseHevyDateString } from '../../utils/date/parseHevyDateString';
+import { ExerciseThumbnail } from '../common/ExerciseThumbnail';
 import { useTheme } from '../theme/ThemeProvider';
 import { LazyRender } from '../ui/LazyRender';
 import { Sparkline } from './HistorySparkline';
@@ -743,19 +744,12 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
                             >
                               {(() => {
                                 const asset = assetsMap?.get(group.exerciseName);
-                                if (asset && (asset.thumbnail || asset.source)) {
-                                  return (
-                                    <img
-                                      src={asset.thumbnail || asset.source}
-                                      alt=""
-                                      className="w-10 h-10 rounded object-cover flex-shrink-0 row-span-2 bg-white"
-                                      loading="lazy"
-                                      decoding="async"
-                                    />
-                                  );
-                                }
                                 return (
-                                  <div className="w-10 h-10 rounded bg-black/50 row-span-2" />
+                                  <ExerciseThumbnail
+                                    asset={asset}
+                                    className="w-10 h-10 rounded lg:rounded-md flex-shrink-0 row-span-2"
+                                    imageClassName="w-full h-full rounded lg:rounded-md object-cover bg-white"
+                                  />
                                 );
                               })()}
 

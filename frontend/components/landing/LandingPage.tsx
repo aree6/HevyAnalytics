@@ -1,6 +1,6 @@
 import React from 'react';
-import { motion } from 'motion/react';
-import { Github, Info, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Github, Info, ArrowUp } from 'lucide-react';
 import type { DataSourceChoice } from '../../utils/dataSources/types';
 import { ThemedBackground } from '../theme/ThemedBackground';
 import { Navigation } from '../layout/Navigation';
@@ -14,9 +14,32 @@ import { HowItWorksDoc } from '../howItWorks/HowItWorksDoc';
 
 interface LandingPageProps {
   onSelectPlatform: (source: DataSourceChoice) => void;
+  onTryDemo?: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTryDemo }) => {
+  const [showScrollTop, setShowScrollTop] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // Handle scroll to top visibility
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      // Check both scrollTop (standard) and if there's any other scroll behavior
+      const scrollY = container.scrollTop;
+      setShowScrollTop(scrollY > 300);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Platform dock items
   const platformDockItems = [
     {
@@ -47,6 +70,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform }) =>
 
   return (
     <motion.div
+      ref={containerRef}
       initial={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
@@ -92,14 +116,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform }) =>
               </span>
             </h1>
             {/* Feature highlights - what you get */}
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-slate-400 mb-12">
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-slate-400 mb-8">
               <FeatureTag icon={<Flame className="w-4 h-4 text-orange-400" />} text="Muscle Heatmaps" />
               <FeatureTag icon={<CalendarDays className="w-4 h-4 text-blue-400" />} text="Calendar Filtering" />
               <FeatureTag icon={<Trophy className="w-4 h-4 text-yellow-400" />} text="PR Detection" />
               <FeatureTag icon={<BarChart3 className="w-4 h-4 text-emerald-400" />} text="Volume Trends" />
               <FeatureTag icon={<Dumbbell className="w-4 h-4 text-purple-400" />} text="Exercise Deep Dives" />
             </div>
+
+            {/* Demo CTA Button */}
+            {onTryDemo && (
+              <div className="mb-8">
+                <button
+                  onClick={onTryDemo}
+                  className="group inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-semibold h-11 px-8 bg-slate-950/75 text-emerald-300 border border-emerald-500/40 hover:border-emerald-400 hover:text-emerald-200 transition-all duration-200"
+                >
+                  <span>Try Demo with Sample Data</span>
+                </button>
+                <p className="text-slate-500 text-sm mt-2 text-center">
+                  No signup required • Instantly explore features
+                </p>
+              </div>
+            )}
           </div>
+        </div>
+      </section>
+
+      {/* ========== REVIEWS SECTION ========== */}
+      <section id="reviews" className="relative z-10 px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+        <div className="max-w-6xl mx-auto">
+          <ReviewsCarousel />
         </div>
       </section>
 
@@ -119,15 +165,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform }) =>
           </div>
         </div>
       </section>
-
-      {/* ========== REVIEWS SECTION ========== */}
-      <section id="reviews" className="relative z-10 px-4 sm:px-6 lg:px-8 py-16 sm:py-24 pb-56">
-        <div className="max-w-6xl mx-auto">
-          <ReviewsCarousel />
-        </div>
-      </section>
       {/* ========== PLATFORM DOCK ========== */}
       <PlatformDock items={platformDockItems} />
+
+      {/* Back to Top Button */}
+      <AnimatePresence>
+        {showScrollTop && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            onClick={scrollToTop}
+            className="fixed bottom-6 right-6 z-[101] p-3 rounded-full bg-slate-900/80 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-colors shadow-lg backdrop-blur-sm"
+            aria-label="Scroll to top"
+          >
+            <ArrowUp className="w-5 h-5" />
+          </motion.button>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

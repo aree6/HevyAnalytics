@@ -31,6 +31,7 @@ import { useDashboardTopExercises } from './useDashboardTopExercises';
 import { useDashboardVolumeDensity } from './useDashboardVolumeDensity';
 import { useDashboardWeeklySetsDashboard } from './useDashboardWeeklySetsDashboard';
 import { AIAnalyzeModal } from '../modals/AIAnalyzeModal';
+import { useTheme } from '../theme/ThemeProvider';
 
 interface DashboardProps {
   dailyData: DailySummary[];
@@ -68,6 +69,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
   const [isMounted, setIsMounted] = useState(false);
 
   const [aiAnalyzeOpen, setAiAnalyzeOpen] = useState(false);
+  
+  // Get theme mode for AIAnalyzeModal
+  const { mode: themeMode } = useTheme();
 
   // Use centralized now if provided, otherwise fall back to data-based calculation
   const effectiveNow = useMemo(() => now ?? getEffectiveNowFromWorkoutData(fullData), [now, fullData]);
@@ -532,6 +536,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
         dailyData={dailyData}
         exerciseStats={exerciseStats}
         effectiveNow={effectiveNow}
+        themeMode={themeMode}
       />
 
     </>

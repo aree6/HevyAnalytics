@@ -15,6 +15,7 @@ import {
   toHeadlessVolumeMap,
 } from '../../utils/muscle/muscleMapping';
 import { getExerciseAssets, ExerciseAsset } from '../../utils/data/exerciseAssets';
+import { ExerciseThumbnail } from '../common/ExerciseThumbnail';
 import { getSvgMuscleVolumeTimeSeriesRolling, getMuscleVolumeTimeSeriesRolling } from '../../utils/muscle/rollingVolumeCalculator';
 import { bucketRollingWeeklySeriesToWeeks } from '../../utils/muscle/rollingSeriesBucketing';
 import { getEffectiveNowFromWorkoutData } from '../../utils/date/dateUtils';
@@ -924,7 +925,6 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
                 <div className="space-y-2 pb-4">
                   {contributingExercises.map((ex, i) => {
                     const asset = assetsMap?.get(ex.name);
-                    const imgUrl = asset?.sourceType === 'video' ? asset.thumbnail : (asset?.thumbnail || asset?.source);
                     const exData = lookupExerciseMuscleData(ex.name, exerciseMuscleData);
                     const { volumes: exVolumes, maxVolume: exMaxVol } = getExerciseMuscleVolumes(exData);
                     const exHeadlessVolumes = toHeadlessVolumeMap(exVolumes);
@@ -953,19 +953,11 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
                           {/* First column: Image/Icon */}
                           <div className="flex items-center justify-center">
                             <div className="w-full aspect-square">
-                              {imgUrl ? (
-                                <img
-                                  src={imgUrl}
-                                  alt=""
-                                  className="h-full w-full rounded-md object-cover bg-white"
-                                  loading="lazy"
-                                  decoding="async"
-                                />
-                              ) : (
-                                <div className="h-full w-full rounded-md bg-black/50 flex items-center justify-center text-slate-500">
-                                  <Dumbbell className="w-6 h-6" />
-                                </div>
-                              )}
+                              <ExerciseThumbnail
+                                asset={asset}
+                                className="h-full w-full rounded-md"
+                                imageClassName="h-full w-full rounded-md object-cover bg-white"
+                              />
                             </div>
                           </div>
 

@@ -43,6 +43,7 @@ import { analyzeExerciseTrend, type StatusResult } from './exerciseTrendUi';
 import { ConfidenceBadge } from './ExerciseBadges';
 import { CustomTooltip } from './ExerciseChartTooltip';
 import { StrengthProgressionValueDot } from './StrengthProgressionValueDot';
+import { ExerciseThumbnail } from '../common/ExerciseThumbnail';
 
 // --- MAIN COMPONENT ---
 
@@ -614,17 +615,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                   >
                     <div className="flex items-center gap-2 min-w-0 pr-2">
                       {(() => {
-                        if (!asset) return (
-                          <div className="flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-md bg-black/50 flex items-center justify-center text-slate-500">
-                            <Dumbbell className="w-5 h-5" />
-                          </div>
-                        );
-                        const imgUrl = asset.sourceType === 'video' ? asset.thumbnail : (asset.thumbnail || asset.source);
-                        return imgUrl ? (
-                          <img src={imgUrl} alt="" className="flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-md object-cover bg-white" loading="lazy" decoding="async" />
-                        ) : (
-                          <div className="flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-md bg-black/50 flex items-center justify-center text-slate-500">
-                            <Dumbbell className="w-5 h-5" />
+                        return (
+                          <div className="flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16">
+                            <ExerciseThumbnail
+                              asset={asset}
+                              className="w-full h-full rounded-md"
+                              imageClassName="flex-shrink-0 w-full h-full rounded-md object-cover bg-white"
+                            />
                           </div>
                         );
                       })()}
@@ -745,34 +742,15 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                   const a = assetLookup.getAsset(selectedStats.name);
                   if (!a) return null;
 
-                  const videoSrc = (a.sourceType === 'video' ? (a.video ?? a.source) : undefined) ?? undefined;
-                  const imgSrc = a.sourceType === 'video' ? a.thumbnail : (a.thumbnail || a.source);
-
-                  if (videoSrc) {
-                    return (
-                      <div className="w-20 h-20 rounded-lg overflow-hidden flex-none">
-                        <video
-                          key={videoSrc}
-                          width={80}
-                          height={80}
-                          className="w-full h-full object-cover"
-                          poster={a.thumbnail}
-                          src={videoSrc}
-                          autoPlay
-                          loop
-                          muted
-                          playsInline
-                          preload="metadata"
-                        />
-                      </div>
-                    );
-                  }
-
-                  return imgSrc ? (
+                  return (
                     <div className="w-20 h-20 rounded-lg overflow-hidden flex-none">
-                      <img src={imgSrc} alt={selectedStats.name} width={80} height={80} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                      <ExerciseThumbnail
+                        asset={a}
+                        className="w-full h-full"
+                        imageClassName="w-full h-full object-cover"
+                      />
                     </div>
-                  ) : null;
+                  );
                 })()}
               </div>
 

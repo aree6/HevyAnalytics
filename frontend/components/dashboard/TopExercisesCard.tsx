@@ -26,6 +26,7 @@ import {
 } from './ChartBits';
 import { getRechartsXAxisInterval, RECHARTS_XAXIS_PADDING } from '../../utils/chart/chartEnhancements';
 import { formatVsPrevRollingWindow } from '../../utils/date/dateUtils';
+import { ExerciseThumbnail } from '../common/ExerciseThumbnail';
 
 export type TopExerciseMode = 'all' | 'weekly' | 'monthly' | 'yearly';
 export type TopExercisesView = 'barh' | 'area';
@@ -92,11 +93,10 @@ export const TopExercisesCard = ({
               onClick={() => setTopExerciseMode('all')}
               title="All"
               aria-label="All"
-              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 ${
-                topExerciseMode === 'all'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-              }`}
+              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 ${topExerciseMode === 'all'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                }`}
             >
               <Infinity className="w-3 h-3" />
               <span className="sr-only">All</span>
@@ -105,11 +105,10 @@ export const TopExercisesCard = ({
               onClick={() => setTopExerciseMode('weekly')}
               title="Last Week"
               aria-label="Last Week"
-              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
-                topExerciseMode === 'weekly'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-              }`}
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${topExerciseMode === 'weekly'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                }`}
             >
               lst wk
             </button>
@@ -117,11 +116,10 @@ export const TopExercisesCard = ({
               onClick={() => setTopExerciseMode('monthly')}
               title="Last Month"
               aria-label="Last Month"
-              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
-                topExerciseMode === 'monthly'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-              }`}
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${topExerciseMode === 'monthly'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                }`}
             >
               lst mo
             </button>
@@ -129,11 +127,10 @@ export const TopExercisesCard = ({
               onClick={() => setTopExerciseMode('yearly')}
               title="Last Year"
               aria-label="Last Year"
-              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${
-                topExerciseMode === 'yearly'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-              }`}
+              className={`px-1 h-5 flex items-center justify-center rounded transition-all duration-200 text-[8px] font-bold leading-none whitespace-nowrap ${topExerciseMode === 'yearly'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                }`}
             >
               lst yr
             </button>
@@ -144,11 +141,10 @@ export const TopExercisesCard = ({
               onClick={() => setTopExercisesView('barh')}
               title="Bars"
               aria-label="Bars"
-              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 ${
-                topExercisesView === 'barh'
-                  ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-              }`}
+              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 ${topExercisesView === 'barh'
+                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                }`}
             >
               <ChartBarStacked className="w-3 h-3" />
               <span className="sr-only">Bars</span>
@@ -157,11 +153,10 @@ export const TopExercisesCard = ({
               onClick={() => setTopExercisesView('area')}
               title="Area"
               aria-label="Area"
-              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 ${
-                topExercisesView === 'area'
-                  ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
-              }`}
+              className={`w-6 h-5 flex items-center justify-center rounded transition-all duration-200 ${topExercisesView === 'area'
+                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+                }`}
             >
               <AreaChartIcon className="w-3 h-3" />
               <span className="sr-only">Area</span>
@@ -262,19 +257,19 @@ export const TopExercisesCard = ({
 
                               const countShimmerStyle: React.CSSProperties | undefined = medal
                                 ? {
-                                    backgroundImage:
-                                      medal === 'gold'
-                                        ? 'linear-gradient(90deg, rgba(245,158,11,1) 0%, rgba(255,255,255,0.95) 18%, rgba(245,158,11,1) 36%, rgba(251,191,36,1) 100%)'
-                                        : medal === 'silver'
-                                          ? 'linear-gradient(90deg, rgba(148,163,184,1) 0%, rgba(255,255,255,0.98) 18%, rgba(148,163,184,1) 36%, rgba(226,232,240,1) 100%)'
-                                          : 'linear-gradient(90deg, rgba(251,146,60,1) 0%, rgba(255,255,255,0.92) 18%, rgba(251,146,60,1) 36%, rgba(253,186,116,1) 100%)',
-                                    backgroundSize: '220% 100%',
-                                    WebkitBackgroundClip: 'text',
-                                    backgroundClip: 'text',
-                                    color: 'transparent',
-                                    filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.08))',
-                                    animation: 'textShimmer 2.4s linear infinite',
-                                  }
+                                  backgroundImage:
+                                    medal === 'gold'
+                                      ? 'linear-gradient(90deg, rgba(245,158,11,1) 0%, rgba(255,255,255,0.95) 18%, rgba(245,158,11,1) 36%, rgba(251,191,36,1) 100%)'
+                                      : medal === 'silver'
+                                        ? 'linear-gradient(90deg, rgba(148,163,184,1) 0%, rgba(255,255,255,0.98) 18%, rgba(148,163,184,1) 36%, rgba(226,232,240,1) 100%)'
+                                        : 'linear-gradient(90deg, rgba(251,146,60,1) 0%, rgba(255,255,255,0.92) 18%, rgba(251,146,60,1) 36%, rgba(253,186,116,1) 100%)',
+                                  backgroundSize: '220% 100%',
+                                  WebkitBackgroundClip: 'text',
+                                  backgroundClip: 'text',
+                                  color: 'transparent',
+                                  filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.08))',
+                                  animation: 'textShimmer 2.4s linear infinite',
+                                }
                                 : undefined;
 
                               const barWidthPct = Math.max(8, pct);
@@ -290,7 +285,7 @@ export const TopExercisesCard = ({
                                 >
                                   <div className="hidden sm:flex items-center gap-2 min-w-0">
                                     <div
-                                      className="relative rounded-full overflow-hidden min-w-0"
+                                      className="relative rounded-full overflow-hidden min-w-0 border border-transparent hover:border-slate-600/40 transition-all"
                                       style={{
                                         height: `${rowH}px`,
                                         width: `${barWidthPct}%`,
@@ -320,18 +315,11 @@ export const TopExercisesCard = ({
                                         className={`absolute top-1/2 -translate-y-1/2 right-1 rounded-full overflow-hidden bg-white ${medalRing}`}
                                         style={{ width: `${avatar}px`, height: `${avatar}px` }}
                                       >
-                                        {thumbnail ? (
-                                          <img
-                                            src={thumbnail}
-                                            alt={exercise.name}
-                                            className="w-full h-full object-cover object-center"
-                                            loading="lazy"
-                                          />
-                                        ) : (
-                                          <div className="w-full h-full bg-white/95 flex items-center justify-center">
-                                            <Dumbbell className="w-5 h-5 text-slate-500" />
-                                          </div>
-                                        )}
+                                        <ExerciseThumbnail
+                                          asset={asset}
+                                          className="w-full h-full"
+                                          imageClassName="w-full h-full object-cover object-center"
+                                        />
                                       </div>
                                     </div>
 
@@ -349,7 +337,7 @@ export const TopExercisesCard = ({
 
                                   <div className="flex flex-col gap-1 sm:hidden min-w-0">
                                     <div
-                                      className="relative rounded-full overflow-hidden min-w-0"
+                                      className="relative rounded-full overflow-hidden min-w-0 border border-transparent hover:border-slate-600/40 transition-all"
                                       style={{
                                         height: `${rowH}px`,
                                         width: `${barWidthPct}%`,
@@ -379,18 +367,11 @@ export const TopExercisesCard = ({
                                         className={`absolute top-1/2 -translate-y-1/2 right-1 rounded-full overflow-hidden bg-white ${medalRing}`}
                                         style={{ width: `${avatar}px`, height: `${avatar}px` }}
                                       >
-                                        {thumbnail ? (
-                                          <img
-                                            src={thumbnail}
-                                            alt={exercise.name}
-                                            className="w-full h-full object-cover object-center"
-                                            loading="lazy"
-                                          />
-                                        ) : (
-                                          <div className="w-full h-full bg-white/95 flex items-center justify-center">
-                                            <Dumbbell className="w-5 h-5 text-slate-500" />
-                                          </div>
-                                        )}
+                                        <ExerciseThumbnail
+                                          asset={asset}
+                                          className="w-full h-full"
+                                          imageClassName="w-full h-full object-cover object-center"
+                                        />
                                       </div>
                                     </div>
                                   </div>

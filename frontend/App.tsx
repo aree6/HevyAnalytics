@@ -658,6 +658,14 @@ const App: React.FC = () => {
       setOnboarding({ intent: 'update', step: 'hevy_login', platform: 'hevy' });
       return;
     }
+    if (dataSource === 'other') {
+      if (!getPreferencesConfirmed()) {
+        setOnboarding({ intent: 'update', step: 'other_prefs', platform: 'other' });
+        return;
+      }
+      setOnboarding({ intent: 'update', step: 'other_csv', platform: 'other', backStep: 'other_prefs' });
+      return;
+    }
     setOnboarding({ intent: 'update', step: 'platform' });
   };
 

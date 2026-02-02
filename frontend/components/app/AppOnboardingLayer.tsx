@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { BodyMapGender } from '../bodyMap/BodyMap';
 import type { WeightUnit } from '../../utils/storage/localStorage';
 import type { OnboardingFlow } from '../../app/onboarding/types';
@@ -72,6 +72,29 @@ export const AppOnboardingLayer: React.FC<AppOnboardingLayerProps> = ({
   onLyfatLogin,
   onLyfatSyncSaved,
 }) => {
+  // Auto-load demo data when entering demo_csv step
+  useEffect(() => {
+    if (onboarding?.step === 'demo_csv' && !isAnalyzing) {
+      // Fetch and process the sample CSV automatically
+      fetch('/sample_demo.csv')
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('Failed to load demo data');
+          }
+          return response.text();
+        })
+        .then((csvText) => {
+          onSetCsvImportError(null);
+          // Create a File object from the CSV text to reuse existing processFile logic
+          const file = new File([csvText], 'sample_demo.csv', { type: 'text/csv' });
+          onProcessFile(file, 'other', weightUnit);
+        })
+        .catch((err) => {
+          onSetCsvImportError('Failed to load demo data. Please try again.');
+        });
+    }
+  }, [onboarding?.step, isAnalyzing, weightUnit, onSetCsvImportError, onProcessFile]);
+
   if (!onboarding) return null;
 
   return (
@@ -97,57 +120,101 @@ export const AppOnboardingLayer: React.FC<AppOnboardingLayerProps> = ({
             }
             onSetOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' });
           }}
+          onTryDemo={() => {
+            onSetCsvImportError(null);
+            onSetHevyLoginError(null);
+            onSetLyfatLoginError(null);
+            onSetOnboarding({ intent: 'initial', step: 'demo_prefs', platform: 'other' });
+          }}
         />
       ) : null}
 
       {/* Modal for update flow only */}
       {onboarding.intent === 'update' && onboarding.step === 'platform' ? (
-        // If user's saved data source is 'other', skip the choose-platform modal
-        // and open the CSV import modal directly so they return to their CSV upload
-        // screen (no platform-specific copy).
-        dataSource === 'other' ? (
-          <CSVImportModal
-            intent={onboarding.intent}
-            platform="other"
-            onClearCache={onClearCacheAndRestart}
-            onFileSelect={(file, gender, unit) => {
-              onSetBodyMapGender(gender);
-              onSetWeightUnit(unit);
-              savePreferencesConfirmed(true);
-              onSetCsvImportError(null);
-              onProcessFile(file, 'other', unit);
-            }}
-            isLoading={isAnalyzing}
-            initialGender={bodyMapGender}
-            initialUnit={weightUnit}
-            onGenderChange={(g) => onSetBodyMapGender(g)}
-            onUnitChange={(u) => onSetWeightUnit(u)}
-            errorMessage={csvImportError}
-            onBack={() => onSetOnboarding(null)}
-            onClose={() => onSetOnboarding(null)}
-          />
-        ) : (
-          <LandingPage
-            onSelectPlatform={(source) => {
-              onSetCsvImportError(null);
-              onSetHevyLoginError(null);
-              onSetLyfatLoginError(null);
-              if (source === 'strong') {
-                onSetOnboarding({ intent: onboarding.intent, step: 'strong_prefs', platform: 'strong' });
-                return;
-              }
-              if (source === 'lyfta') {
-                onSetOnboarding({ intent: onboarding.intent, step: 'lyfta_prefs', platform: 'lyfta' });
-                return;
-              }
-              if (source === 'other') {
-                onSetOnboarding({ intent: onboarding.intent, step: 'other_prefs', platform: 'other' });
-                return;
-              }
-              onSetOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' });
-            }}
-          />
-        )
+        <LandingPage
+          onSelectPlatform={(source) => {
+            onSetCsvImportError(null);
+            onSetHevyLoginError(null);
+            onSetLyfatLoginError(null);
+            if (source === 'strong') {
+              onSetOnboarding({ intent: onboarding.intent, step: 'strong_prefs', platform: 'strong' });
+              return;
+            }
+            if (source === 'lyfta') {
+              onSetOnboarding({ intent: onboarding.intent, step: 'lyfta_prefs', platform: 'lyfta' });
+              return;
+            }
+            if (source === 'other') {
+              onSetOnboarding({ intent: onboarding.intent, step: 'other_prefs', platform: 'other' });
+              return;
+            }
+            onSetOnboarding({ intent: onboarding.intent, step: 'hevy_prefs', platform: 'hevy' });
+          }}
+          onTryDemo={() => {
+            onSetCsvImportError(null);
+            onSetHevyLoginError(null);
+            onSetLyfatLoginError(null);
+            onSetOnboarding({ intent: 'initial', step: 'demo_prefs', platform: 'other' });
+          }}
+        />
+      ) : null}
+
+      {/* Demo preferences step */}
+      {onboarding.step === 'demo_prefs' ? (
+        <CSVImportModal
+          intent={onboarding.intent}
+          platform="other"
+          variant="preferences"
+          continueLabel="Try Demo"
+          isLoading={isAnalyzing}
+          initialGender={getPreferencesConfirmed() ? bodyMapGender : undefined}
+          initialUnit={getPreferencesConfirmed() ? weightUnit : undefined}
+          onGenderChange={(g) => onSetBodyMapGender(g)}
+          onUnitChange={(u) => onSetWeightUnit(u)}
+          onContinue={(gender, unit) => {
+            onSetBodyMapGender(gender);
+            onSetWeightUnit(unit);
+            savePreferencesConfirmed(true);
+            onSetOnboarding({ intent: onboarding.intent, step: 'demo_csv', platform: 'other', backStep: 'demo_prefs' });
+          }}
+          onBack={
+            onboarding.intent === 'initial'
+              ? () => onSetOnboarding({ intent: onboarding.intent, step: 'platform' })
+              : () => onSetOnboarding({ intent: onboarding.intent, step: 'platform' })
+          }
+          onClose={onboarding.intent === 'update' ? () => onSetOnboarding(null) : undefined}
+        />
+      ) : null}
+
+      {/* Demo CSV step - automatically load sample data */}
+      {onboarding.step === 'demo_csv' ? (
+        <CSVImportModal
+          intent={onboarding.intent}
+          platform="other"
+          variant="csv"
+          hideBodyTypeAndUnit={true}
+          onClearCache={onClearCacheAndRestart}
+          onFileSelect={(_file, _gender, unit) => {
+            // This won't be called for demo since we'll auto-load
+            onSetCsvImportError(null);
+            onProcessFile(_file, 'other', unit);
+          }}
+          isLoading={isAnalyzing}
+          initialGender={bodyMapGender}
+          initialUnit={weightUnit}
+          onGenderChange={(g) => onSetBodyMapGender(g)}
+          onUnitChange={(u) => onSetWeightUnit(u)}
+          errorMessage={csvImportError}
+          onBack={() => {
+            if (onboarding.intent === 'initial') {
+              const backStep = onboarding.backStep ?? 'demo_prefs';
+              onSetOnboarding({ intent: onboarding.intent, step: backStep, platform: 'other' });
+              return;
+            }
+            onSetOnboarding({ intent: 'initial', step: 'platform' });
+          }}
+          onClose={onboarding.intent === 'update' ? () => onSetOnboarding(null) : undefined}
+        />
       ) : null}
 
       {onboarding.step === 'hevy_prefs' ? (
@@ -347,7 +414,7 @@ export const AppOnboardingLayer: React.FC<AppOnboardingLayerProps> = ({
               onSetOnboarding({ intent: onboarding.intent, step: backStep, platform: 'other' });
               return;
             }
-            onSetOnboarding(null);
+            onSetOnboarding({ intent: 'initial', step: 'platform' });
           }}
           onClose={onboarding.intent === 'update' ? () => onSetOnboarding(null) : undefined}
         />
