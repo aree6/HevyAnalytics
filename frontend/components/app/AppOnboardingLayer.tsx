@@ -76,7 +76,7 @@ export const AppOnboardingLayer: React.FC<AppOnboardingLayerProps> = ({
   useEffect(() => {
     if (onboarding?.step === 'demo_csv' && !isAnalyzing) {
       // Fetch and process the sample CSV automatically
-      fetch('/sample_demo.csv')
+      fetch(`${import.meta.env.BASE_URL}sample_demo.csv`)
         .then((response) => {
           if (!response.ok) {
             throw new Error('Failed to load demo data');
