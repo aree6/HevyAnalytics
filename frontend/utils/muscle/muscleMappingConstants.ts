@@ -34,7 +34,7 @@ export const HEADLESS_MUSCLE_NAMES: Readonly<Record<HeadlessMuscleId, string>> =
   traps: 'Traps',
   lats: 'Lats',
   lowerback: 'Lower Back',
-  abdominals: 'Abdominals',
+  abdominals: 'Abs',
   obliques: 'Obliques',
   quads: 'Quads',
   hamstrings: 'Hamstrings',
@@ -42,6 +42,17 @@ export const HEADLESS_MUSCLE_NAMES: Readonly<Record<HeadlessMuscleId, string>> =
   calves: 'Calves',
   adductors: 'Adductors',
 };
+
+const roundToOneDecimal = (n: number): number => Math.round(n * 10) / 10;
+
+/** Build radar chart series from headless volume map: order by value descending (highest first), rounded values. */
+export function getHeadlessRadarSeries(headlessVolumes: Map<string, number>): { subject: string; value: number }[] {
+  const raw = HEADLESS_MUSCLE_IDS.map((id) => ({
+    subject: HEADLESS_MUSCLE_NAMES[id],
+    value: roundToOneDecimal(headlessVolumes.get(id) ?? 0),
+  }));
+  return [...raw].sort((a, b) => b.value - a.value);
+}
 
 export const DETAILED_SVG_ID_TO_HEADLESS_ID: Readonly<Record<string, HeadlessMuscleId>> = {
   // Chest

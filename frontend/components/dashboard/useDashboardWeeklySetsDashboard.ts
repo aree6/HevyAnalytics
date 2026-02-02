@@ -16,18 +16,15 @@ export const useDashboardWeeklySetsDashboard = (args: {
   compositionGrouping: WeeklySetsGrouping;
 }): {
   weeklySetsDashboard: {
-    composition: Array<{ subject: string; value: number }>;
     heatmap: { volumes: Map<string, number>; maxVolume: number };
     windowStart: Date | null;
   };
-  compositionQuickData: Array<{ subject: string; value: number }>;
 } => {
   const { assetsMap, fullData, effectiveNow, muscleCompQuick, compositionGrouping } = args;
 
   const weeklySetsDashboard = useMemo(() => {
     if (!assetsMap) {
       return {
-        composition: [] as { subject: string; value: number }[],
         heatmap: { volumes: new Map<string, number>(), maxVolume: 1 },
         windowStart: null as Date | null,
       };
@@ -46,7 +43,6 @@ export const useDashboardWeeklySetsDashboard = (args: {
           compositionGrouping
         );
         return {
-          composition: computed.composition,
           heatmap: computed.heatmap,
           windowStart: computed.windowStart,
         };
@@ -55,7 +51,5 @@ export const useDashboardWeeklySetsDashboard = (args: {
     );
   }, [assetsMap, fullData, effectiveNow, muscleCompQuick, compositionGrouping]);
 
-  const compositionQuickData = weeklySetsDashboard.composition;
-
-  return { weeklySetsDashboard, compositionQuickData };
+  return { weeklySetsDashboard };
 };

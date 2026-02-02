@@ -30,8 +30,13 @@ import {
   YAxis,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Dumbbell, X, Activity, Infinity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Dumbbell, X, Activity, Infinity, Scan, Grid3X3 } from 'lucide-react';
 import { type NormalizedMuscleGroup } from '../../utils/muscle/muscleNormalization';
 import { LazyRender } from '../ui/LazyRender';
 import { ChartSkeleton } from '../ui/ChartSkeleton';
@@ -55,6 +60,7 @@ import {
   getHeadlessIdForDetailedSvgId,
   HEADLESS_ID_TO_DETAILED_SVG_IDS,
   HEADLESS_MUSCLE_NAMES,
+  getHeadlessRadarSeries,
   type HeadlessMuscleId,
 } from '../../utils/muscle/muscleMappingConstants';
 
@@ -104,6 +110,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
   const [weeklySetsWindow, setWeeklySetsWindow] = useState<WeeklySetsWindow>('30d');
   const [viewMode, setViewMode] = useState<ViewMode>('headless');
+  const [weeklySetsChartView, setWeeklySetsChartView] = useState<'heatmap' | 'radar'>('heatmap');
   const [activeQuickFilter, setActiveQuickFilter] = useState<QuickFilterCategory | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<TooltipData | null>(null);
 
@@ -333,6 +340,8 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
     // Derive headless weekly rates from the same cached weekly-sets computation the Dashboard uses.
     return toHeadlessVolumeMap(heatmap.volumes);
   }, [assetsMap, windowStart, weeklySetsDashboardMuscles]);
+
+  const radarData = useMemo(() => getHeadlessRadarSeries(headlessRatesMap), [headlessRatesMap]);
 
   const weeklySetsSummary = useMemo(() => {
     if (viewMode === 'headless') {
@@ -704,10 +713,10 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
       {/* Main Content - Always Side by Side Layout */}
       <div className="grid gap-2 grid-cols-1 lg:grid-cols-2">
         {/* Left: Body Map */}
-        <div className="bg-black/70 rounded-xl border border-slate-700/50 p-4 relative">
+        <div className="bg-black/70 rounded-xl border border-slate-700/50 p-4 relative flex flex-col min-h-0">
           {/* Top Bar: Quick Filters (left) + Time Window (right) */}
-          <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between">
-            {/* Quick Filters - Left side (Push/Pull/Legs only) */}
+          <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between gap-2">
+            {/* Quick Filters - Left */}
             <div className="flex items-center gap-1 bg-black/70 rounded-lg p-1 shadow-lg">
               {(['PUS', 'PUL', 'LEG'] as const).map(filter => (
                 <button
@@ -724,7 +733,27 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
               ))}
             </div>
 
-            {/* Time Window Toggle - Right side */}
+            {/* Heatmap / Radar view - center */}
+            <div className="bg-black/70 p-0.5 rounded-lg inline-flex gap-0.5 border border-slate-700/50 shrink-0">
+              <button
+                onClick={() => setWeeklySetsChartView('heatmap')}
+                title="Heatmap"
+                aria-label="Heatmap"
+                className={`w-6 h-5 flex items-center justify-center rounded ${weeklySetsChartView === 'heatmap' ? 'bg-cyan-600 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
+              >
+                <Grid3X3 className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => setWeeklySetsChartView('radar')}
+                title="Radar"
+                aria-label="Radar"
+                className={`w-6 h-5 flex items-center justify-center rounded ${weeklySetsChartView === 'radar' ? 'bg-cyan-600 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
+              >
+                <Scan className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Time Window Toggle - Right */}
             <div className="inline-flex bg-black/70 rounded-lg p-0.5 border border-slate-700/50">
               {(['all', '7d', '30d', '365d'] as const).map(w => (
                 <button
@@ -747,45 +776,97 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
             </div>
           </div>
 
-          <div className="sm:transform sm:scale-[0.8] sm:origin-middle">
-            <BodyMap
-              onPartClick={handleMuscleClick}
-              selectedPart={selectedMuscle}
-              selectedMuscleIdsOverride={selectedBodyMapIds}
-              hoveredMuscleIdsOverride={hoveredBodyMapIds}
-              muscleVolumes={viewMode === 'group' ? groupedBodyMapVolumes : muscleVolumes}
-              maxVolume={viewMode === 'group' ? maxGroupVolume : maxVolume}
-              onPartHover={handleMuscleHover}
-              gender={bodyMapGender}
-              viewMode={viewMode}
-            />
+          {weeklySetsChartView === 'radar' ? (
+          <div className="flex-1 flex flex-col items-center justify-center min-h-0 pt-10">
+            {radarData.some((d) => (d.value ?? 0) > 0) ? (
+              <div className="w-full min-h-[280px] flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={280}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                    <PolarGrid stroke="#334155" />
+                    <PolarAngleAxis
+                      dataKey="subject"
+                      tick={({ payload, x, y, index, cx, cy }: { payload?: { subject?: string }; x?: number; y?: number; index?: number; cx?: number; cy?: number }) => {
+                        const label = radarData[index ?? 0]?.subject ?? payload?.subject ?? '';
+                        const px = x ?? 0;
+                        const py = y ?? 0;
+                        const outward = 1.18;
+                        const tx = cx != null && cy != null ? cx + (px - cx) * outward : px;
+                        const ty = cx != null && cy != null ? cy + (py - cy) * outward : py;
+                        return (
+                          <g transform={`translate(${tx},${ty})`}>
+                            <text fill="#94a3b8" fontSize={11} textAnchor="middle" dominantBaseline="middle">
+                              {label}
+                            </text>
+                          </g>
+                        );
+                      }}
+                    />
+                    <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+                    <Radar
+                      name="Weekly Sets"
+                      dataKey="value"
+                      stroke="#06b6d4"
+                      strokeWidth={3}
+                      fill="#06b6d4"
+                      fillOpacity={0.35}
+                      animationDuration={1500}
+                    />
+                    <RechartsTooltip
+                      contentStyle={CHART_TOOLTIP_STYLE}
+                      formatter={(value: number) => [Number(value).toFixed(1), 'Sets/wk']}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center min-h-[280px] text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg mx-2 w-full">
+                No muscle composition for this period yet.
+              </div>
+            )}
           </div>
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0 pt-10">
+              <div className="sm:transform sm:scale-[0.8] sm:origin-middle">
+                <BodyMap
+                  onPartClick={handleMuscleClick}
+                  selectedPart={selectedMuscle}
+                  selectedMuscleIdsOverride={selectedBodyMapIds}
+                  hoveredMuscleIdsOverride={hoveredBodyMapIds}
+                  muscleVolumes={viewMode === 'group' ? groupedBodyMapVolumes : muscleVolumes}
+                  maxVolume={viewMode === 'group' ? maxGroupVolume : maxVolume}
+                  onPartHover={handleMuscleHover}
+                  gender={bodyMapGender}
+                  viewMode={viewMode}
+                />
+              </div>
 
-          <div className="sm:hidden  mb-10 text-center text-[11px] font-semibold text-slate-600">
-            Tap to see more details
-          </div>
+              <div className="sm:hidden mb-10 text-center text-[11px] font-semibold text-slate-600">
+                Tap to see more details
+              </div>
 
-          {/* Color Legend - Bottom of body map */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
-            <div className="flex items-center gap-3 text-xs text-slate-400 bg-slate-950/75 rounded-lg px-3 py-1.5">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-2 rounded" style={{ backgroundColor: '#ffffff' }}></div>
-                <span>None</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 75%)' }}></div>
-                <span>Low</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 50%)' }}></div>
-                <span>Med</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 25%)' }}></div>
-                <span>High</span>
+              {/* Color Legend - Bottom of body map */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
+                <div className="flex items-center gap-3 text-xs text-slate-400 bg-slate-950/75 rounded-lg px-3 py-1.5">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: '#ffffff' }}></div>
+                    <span>None</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 75%)' }}></div>
+                    <span>Low</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 50%)' }}></div>
+                    <span>Med</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-2 rounded" style={{ backgroundColor: 'hsl(var(--heatmap-hue), 75%, 25%)' }}></div>
+                    <span>High</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Hover Tooltip */}
           {hoverTooltip && <HoverTooltip data={hoverTooltip} />}

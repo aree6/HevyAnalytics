@@ -286,7 +286,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     effectiveNow,
   });
 
-  const { weeklySetsDashboard, compositionQuickData } = useDashboardWeeklySetsDashboard({
+  const { weeklySetsDashboard } = useDashboardWeeklySetsDashboard({
     assetsMap,
     fullData,
     effectiveNow,
@@ -423,7 +423,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
               setCompositionGrouping={setCompositionGrouping}
               muscleCompQuick={muscleCompQuick}
               setMuscleCompQuick={setMuscleCompQuick}
-              compositionQuickData={compositionQuickData}
               heatmap={weeklySetsDashboard.heatmap}
               tooltipStyle={TooltipStyle as any}
               onMuscleClick={(muscleId, viewMode) => onMuscleClick?.(muscleId, viewMode, muscleCompQuick)}

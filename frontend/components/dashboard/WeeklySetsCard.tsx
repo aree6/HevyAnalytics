@@ -1,12 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  Dumbbell,
-  Grid3X3,
-  Infinity,
-  PersonStanding,
-  Scan,
-  BicepsFlexed,
-} from 'lucide-react';
+import { Grid3X3, Infinity, Scan } from 'lucide-react';
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -27,16 +20,14 @@ import {
   InsightText,
   TrendBadge,
 } from './ChartBits';
-import { SVG_MUSCLE_NAMES, toHeadlessVolumeMap } from '../../utils/muscle/muscleMapping';
-import { SVG_TO_MUSCLE_GROUP, getGroupHighlightIds, HEADLESS_MUSCLE_NAMES } from '../../utils/muscle/muscleMappingConstants';
+import { toHeadlessVolumeMap } from '../../utils/muscle/muscleMapping';
+import { SVG_TO_MUSCLE_GROUP, getGroupHighlightIds, HEADLESS_MUSCLE_NAMES, getHeadlessRadarSeries } from '../../utils/muscle/muscleMappingConstants';
 import { differenceInCalendarDays } from 'date-fns';
 import { isPlausibleDate } from '../../utils/date/dateUtils';
 
 type WeeklySetsView = 'radar' | 'heatmap';
 type WeeklySetsWindow = 'all' | '7d' | '30d' | '365d';
 type WeeklySetsGrouping = 'groups' | 'muscles';
-
-type WeeklySetsPoint = { subject: string; value: number };
 
 type HeatmapData = {
   volumes: Map<string, number>;
@@ -61,7 +52,6 @@ export const WeeklySetsCard = ({
   setCompositionGrouping,
   muscleCompQuick,
   setMuscleCompQuick,
-  compositionQuickData,
   heatmap,
   tooltipStyle,
   onMuscleClick,
@@ -76,7 +66,6 @@ export const WeeklySetsCard = ({
   setCompositionGrouping: (v: WeeklySetsGrouping) => void;
   muscleCompQuick: WeeklySetsWindow;
   setMuscleCompQuick: (v: WeeklySetsWindow) => void;
-  compositionQuickData: WeeklySetsPoint[];
   heatmap: HeatmapData;
   tooltipStyle: Record<string, unknown>;
   onMuscleClick?: (muscleId: string, viewMode: 'muscle' | 'group' | 'headless') => void;
@@ -86,16 +75,19 @@ export const WeeklySetsCard = ({
 }) => {
   const [heatmapHoveredMuscle, setHeatmapHoveredMuscle] = useState<string | null>(null);
 
+  const headlessVolumes = useMemo(() => toHeadlessVolumeMap(heatmap.volumes), [heatmap.volumes]);
+  const radarData = useMemo(() => getHeadlessRadarSeries(headlessVolumes), [headlessVolumes]);
+
   const weeklySetsInsight = useMemo(() => {
-    if (!compositionQuickData || compositionQuickData.length === 0) return null;
-    const total = compositionQuickData.reduce((acc, d) => acc + (d.value || 0), 0);
-    const sorted = [...compositionQuickData].sort((a, b) => (b.value || 0) - (a.value || 0));
+    const hasData = radarData.some((d) => (d.value ?? 0) > 0);
+    if (!hasData) return null;
+    const total = radarData.reduce((acc, d) => acc + (d.value || 0), 0);
+    const sorted = [...radarData].filter((d) => (d.value ?? 0) > 0).sort((a, b) => (b.value || 0) - (a.value || 0));
     const top = sorted[0];
-    const topShare = total > 0 ? safePct(top.value || 0, total) : 0;
+    if (!top) return null;
     const top3 = sorted.slice(0, 3).reduce((acc, d) => acc + (d.value || 0), 0);
     const top3Share = total > 0 ? safePct(top3, total) : 0;
 
-    // Compute effective window duration for the label
     let durationLabel = '';
     if (windowStart && isPlausibleDate(windowStart) && isPlausibleDate(now)) {
       const days = differenceInCalendarDays(now, windowStart) + 1;
@@ -105,11 +97,10 @@ export const WeeklySetsCard = ({
     return {
       total,
       top,
-      topShare,
       top3Share,
       durationLabel,
     };
-  }, [compositionQuickData, windowStart, now]);
+  }, [radarData, windowStart, now]);
 
   const heatmapHoveredMuscleIds = useMemo(() => {
     if (!heatmapHoveredMuscle) return undefined;
@@ -128,21 +119,11 @@ export const WeeklySetsCard = ({
 
   const weeklySetsHoverMeta = useMemo(() => {
     if (!heatmapHoveredMuscle) return null;
-
-    // Try headless muscle name first (for headless mode), then SVG name, then group
-    const name =
-      (HEADLESS_MUSCLE_NAMES as any)[heatmapHoveredMuscle] ||
-      (compositionGrouping === 'groups'
-        ? (SVG_TO_MUSCLE_GROUP as any)[heatmapHoveredMuscle]
-        : (SVG_MUSCLE_NAMES as any)[heatmapHoveredMuscle]) ||
-      'Unknown';
-
-    // Get value from headless-converted volumes to match BodyMap's data source
-    const headlessVolumes = toHeadlessVolumeMap(heatmap.volumes);
-    const value = headlessVolumes.get(heatmapHoveredMuscle) || heatmap.volumes.get(heatmapHoveredMuscle) || 0;
-
+    const name = (HEADLESS_MUSCLE_NAMES as any)[heatmapHoveredMuscle] ?? (SVG_TO_MUSCLE_GROUP as any)[heatmapHoveredMuscle] ?? 'Unknown';
+    const raw = headlessVolumes.get(heatmapHoveredMuscle) ?? 0;
+    const value = Math.round(raw * 10) / 10;
     return { name, value };
-  }, [heatmapHoveredMuscle, compositionGrouping, heatmap]);
+  }, [heatmapHoveredMuscle, headlessVolumes]);
 
   return (
     <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl min-w-0">
@@ -248,16 +229,33 @@ export const WeeklySetsCard = ({
 
       <div className={`relative z-10 flex-1 w-full min-h-[250px] sm:min-h-[300px] transition-all duration-700 delay-100 ${isMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} min-w-0 pb-10`}>
         {weeklySetsView === 'radar' ? (
-          compositionQuickData.length === 0 ? (
+          !radarData.some((d) => (d.value ?? 0) > 0) ? (
             <div className="flex items-center justify-center h-[300px] text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
               No muscle composition for this period yet.
             </div>
           ) : (
             <LazyRender className="w-full" placeholder={<ChartSkeleton style={{ height: 300 }} />}>
               <ResponsiveContainer width="100%" height={300}>
-                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={compositionQuickData}>
+                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
                   <PolarGrid stroke="#334155" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                  <PolarAngleAxis
+                    dataKey="subject"
+                    tick={({ payload, x, y, index, cx, cy }: { payload?: { subject?: string }; x?: number; y?: number; index?: number; cx?: number; cy?: number }) => {
+                      const label = radarData[index ?? 0]?.subject ?? payload?.subject ?? '';
+                      const px = x ?? 0;
+                      const py = y ?? 0;
+                      const outward = 1.18;
+                      const tx = cx != null && cy != null ? cx + (px - cx) * outward : px;
+                      const ty = cx != null && cy != null ? cy + (py - cy) * outward : py;
+                      return (
+                        <g transform={`translate(${tx},${ty})`}>
+                          <text fill="#94a3b8" fontSize={11} textAnchor="middle" dominantBaseline="middle">
+                            {label}
+                          </text>
+                        </g>
+                      );
+                    }}
+                  />
                   <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
                   <Radar
                     name="Weekly Sets"
@@ -268,7 +266,10 @@ export const WeeklySetsCard = ({
                     fillOpacity={0.35}
                     animationDuration={1500}
                   />
-                  <Tooltip contentStyle={tooltipStyle} />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(value: number) => [Number(value).toFixed(1), 'Sets/wk']}
+                  />
                 </RadarChart>
               </ResponsiveContainer>
             </LazyRender>
@@ -284,22 +285,16 @@ export const WeeklySetsCard = ({
                 <>
                   <div className="relative flex justify-center w-full mt-4 sm:mt-6">
                     <div className="transform scale-[0.5] origin-center">
-                      {(() => {
-                        const headlessVolumes = toHeadlessVolumeMap(heatmap.volumes);
-                        const headlessMax = Math.max(1, ...Array.from(headlessVolumes.values()));
-                        return (
                       <BodyMap
                         onPartClick={handleBodyMapClick}
                         selectedPart={null}
                         muscleVolumes={headlessVolumes}
-                        maxVolume={headlessMax}
+                        maxVolume={Math.max(1, ...(Array.from(headlessVolumes.values()) as number[]))}
                         hoveredMuscleIdsOverride={heatmapHoveredMuscleIds}
                         onPartHover={setHeatmapHoveredMuscle}
                         gender={bodyMapGender}
                         viewMode="headless"
                       />
-                        );
-                      })()}
                     </div>
 
                     {weeklySetsHoverMeta && (
@@ -366,9 +361,9 @@ export const WeeklySetsCard = ({
         <InsightLine>
           {weeklySetsInsight ? (
             <>
-              <TrendBadge label={<BadgeLabel main={`~${weeklySetsInsight.total.toFixed(1)}/wk${weeklySetsInsight.durationLabel}`} />} tone="info" />
+              <TrendBadge label={<BadgeLabel main={`~${Number(weeklySetsInsight.total).toFixed(1)}/wk${weeklySetsInsight.durationLabel}`} />} tone="info" />
               <TrendBadge
-                label={`Top: ${weeklySetsInsight.top.subject} ${weeklySetsInsight.top.value.toFixed(1)}/wk`}
+                label={`Top: ${weeklySetsInsight.top.subject} ${Number(weeklySetsInsight.top.value).toFixed(1)}/wk`}
                 tone="neutral"
               />
               <TrendBadge

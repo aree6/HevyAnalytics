@@ -11,18 +11,12 @@ import { createExerciseNameResolver, type ExerciseNameResolver } from '../exerci
 export type WeeklySetsWindow = 'all' | '7d' | '30d' | '365d';
 export type WeeklySetsGrouping = 'groups' | 'muscles';
 
-export interface WeeklySetsCompositionEntry {
-  subject: string;
-  value: number;
-}
-
 export interface WeeklySetsHeatmapResult {
   volumes: Map<string, number>;
   maxVolume: number;
 }
 
 export interface WeeklySetsDashboardResult {
-  composition: WeeklySetsCompositionEntry[];
   heatmap: WeeklySetsHeatmapResult;
   weeklyRatesBySubject: Map<string, number>;
   weeks: number;
@@ -63,7 +57,6 @@ export const computeWeeklySetsDashboardData = (
   const windowStart = getWindowStart(data, now, window);
   if (!windowStart) {
     return {
-      composition: [],
       heatmap: { volumes: new Map(), maxVolume: 1 },
       weeklyRatesBySubject: new Map(),
       weeks: 1,
@@ -122,12 +115,6 @@ export const computeWeeklySetsDashboardData = (
     weeklyRates.set(k, Number((v / weeks).toFixed(1)));
   }
 
-  const composition: WeeklySetsCompositionEntry[] = Array.from(weeklyRates.entries())
-    .map(([subject, value]) => ({ subject, value }))
-    .filter((e) => e.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 16);
-
   const volumes = new Map<string, number>();
   let maxVolume = 0;
 
@@ -168,7 +155,6 @@ export const computeWeeklySetsDashboardData = (
   }
 
   return {
-    composition,
     heatmap: { volumes, maxVolume: Math.max(maxVolume, 1) },
     weeklyRatesBySubject: weeklyRates,
     weeks,
