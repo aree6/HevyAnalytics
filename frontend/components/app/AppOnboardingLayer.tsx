@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import type { BodyMapGender } from '../bodyMap/BodyMap';
 import type { WeightUnit } from '../../utils/storage/localStorage';
 import type { OnboardingFlow } from '../../app/onboarding/types';
@@ -72,29 +72,6 @@ export const AppOnboardingLayer: React.FC<AppOnboardingLayerProps> = ({
   onLyfatLogin,
   onLyfatSyncSaved,
 }) => {
-  // Auto-load demo data when entering demo_csv step
-  useEffect(() => {
-    if (onboarding?.step === 'demo_csv' && !isAnalyzing) {
-      // Fetch and process the sample CSV automatically
-      fetch(`${import.meta.env.BASE_URL}sample_demo.csv`)
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error('Failed to load demo data');
-          }
-          return response.text();
-        })
-        .then((csvText) => {
-          onSetCsvImportError(null);
-          // Create a File object from the CSV text to reuse existing processFile logic
-          const file = new File([csvText], 'sample_demo.csv', { type: 'text/csv' });
-          onProcessFile(file, 'other', weightUnit);
-        })
-        .catch((err) => {
-          onSetCsvImportError('Failed to load demo data. Please try again.');
-        });
-    }
-  }, [onboarding?.step, isAnalyzing, weightUnit, onSetCsvImportError, onProcessFile]);
-
   if (!onboarding) return null;
 
   return (
@@ -171,48 +148,30 @@ export const AppOnboardingLayer: React.FC<AppOnboardingLayerProps> = ({
           initialUnit={getPreferencesConfirmed() ? weightUnit : undefined}
           onGenderChange={(g) => onSetBodyMapGender(g)}
           onUnitChange={(u) => onSetWeightUnit(u)}
-          onContinue={(gender, unit) => {
+          onContinue={async (gender, unit) => {
             onSetBodyMapGender(gender);
             onSetWeightUnit(unit);
             savePreferencesConfirmed(true);
-            onSetOnboarding({ intent: onboarding.intent, step: 'demo_csv', platform: 'other', backStep: 'demo_prefs' });
+            
+            // Load demo data directly instead of showing CSV upload screen
+            try {
+              onSetCsvImportError(null);
+              const response = await fetch(`${import.meta.env.BASE_URL}sample_demo.csv`);
+              if (!response.ok) {
+                throw new Error('Failed to load demo data');
+              }
+              const csvText = await response.text();
+              const file = new File([csvText], 'sample_demo.csv', { type: 'text/csv' });
+              onProcessFile(file, 'other', unit);
+            } catch (err) {
+              onSetCsvImportError('Failed to load demo data. Please try again.');
+            }
           }}
           onBack={
             onboarding.intent === 'initial'
               ? () => onSetOnboarding({ intent: onboarding.intent, step: 'platform' })
               : () => onSetOnboarding({ intent: onboarding.intent, step: 'platform' })
           }
-          onClose={onboarding.intent === 'update' ? () => onSetOnboarding(null) : undefined}
-        />
-      ) : null}
-
-      {/* Demo CSV step - automatically load sample data */}
-      {onboarding.step === 'demo_csv' ? (
-        <CSVImportModal
-          intent={onboarding.intent}
-          platform="other"
-          variant="csv"
-          hideBodyTypeAndUnit={true}
-          onClearCache={onClearCacheAndRestart}
-          onFileSelect={(_file, _gender, unit) => {
-            // This won't be called for demo since we'll auto-load
-            onSetCsvImportError(null);
-            onProcessFile(_file, 'other', unit);
-          }}
-          isLoading={isAnalyzing}
-          initialGender={bodyMapGender}
-          initialUnit={weightUnit}
-          onGenderChange={(g) => onSetBodyMapGender(g)}
-          onUnitChange={(u) => onSetWeightUnit(u)}
-          errorMessage={csvImportError}
-          onBack={() => {
-            if (onboarding.intent === 'initial') {
-              const backStep = onboarding.backStep ?? 'demo_prefs';
-              onSetOnboarding({ intent: onboarding.intent, step: backStep, platform: 'other' });
-              return;
-            }
-            onSetOnboarding({ intent: 'initial', step: 'platform' });
-          }}
           onClose={onboarding.intent === 'update' ? () => onSetOnboarding(null) : undefined}
         />
       ) : null}

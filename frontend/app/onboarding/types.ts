@@ -5,7 +5,6 @@ export type OnboardingIntent = 'initial' | 'update';
 export type OnboardingStep =
   | 'platform'
   | 'demo_prefs'
-  | 'demo_csv'
   | 'strong_prefs'
   | 'strong_csv'
   | 'lyfta_prefs'
