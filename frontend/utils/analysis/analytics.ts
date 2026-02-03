@@ -2,7 +2,7 @@ import { WorkoutSet, ExerciseStats, DailySummary } from '../../types';
 import { format, startOfDay, subDays, eachDayOfInterval, getDay, parse, differenceInMinutes, isValid } from 'date-fns';
 import { getDateKey, TimePeriod, sortByTimestamp, getSessionKey } from '../date/dateUtils';
 import { roundTo } from '../format/formatters';
-import { isWarmupSet, countSets, isLeftSet, isRightSet } from './setClassification';
+import { isWarmupSet, isLeftSet, isRightSet, isUnilateralSet } from './setClassification';
 
 const sortByParsedDate = (sets: WorkoutSet[], ascending: boolean): WorkoutSet[] => {
   const sign = ascending ? 1 : -1;
@@ -27,22 +27,28 @@ const sortByParsedDate = (sets: WorkoutSet[], ascending: boolean): WorkoutSet[] 
 export const identifyPersonalRecords = (data: WorkoutSet[]): WorkoutSet[] => {
   const sorted = sortByParsedDate(data, true);
   const maxWeightMap = new Map<string, number>();
+  const isPrFlags = new Map<WorkoutSet, boolean>();
 
-  const dataWithPrs = sorted.map(set => {
-    if (isWarmupSet(set)) return { ...set, isPr: false };
+  for (const set of sorted) {
+    if (isWarmupSet(set)) {
+      isPrFlags.set(set, false);
+      continue;
+    }
     const exercise = set.exercise_title;
     const currentWeight = set.weight_kg || 0;
     const previousMax = maxWeightMap.get(exercise) ?? 0;
-    
+
     const isPr = currentWeight > 0 && currentWeight > previousMax;
     if (isPr) {
       maxWeightMap.set(exercise, currentWeight);
     }
+    isPrFlags.set(set, isPr);
+  }
 
-    return { ...set, isPr };
-  });
-
-  return sortByParsedDate(dataWithPrs, false);
+  return sortByParsedDate(sorted, false).map((set) => ({
+    ...set,
+    isPr: isPrFlags.get(set) ?? false,
+  }));
 };
 
 const parseSessionDuration = (startDate: Date | undefined, endTimeStr: string): number => {
@@ -58,69 +64,62 @@ const parseSessionDuration = (startDate: Date | undefined, endTimeStr: string): 
 };
 
 export const getDailySummaries = (data: WorkoutSet[]): DailySummary[] => {
-  // First, group sets by date
-  const setsByDate = new Map<string, WorkoutSet[]>();
   const metaByDate = new Map<string, {
     timestamp: number;
     workoutTitle: string;
     sessions: Set<string>;
     durationMinutes: number;
+    totalVolume: number;
+    totalReps: number;
+    setCount: number;
   }>();
 
   for (const set of data) {
     if (!set.parsedDate) continue;
-    
+
     const dateKey = format(set.parsedDate, 'yyyy-MM-dd');
-    
-    if (!setsByDate.has(dateKey)) {
-      setsByDate.set(dateKey, []);
-      metaByDate.set(dateKey, {
+
+    let meta = metaByDate.get(dateKey);
+    if (!meta) {
+      meta = {
         timestamp: startOfDay(set.parsedDate).getTime(),
         workoutTitle: set.title || 'Workout',
         sessions: new Set(),
         durationMinutes: 0,
-      });
+        totalVolume: 0,
+        totalReps: 0,
+        setCount: 0,
+      };
+      metaByDate.set(dateKey, meta);
     }
-    
-    setsByDate.get(dateKey)!.push(set);
-    
-    const meta = metaByDate.get(dateKey)!;
+
     const sessionKey = getSessionKey(set);
     if (sessionKey && !meta.sessions.has(sessionKey)) {
       meta.sessions.add(sessionKey);
       meta.durationMinutes += parseSessionDuration(set.parsedDate, set.end_time);
     }
+
+    if (isWarmupSet(set)) continue;
+
+    meta.totalVolume += (set.weight_kg || 0) * (set.reps || 0);
+    meta.totalReps += set.reps || 0;
+    meta.setCount += isUnilateralSet(set) ? 0.5 : 1;
   }
 
   const summaries: DailySummary[] = [];
-  
-  for (const [dateKey, sets] of setsByDate) {
-    const meta = metaByDate.get(dateKey)!;
-    
-    // Calculate volume and reps from non-warmup sets
-    let totalVolume = 0;
-    let totalReps = 0;
-    for (const set of sets) {
-      if (isWarmupSet(set)) continue;
-      totalVolume += (set.weight_kg || 0) * (set.reps || 0);
-      totalReps += set.reps || 0;
-    }
-    
-    // Count working sets (warmups excluded)
-    const setCount = countSets(sets);
-    
-    if (setCount > 0) {
-      summaries.push({
-        date: dateKey,
-        timestamp: meta.timestamp,
-        totalVolume,
-        workoutTitle: meta.workoutTitle,
-        sets: setCount,
-        avgReps: setCount > 0 ? Math.round(totalReps / setCount) : 0,
-        durationMinutes: meta.durationMinutes,
-        density: meta.durationMinutes > 0 ? Math.round(totalVolume / meta.durationMinutes) : 0,
-      });
-    }
+
+  for (const [dateKey, meta] of metaByDate) {
+    if (meta.setCount <= 0) continue;
+    summaries.push({
+      date: dateKey,
+      timestamp: meta.timestamp,
+      totalVolume: meta.totalVolume,
+      workoutTitle: meta.workoutTitle,
+      sets: meta.setCount,
+      avgReps: meta.setCount > 0 ? Math.round(meta.totalReps / meta.setCount) : 0,
+      durationMinutes: meta.durationMinutes,
+      density: meta.durationMinutes > 0 ? Math.round(meta.totalVolume / meta.durationMinutes) : 0,
+    });
   }
 
   return sortByTimestamp(summaries);
@@ -132,9 +131,8 @@ const calculateOneRepMax = (weight: number, reps: number): number => {
 };
 
 export const getExerciseStats = (data: WorkoutSet[]): ExerciseStats[] => {
-  // First, group sets by exercise name
-  const setsByExercise = new Map<string, WorkoutSet[]>();
-  
+  const statsByExercise = new Map<string, ExerciseStats>();
+
   for (const set of data) {
     if (isWarmupSet(set)) continue;
     const name = set.exercise_title;
@@ -145,65 +143,50 @@ export const getExerciseStats = (data: WorkoutSet[]): ExerciseStats[] => {
     const y = d.getFullYear();
     if (y <= 1970 || y >= 2100) continue;
 
-    if (!setsByExercise.has(name)) {
-      setsByExercise.set(name, []);
-    }
-    setsByExercise.get(name)!.push(set);
-  }
-
-  const results: ExerciseStats[] = [];
-
-  for (const [name, sets] of setsByExercise) {
-    let totalVolume = 0;
-    let maxWeight = 0;
-    let prCount = 0;
-    let hasUnilateralData = false;
-    const history: ExerciseStats['history'] = [];
-
-    for (const set of sets) {
-      const volume = (set.weight_kg || 0) * (set.reps || 0);
-      const oneRepMax = calculateOneRepMax(set.weight_kg, set.reps);
-
-      totalVolume += volume;
-      if (set.weight_kg > maxWeight) maxWeight = set.weight_kg;
-      if (set.isPr) prCount += 1;
-
-      // Determine side for unilateral exercises
-      let side: 'left' | 'right' | undefined;
-      if (isLeftSet(set)) {
-        side = 'left';
-        hasUnilateralData = true;
-      } else if (isRightSet(set)) {
-        side = 'right';
-        hasUnilateralData = true;
-      }
-
-      history.push({
-        date: set.parsedDate!,
-        weight: set.weight_kg,
-        reps: set.reps,
-        oneRepMax,
-        volume,
-        isPr: set.isPr ?? false,
-        side,
-      });
+    let stats = statsByExercise.get(name);
+    if (!stats) {
+      stats = {
+        name,
+        totalSets: 0,
+        totalVolume: 0,
+        maxWeight: 0,
+        prCount: 0,
+        history: [],
+        hasUnilateralData: false,
+      };
+      statsByExercise.set(name, stats);
     }
 
-    // Count sets (warmups already filtered above)
-    const totalSets = countSets(sets, { excludeWarmup: false });
+    const volume = (set.weight_kg || 0) * (set.reps || 0);
+    const oneRepMax = calculateOneRepMax(set.weight_kg, set.reps);
 
-    results.push({
-      name,
-      totalSets,
-      totalVolume,
-      maxWeight,
-      prCount,
-      history,
-      hasUnilateralData,
+    stats.totalVolume += volume;
+    if (set.weight_kg > stats.maxWeight) stats.maxWeight = set.weight_kg;
+    if (set.isPr) stats.prCount += 1;
+
+    let side: 'left' | 'right' | undefined;
+    if (isLeftSet(set)) {
+      side = 'left';
+      stats.hasUnilateralData = true;
+    } else if (isRightSet(set)) {
+      side = 'right';
+      stats.hasUnilateralData = true;
+    }
+
+    stats.history.push({
+      date: d,
+      weight: set.weight_kg,
+      reps: set.reps,
+      oneRepMax,
+      volume,
+      isPr: set.isPr ?? false,
+      side,
     });
+
+    stats.totalSets += isUnilateralSet(set) ? 0.5 : 1;
   }
 
-  return results.sort((a, b) => b.totalSets - a.totalSets);
+  return Array.from(statsByExercise.values()).sort((a, b) => b.totalSets - a.totalSets);
 };
 
 export interface HeatmapEntry {

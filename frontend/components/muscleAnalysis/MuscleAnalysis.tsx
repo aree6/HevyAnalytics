@@ -19,6 +19,7 @@ import { ExerciseThumbnail } from '../common/ExerciseThumbnail';
 import { getSvgMuscleVolumeTimeSeriesRolling, getMuscleVolumeTimeSeriesRolling } from '../../utils/muscle/rollingVolumeCalculator';
 import { bucketRollingWeeklySeriesToWeeks } from '../../utils/muscle/rollingSeriesBucketing';
 import { getEffectiveNowFromWorkoutData } from '../../utils/date/dateUtils';
+import { isWarmupSet } from '../../utils/analysis/setClassification';
 import {
   computeWeeklySetsDashboardData,
   WeeklySetsWindow,
@@ -490,7 +491,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
 
   // Total sets for the period
   const totalSets = useMemo(() => {
-    return data.length;
+    return data.reduce((acc, s) => (isWarmupSet(s) ? acc : acc + 1), 0);
   }, [data]);
 
   // Muscles worked count

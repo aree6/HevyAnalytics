@@ -6,7 +6,7 @@ import { getSvgIdsForCsvMuscleName } from './muscleMapping';
 import { getMuscleContributionsFromAsset } from './muscleContributions';
 import { normalizeMuscleGroup } from './muscleNormalization';
 import { isWarmupSet } from '../analysis/setClassification';
-import { createExerciseNameResolver, type ExerciseNameResolver } from '../exercise/exerciseNameResolver';
+import { createExerciseAssetLookup } from '../exercise/exerciseAssetLookup';
 
 export type WeeklySetsWindow = 'all' | '7d' | '30d' | '365d';
 export type WeeklySetsGrouping = 'groups' | 'muscles';
@@ -64,27 +64,7 @@ export const computeWeeklySetsDashboardData = (
     };
   }
 
-  const lowerMap = new Map<string, ExerciseAsset>();
-  assetsMap.forEach((v, k) => lowerMap.set(k.toLowerCase(), v));
-
-  // Create fuzzy resolver for exercise name matching
-  const allNames = Array.from(assetsMap.keys());
-  const resolver = allNames.length > 0 ? createExerciseNameResolver(allNames) : null;
-
-  const lookupAsset = (name: string): ExerciseAsset | undefined => {
-    // Try exact match first
-    let asset = assetsMap.get(name) || lowerMap.get(name.toLowerCase());
-    if (asset) return asset;
-    // Fuzzy fallback
-    if (resolver) {
-      const resolved = resolver.resolve(name);
-      if (resolved) {
-        const resolvedName = resolved.name;
-        asset = assetsMap.get(resolvedName) || lowerMap.get(resolvedName.toLowerCase());
-      }
-    }
-    return asset;
-  };
+  const lookup = createExerciseAssetLookup(assetsMap);
 
   const totals = new Map<string, number>();
   for (const s of data) {
@@ -94,7 +74,7 @@ export const computeWeeklySetsDashboardData = (
     if (d < windowStart || d > now) continue;
 
     const name = s.exercise_title || '';
-    const asset = lookupAsset(name);
+    const asset = lookup.getAsset(name);
     if (!asset) continue;
 
     const primaryGroup = normalizeMuscleGroup(asset.primary_muscle);

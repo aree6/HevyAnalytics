@@ -16,6 +16,44 @@ const isProd = process.env.NODE_ENV === 'production';
 
 const app = express();
 
+type CachedValue<T> = {
+  value?: T;
+  timestamp: number;
+  inFlight?: Promise<T>;
+};
+
+const RESPONSE_CACHE_TTL_MS = 2 * 60 * 1000;
+const RESPONSE_CACHE_MAX = 50;
+const responseCache = new Map<string, CachedValue<unknown>>();
+
+const getCachedResponse = async <T>(key: string, compute: () => Promise<T>): Promise<T> => {
+  const now = Date.now();
+  const existing = responseCache.get(key);
+  if (existing && existing.value !== undefined && (now - existing.timestamp) < RESPONSE_CACHE_TTL_MS) {
+    return existing.value as T;
+  }
+  if (existing?.inFlight) return existing.inFlight as Promise<T>;
+
+  const inFlight = compute()
+    .then((value) => {
+      responseCache.set(key, { value, timestamp: Date.now() });
+      if (responseCache.size > RESPONSE_CACHE_MAX) {
+        const entries = Array.from(responseCache.entries())
+          .sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
+        const toRemove = entries.slice(0, responseCache.size - RESPONSE_CACHE_MAX);
+        for (const [oldKey] of toRemove) responseCache.delete(oldKey);
+      }
+      return value;
+    })
+    .catch((err) => {
+      responseCache.delete(key);
+      throw err;
+    });
+
+  responseCache.set(key, { timestamp: now, inFlight });
+  return inFlight;
+};
+
 // Render/Cloudflare set X-Forwarded-For. Enabling trust proxy allows express-rate-limit
 // to correctly identify clients and avoids ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
 // We keep this enabled even if NODE_ENV isn't set, since hosted platforms commonly omit it.
@@ -127,8 +165,12 @@ app.post('/api/hevy/api-key/sets', async (req, res) => {
   if (!apiKey) return res.status(400).json({ error: 'Missing apiKey' });
 
   try {
-    const workouts = await hevyProGetAllWorkouts(apiKey);
-    const sets = mapHevyProWorkoutsToWorkoutSets(workouts);
+    const cacheKey = `hevyProSets:${apiKey}`;
+    const { workouts, sets } = await getCachedResponse(cacheKey, async () => {
+      const workouts = await hevyProGetAllWorkouts(apiKey);
+      const sets = mapHevyProWorkoutsToWorkoutSets(workouts);
+      return { workouts, sets };
+    });
     res.json({ sets, meta: { workouts: workouts.length } });
   } catch (err) {
     const status = (err as any).statusCode ?? 500;
@@ -188,25 +230,28 @@ app.get('/api/hevy/sets', async (req, res) => {
 
   try {
     const token = requireAuthTokenHeader(req);
+    const cacheKey = `hevySets:${token}:${username}:${maxPages ?? 'all'}`;
+    const { workouts, sets } = await getCachedResponse(cacheKey, async () => {
+      const allWorkouts = [] as any[];
+      let offset = 0;
+      let page = 0;
 
-    const allWorkouts = [] as any[];
-    let offset = 0;
-    let page = 0;
+      while (true) {
+        if (maxPages != null && page >= maxPages) break;
 
-    while (true) {
-      if (maxPages != null && page >= maxPages) break;
+        const data = await hevyGetWorkoutsPaged(token, { username, offset });
+        const workouts = data.workouts ?? [];
+        if (workouts.length === 0) break;
 
-      const data = await hevyGetWorkoutsPaged(token, { username, offset });
-      const workouts = data.workouts ?? [];
-      if (workouts.length === 0) break;
+        allWorkouts.push(...workouts);
+        offset += 5;
+        page += 1;
+      }
 
-      allWorkouts.push(...workouts);
-      offset += 5;
-      page += 1;
-    }
-
-    const sets = mapHevyWorkoutsToWorkoutSets(allWorkouts);
-    res.json({ sets, meta: { workouts: allWorkouts.length } });
+      const sets = mapHevyWorkoutsToWorkoutSets(allWorkouts);
+      return { workouts: allWorkouts, sets };
+    });
+    res.json({ sets, meta: { workouts: workouts.length } });
   } catch (err) {
     const status = (err as any).statusCode ?? 500;
     res.status(status).json({ error: (err as Error).message || 'Failed to fetch sets' });
@@ -236,13 +281,16 @@ app.post('/api/lyfta/sets', async (req, res) => {
   if (!apiKey) return res.status(400).json({ error: 'Missing apiKey' });
 
   try {
-    // Fetch both workout details and summaries in parallel
-    const [workouts, summaries] = await Promise.all([
-      lyfatGetAllWorkouts(apiKey),
-      lyfatGetAllWorkoutSummaries(apiKey)
-    ]);
-    
-    const sets = mapLyfataWorkoutsToWorkoutSets(workouts, summaries);
+    const cacheKey = `lyftaSets:${apiKey}`;
+    const { workouts, sets } = await getCachedResponse(cacheKey, async () => {
+      // Fetch both workout details and summaries in parallel
+      const [workouts, summaries] = await Promise.all([
+        lyfatGetAllWorkouts(apiKey),
+        lyfatGetAllWorkoutSummaries(apiKey)
+      ]);
+      const sets = mapLyfataWorkoutsToWorkoutSets(workouts, summaries);
+      return { workouts, sets };
+    });
     res.json({ sets, meta: { workouts: workouts.length } });
   } catch (err) {
     const status = (err as any).statusCode ?? 500;

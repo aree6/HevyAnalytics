@@ -22,6 +22,7 @@ import {
 import { type BodyMapGender } from '../bodyMap/BodyMap';
 import { getMonth } from 'date-fns';
 import { getEffectiveNowFromWorkoutData, getSessionKey } from '../../utils/date/dateUtils';
+import { createExerciseAssetLookup } from '../../utils/exercise/exerciseAssetLookup';
 import { type CardTheme } from './FlexCard';
 import { LazyRender } from '../ui/LazyRender';
 import { BestMonthCard } from './BestMonthCard';
@@ -140,6 +141,8 @@ export const FlexView: React.FC<FlexViewProps> = ({
 
   const effectiveNow = useMemo(() => now ?? getEffectiveNowFromWorkoutData(data), [now, data]);
 
+  const assetLookup = useMemo(() => createExerciseAssetLookup(assetsMap), [assetsMap]);
+
   const ytdHeadlessHeatmap = useMemo(() => {
     const ytdStart = new Date(effectiveNow.getFullYear(), 0, 1);
 
@@ -175,10 +178,6 @@ export const FlexView: React.FC<FlexViewProps> = ({
     const exerciseCounts = new Map<string, number>();
     const muscleGroups = new Map<NormalizedMuscleGroup, number>();
 
-    // Case-insensitive lookup cache for assets
-    const lowerAssetsMap = new Map<string, ExerciseAsset>();
-    assetsMap.forEach((v, k) => lowerAssetsMap.set(k.toLowerCase(), v));
-
     for (const set of data) {
       if (isWarmupSet(set)) continue;
       totalVolumeKg += (set.weight_kg || 0) * (set.reps || 0);
@@ -195,7 +194,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
 
       // Muscle groups
       if (set.parsedDate) {
-        const asset = assetsMap.get(exerciseName) || lowerAssetsMap.get(exerciseName.toLowerCase());
+        const asset = assetLookup.getAsset(exerciseName);
         if (asset) {
           const primaryMuscle = normalizeMuscleGroup(asset.primary_muscle);
           if (primaryMuscle !== 'Cardio') {
@@ -232,7 +231,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([name, count]) => {
-        const asset = assetsMap.get(name) || lowerAssetsMap.get(name.toLowerCase());
+        const asset = assetLookup.getAsset(name);
         return {
           name,
           count,
@@ -288,7 +287,7 @@ export const FlexView: React.FC<FlexViewProps> = ({
       monthlyData,
       muscleData,
     };
-  }, [data, weightUnit, assetsMap, dailySummariesProp, effectiveNow]);
+  }, [data, weightUnit, assetsMap, dailySummariesProp, effectiveNow, assetLookup]);
 
   // Streak info
   const streakInfo = useMemo(() => calculateStreakInfo(data, effectiveNow), [data, effectiveNow]);
@@ -299,21 +298,19 @@ export const FlexView: React.FC<FlexViewProps> = ({
   // Top PR exercises
   const topPRExercises = useMemo(() => {
     const exerciseStats = exerciseStatsProp ?? getExerciseStats(data);
-    const lowerAssetsMap = new Map<string, ExerciseAsset>();
-    assetsMap.forEach((v, k) => lowerAssetsMap.set(k.toLowerCase(), v));
     return exerciseStats
       .filter(s => s.prCount > 0)
       .sort((a, b) => b.maxWeight - a.maxWeight)
       .slice(0, 3)
       .map(s => {
-        const asset = assetsMap.get(s.name) || lowerAssetsMap.get(s.name.toLowerCase());
+        const asset = assetLookup.getAsset(s.name);
         return {
           name: s.name,
           weight: convertWeight(s.maxWeight, weightUnit),
           thumbnail: asset?.thumbnail,
         };
       });
-  }, [data, weightUnit, assetsMap, exerciseStatsProp]);
+  }, [data, weightUnit, assetLookup, exerciseStatsProp]);
 
   // Cards configuration
   const CARDS = [

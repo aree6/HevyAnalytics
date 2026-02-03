@@ -149,10 +149,10 @@ export const summarizeExerciseHistory = (
 
 export const analyzeExerciseTrendCore = (
   stats: ExerciseStats,
-  options?: { trendMode?: ExerciseTrendMode }
+  options?: { trendMode?: ExerciseTrendMode; summarizedHistory?: ExerciseSessionEntry[] }
 ): ExerciseTrendCoreResult => {
   const trendMode: ExerciseTrendMode = options?.trendMode ?? 'reactive';
-  const history = summarizeExerciseHistory(stats.history);
+  const history = options?.summarizedHistory ?? summarizeExerciseHistory(stats.history);
 
   // No usable history yet.
   if (history.length === 0) {

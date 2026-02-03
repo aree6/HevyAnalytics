@@ -7,12 +7,12 @@ import { isWarmupSet } from '../../utils/analysis/setClassification';
 import {
   formatLastRollingWindow,
   getRollingWindowDaysForMode,
-  getRollingWindowStartForMode,
   DEFAULT_CHART_MAX_POINTS,
   pickChartAggregation,
 } from '../../utils/date/dateUtils';
 import { computationCache } from '../../utils/storage/computationCache';
 import type { TimeFilterMode } from '../../utils/storage/localStorage';
+import { getWindowedWorkoutSets } from '../../utils/analysis/windowedWorkoutSets';
 
 const safePct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
 
@@ -28,27 +28,10 @@ export const useDashboardIntensityEvolution = (args: {
   const { fullData, rangeMode, allAggregationMode, effectiveNow } = args;
 
   const intensityData = useMemo(() => {
-    const windowStart = getRollingWindowStartForMode(rangeMode, effectiveNow);
-    const filtered = windowStart
-      ? fullData.filter((s) => {
-          const d = s.parsedDate;
-          return !!d && d >= windowStart;
-        })
-      : fullData;
+    const { filtered, minTs, maxTs } = getWindowedWorkoutSets(fullData, rangeMode, effectiveNow);
 
     const preferred: 'daily' | 'weekly' | 'monthly' =
       rangeMode === 'all' ? allAggregationMode : rangeMode === 'yearly' ? 'weekly' : 'daily';
-
-    let minTs = Number.POSITIVE_INFINITY;
-    let maxTs = Number.NEGATIVE_INFINITY;
-    for (const s of filtered) {
-      const d = s.parsedDate;
-      if (!d) continue;
-      const ts = d.getTime();
-      if (!Number.isFinite(ts)) continue;
-      if (ts < minTs) minTs = ts;
-      if (ts > maxTs) maxTs = ts;
-    }
 
     const mode: 'daily' | 'weekly' | 'monthly' =
       Number.isFinite(minTs) && Number.isFinite(maxTs) && maxTs > minTs

@@ -4,8 +4,9 @@ import type { ExerciseStats, WorkoutSet } from '../../types';
 import { getTopExercisesRadial, getTopExercisesOverTime } from '../../utils/analysis/analytics';
 import { calculateDelta } from '../../utils/analysis/insights';
 import { isWarmupSet } from '../../utils/analysis/setClassification';
-import { DEFAULT_CHART_MAX_POINTS, getRollingWindowStartForMode, getSessionKey, pickChartAggregation } from '../../utils/date/dateUtils';
+import { DEFAULT_CHART_MAX_POINTS, getSessionKey, pickChartAggregation } from '../../utils/date/dateUtils';
 import { computationCache } from '../../utils/storage/computationCache';
+import { getWindowedWorkoutSets } from '../../utils/analysis/windowedWorkoutSets';
 
 const safePct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
 
@@ -136,28 +137,10 @@ export const useDashboardTopExercises = (args: {
     const names = (topExercisesBarData.length > 0 ? topExercisesBarData : topExercisesData).map((e) => e.name);
     const rangeMode = topExerciseMode;
 
-    const windowStart = getRollingWindowStartForMode(rangeMode as any, effectiveNow);
-    const filtered =
-      windowStart
-        ? fullData.filter((s) => {
-            const d = s.parsedDate;
-            return !!d && d >= windowStart;
-          })
-        : fullData;
+    const { filtered, minTs, maxTs } = getWindowedWorkoutSets(fullData, rangeMode as any, effectiveNow);
 
     const preferred: 'daily' | 'weekly' | 'monthly' =
       rangeMode === 'all' ? allAggregationMode : rangeMode === 'yearly' ? 'weekly' : 'daily';
-
-    let minTs = Number.POSITIVE_INFINITY;
-    let maxTs = Number.NEGATIVE_INFINITY;
-    for (const s of filtered) {
-      const d = s.parsedDate;
-      if (!d) continue;
-      const ts = d.getTime();
-      if (!Number.isFinite(ts)) continue;
-      if (ts < minTs) minTs = ts;
-      if (ts > maxTs) maxTs = ts;
-    }
 
     const mode: 'daily' | 'weekly' | 'monthly' =
       Number.isFinite(minTs) && Number.isFinite(maxTs) && maxTs > minTs

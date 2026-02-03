@@ -25,16 +25,27 @@ class ComputationCache {
     if (data === null || data === undefined) return 'null';
     
     if (Array.isArray(data)) {
-      // For arrays, use length + first/last item timestamps as a quick hash
+      // For arrays, use length + first/last item timestamps + a light sample checksum
       const len = data.length;
       if (len === 0) return 'empty';
-      
+
       const first = data[0];
       const last = data[len - 1];
       const firstTs = first?.parsedDate?.getTime?.() ?? first?.timestamp ?? 0;
       const lastTs = last?.parsedDate?.getTime?.() ?? last?.timestamp ?? 0;
-      
-      return `arr:${len}:${firstTs}:${lastTs}`;
+
+      const sampleCount = Math.min(5, len);
+      let sampleSum = 0;
+      for (let i = 0; i < sampleCount; i++) {
+        const idx = Math.floor((i * (len - 1)) / Math.max(sampleCount - 1, 1));
+        const item = data[idx] as any;
+        const ts = item?.parsedDate?.getTime?.() ?? item?.timestamp ?? 0;
+        const weight = item?.weight_kg ?? 0;
+        const reps = item?.reps ?? 0;
+        sampleSum += (Number(ts) || 0) + (Number(weight) || 0) * 10 + (Number(reps) || 0);
+      }
+
+      return `arr:${len}:${firstTs}:${lastTs}:${Math.round(sampleSum)}`;
     }
     
     if (typeof data === 'object') {

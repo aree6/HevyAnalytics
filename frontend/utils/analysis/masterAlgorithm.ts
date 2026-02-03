@@ -1,6 +1,8 @@
 import { WorkoutSet, SessionAnalysis, AnalysisResult, SetWisdom, AnalysisStatus, StructuredTooltip, TooltipLine } from '../../types';
 import { roundTo } from '../format/formatters';
 import { isWarmupSet } from './setClassification';
+import { pickDeterministic } from './messageVariations';
+import { getSetCommentary, getPromoteMessage, getDemoteTooHeavyMessage, getDemoteInconsistentMessage } from './setCommentaryLibrary';
 
 export { isWarmupSet } from './setClassification';
 
@@ -171,32 +173,33 @@ const analyzeSameWeight = (
   setNumber: number
 ): AnalysisResult => {
   const repDiff = currReps - prevReps;
-  // `setNumber` is the current working set number in the transition (e.g. Set 1 → 2 passes 2).
-  // We treat the first transition (after the first working set) specially in messaging.
   const isAfterFirstWorkingSet = setNumber === 2;
+  const seedBase = `${transition}|${prevReps}|${currReps}`;
   
-  // REPS INCREASED
   if (repDiff > 0) {
+    const commentary = getSetCommentary('sameWeight_repsIncreased', seedBase, { diff: repDiff });
+    const whyLines = commentary.whyLines || [];
     return createAnalysisResult(
       transition, 'success', 0, repDropPct, currReps, `${prevReps}`,
-      'Second Wind',
-      `+${repDiff} reps vs lst`,
+      pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+      pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
       buildStructured(`+${repDiff} reps`, 'up', [
-        line('Had reserves in lst set', 'gray'),
-        line('Or took longer rest this time', 'gray'),
+        line(whyLines[0], 'gray'),
+        line(whyLines[1], 'gray'),
       ])
     );
   }
   
-  // REPS SAME
   if (repDiff === 0) {
+    const commentary = getSetCommentary('sameWeight_repsSame', seedBase, { reps: currReps });
+    const whyLines = commentary.whyLines || [];
     return createAnalysisResult(
       transition, 'success', 0, 0, currReps, `${prevReps}`,
-      'Consistent',
-      `Maintained ${currReps} reps`,
+      pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+      pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
       buildStructured('= reps', 'same', [
-        line('Good pacing and recovery', 'green'),
-        line('Rest time is working well', 'gray'),
+        line(whyLines[0], 'green'),
+        line(whyLines[1], 'gray'),
       ])
     );
   }
@@ -204,48 +207,55 @@ const analyzeSameWeight = (
   const dropAbs = Math.abs(repDiff);
   const dropPctAbs = Math.abs(repDropPct);
   
-  // MILD DROP (0-15%)
   if (dropPctAbs <= DROP_THRESHOLD_MILD) {
+    const commentary = getSetCommentary('sameWeight_dropMild', seedBase, { dropAbs, dropPct: roundTo(dropPctAbs, 0) });
+    const whyLines = commentary.whyLines || [];
     return createAnalysisResult(
       transition, 'info', 0, repDropPct, currReps, `${prevReps}`,
-      'Normal Fatigue',
-      `-${dropAbs} reps (${roundTo(dropPctAbs, 0)}%)`,
+      pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+      pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
       buildStructured(`-${dropAbs} reps`, 'down', [
-        line('Normal fatigue between sets', 'blue'),
-        line('Muscles recovering as expected', 'gray'),
+        line(whyLines[0], 'blue'),
+        line(whyLines[1], 'gray'),
       ])
     );
   }
   
-  // MODERATE DROP (15-25%)
   if (dropPctAbs <= DROP_THRESHOLD_MODERATE) {
+    const commentary = getSetCommentary('sameWeight_dropModerate', seedBase, { dropAbs, dropPct: roundTo(dropPctAbs, 0) });
+    const whyLines = commentary.whyLines || [];
+    const improveLines = commentary.improveLines || [];
+    
     const why: TooltipLine[] = isAfterFirstWorkingSet 
-      ? [line('First set pushed close to failure', 'yellow')]
-      : [line('Lst set was near failure', 'yellow'), line('Or rest was shorter than usual', 'gray')];
+      ? [line(whyLines[0], 'yellow')]
+      : [line(whyLines[0], 'yellow'), line(whyLines[1], 'gray')];
     
     return createAnalysisResult(
       transition, 'warning', 0, repDropPct, currReps, `${prevReps}`,
-      'High Fatigue',
-      `-${dropAbs} reps (${roundTo(dropPctAbs, 0)}%)`,
+      pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+      pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
       buildStructured(`-${dropAbs} reps`, 'down', why, [
-        line('Normal if training to failure', 'gray'),
-        line('For more volume: rest 2-3 min', 'blue'),
+        line(improveLines[0], 'gray'),
+        line(improveLines[1], 'blue'),
       ])
     );
   }
   
-  // SEVERE DROP (>25%)
+  const commentary = getSetCommentary('sameWeight_dropSevere', seedBase, { dropAbs, dropPct: roundTo(dropPctAbs, 0) });
+  const whyLines = commentary.whyLines || [];
+  const improveLines = commentary.improveLines || [];
+  
   const why: TooltipLine[] = isAfterFirstWorkingSet
-    ? [line('First set was to failure', 'red'), line('Limits performance on remaining sets', 'gray')]
-    : [line('Accumulated fatigue from lst sets', 'red'), line('Or rest time too short', 'gray')];
+    ? [line(whyLines[0], 'red'), line(whyLines[1], 'gray')]
+    : [line(whyLines[0], 'red'), line(whyLines[1], 'gray')];
   
   return createAnalysisResult(
     transition, 'danger', 0, repDropPct, currReps, `${prevReps}`,
-    'Significant Drop',
-    `-${dropAbs} reps (${roundTo(dropPctAbs, 0)}%)`,
+    pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+    pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
     buildStructured(`-${dropAbs} reps`, 'down', why, [
-      line('If intentional: good intensity', 'green'),
-      line('For more volume: leave 1-2 RIR', 'blue'),
+      line(improveLines[0], 'green'),
+      line(improveLines[1], 'blue'),
     ])
   );
 };
@@ -267,60 +277,67 @@ const analyzeWeightIncrease = (
   const currVol = currWeight * currReps;
   const volChangePct = calculatePercentChange(prevVol, currVol);
   const pct = roundTo(weightChangePct, 0);
+  const seedBase = `${transition}|${weightChangePct}|${currReps}|${expectedLabel}`;
 
-  // EXCEEDED EXPECTATIONS
   if (currReps > expected.max) {
+    const commentary = getSetCommentary('weightIncrease_exceeded', seedBase, { pct, currReps, expectedLabel });
+    const whyLines = commentary.whyLines || [];
     return createAnalysisResult(
       transition, 'success', weightChangePct, volChangePct, currReps, expectedLabel,
-      'Strong Progress',
-      `+${pct}% weight, ${currReps} reps`,
+      pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+      pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
       buildStructured(`+${pct}% weight`, 'up', [
-        line(`Got ${currReps} reps (expected ${expectedLabel})`, 'green'),
-        line('Strength gains showing', 'gray'),
+        line(whyLines[0].replace('{currReps}', String(currReps)).replace('{expectedLabel}', expectedLabel), 'green'),
+        line(whyLines[1], 'gray'),
       ])
     );
   }
   
-  // MET EXPECTATIONS (within fatigue buffer)
   if (currReps >= (expected.center - FATIGUE_BUFFER) || (currReps >= expected.min && currReps <= expected.max)) {
+    const commentary = getSetCommentary('weightIncrease_met', seedBase, { pct, currReps });
+    const whyLines = commentary.whyLines || [];
     return createAnalysisResult(
       transition, 'success', weightChangePct, volChangePct, currReps, expectedLabel,
-      'Good Progress',
-      `+${pct}% weight, ${currReps} reps`,
+      pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+      pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
       buildStructured(`+${pct}% weight`, 'up', [
-        line(`Hit ${currReps} reps as expected`, 'green'),
-        line('Progress achieved', 'gray'),
+        line(whyLines[0].replace('{currReps}', String(currReps)), 'green'),
+        line(whyLines[1], 'gray'),
       ])
     );
   }
   
-  // SLIGHTLY BELOW (1-3 reps under)
   if (currReps >= expectedTarget - 3) {
+    const commentary = getSetCommentary('weightIncrease_slightlyBelow', seedBase, { pct, currReps, expectedLabel });
+    const whyLines = commentary.whyLines || [];
+    const improveLines = commentary.improveLines || [];
     return createAnalysisResult(
       transition, 'warning', weightChangePct, volChangePct, currReps, expectedLabel,
-      'Slightly Ambitious',
-      `+${pct}% weight, ${currReps} reps`,
+      pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+      pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
       buildStructured(`+${pct}% weight`, 'up', [
-        line(`Got ${currReps} reps (expected ${expectedLabel})`, 'yellow'),
-        line('Weight jump may be slightly aggressive', 'gray'),
+        line(whyLines[0].replace('{currReps}', String(currReps)).replace('{expectedLabel}', expectedLabel), 'yellow'),
+        line(whyLines[1], 'gray'),
       ], [
-        line('Keep trying this weight', 'blue'),
-        line('Strength adapts over time', 'gray'),
+        line(improveLines[0], 'blue'),
+        line(improveLines[1], 'gray'),
       ])
     );
   }
   
-  // SIGNIFICANTLY BELOW
+  const commentary = getSetCommentary('weightIncrease_significantlyBelow', seedBase, { pct, currReps, expectedLabel });
+  const whyLines = commentary.whyLines || [];
+  const improveLines = commentary.improveLines || [];
   return createAnalysisResult(
     transition, 'danger', weightChangePct, volChangePct, currReps, expectedLabel,
-    'Premature Jump',
-    `+${pct}% weight, ${currReps} reps`,
+    pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+    pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
     buildStructured(`+${pct}% weight`, 'up', [
-      line(`Only ${currReps} reps (expected ${expectedLabel})`, 'red'),
-      line('Weight increase too aggressive', 'gray'),
+      line(whyLines[0].replace('{currReps}', String(currReps)).replace('{expectedLabel}', expectedLabel), 'red'),
+      line(whyLines[1], 'gray'),
     ], [
-      line('Build more reps at lst weight first', 'blue'),
-      line('Try smaller 2.5-5% jumps', 'gray'),
+      line(improveLines[0], 'blue'),
+      line(improveLines[1], 'gray'),
     ])
   );
 };
@@ -342,44 +359,49 @@ const analyzeWeightDecrease = (
   const currVol = currWeight * currReps;
   const volChangePct = calculatePercentChange(prevVol, currVol);
   const pct = roundTo(weightChangePct, 0);
+  const seedBase = `${transition}|${weightChangePct}|${currReps}|${expectedLabel}`;
   
-  // MET OR EXCEEDED EXPECTATIONS
   if (currReps >= expected.min) {
+    const commentary = getSetCommentary('weightDecrease_met', seedBase, { pct, currReps });
+    const whyLines = commentary.whyLines || [];
     return createAnalysisResult(
       transition, 'success', weightChangePct, volChangePct, currReps, expectedLabel,
-      'Effective Backoff',
-      `${pct}% weight, ${currReps} reps`,
+      pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+      pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
       buildStructured(`${pct}% weight`, 'down', [
-        line('Smart backoff for volume', 'green'),
-        line('Reduced neural fatigue while maintaining work', 'gray'),
+        line(whyLines[0], 'green'),
+        line(whyLines[1], 'gray'),
       ])
     );
   }
   
-  // SLIGHTLY BELOW
   if (currReps >= expectedTarget - 3) {
+    const commentary = getSetCommentary('weightDecrease_slightlyBelow', seedBase, { pct, currReps, expectedLabel });
+    const whyLines = commentary.whyLines || [];
     return createAnalysisResult(
       transition, 'info', weightChangePct, volChangePct, currReps, expectedLabel,
-      'Fatigued Backoff',
-      `${pct}% weight, ${currReps} reps`,
+      pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+      pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
       buildStructured(`${pct}% weight`, 'down', [
-        line(`Got ${currReps} reps (expected ${expectedLabel})`, 'yellow'),
-        line('Accumulated fatigue from earlier sets', 'gray'),
+        line(whyLines[0].replace('{currReps}', String(currReps)).replace('{expectedLabel}', expectedLabel), 'yellow'),
+        line(whyLines[1], 'gray'),
       ])
     );
   }
   
-  // SIGNIFICANTLY BELOW
+  const commentary = getSetCommentary('weightDecrease_significantlyBelow', seedBase, { pct, currReps, expectedLabel });
+  const whyLines = commentary.whyLines || [];
+  const improveLines = commentary.improveLines || [];
   return createAnalysisResult(
     transition, 'warning', weightChangePct, volChangePct, currReps, expectedLabel,
-    'Heavy Fatigue',
-    `${pct}% weight, ${currReps} reps`,
+    pickDeterministic(`${seedBase}|short`, commentary.shortMessages),
+    pickDeterministic(`${seedBase}|tooltip`, commentary.tooltips),
     buildStructured(`${pct}% weight`, 'down', [
-      line(`Only ${currReps} reps (expected ${expectedLabel})`, 'red'),
-      line('High accumulated fatigue', 'gray'),
+      line(whyLines[0].replace('{currReps}', String(currReps)).replace('{expectedLabel}', expectedLabel), 'red'),
+      line(whyLines[1], 'gray'),
     ], [
-      line('Good if training to failure intentionally', 'green'),
-      line('Otherwise: end exercise or rest longer', 'gray'),
+      line(improveLines[0], 'green'),
+      line(improveLines[1], 'gray'),
     ])
   );
 };
@@ -491,6 +513,9 @@ export const analyzeProgression = (
   
   if (workingSets.length === 0) return null;
 
+  const exerciseName = workingSets[0]?.exercise_title || 'unknown';
+  const seedBase = `progression|${exerciseName}|${workingSets.length}`;
+
   const reps = workingSets.map(s => s.reps);
   const weights = workingSets.map(s => s.weight_kg);
   const minReps = Math.min(...reps);
@@ -515,8 +540,17 @@ export const analyzeProgression = (
     const increase = topWeightMinReps >= PROMOTE_THRESHOLD ? '5-10%' : '2.5-5%';
     return { 
       type: 'promote', 
-      message: 'Increase Weight',
-      tooltip: `All sets hit ${topWeightMinReps}+ reps. Increase by ${increase} next session.`,
+      message: pickDeterministic(`${seedBase}|promote_msg`, [
+        'Increase Weight',
+        'Level Up',
+        'Add Load',
+        'Progress',
+        'Next Level',
+        'Increase',
+        'Add Weight',
+        'Step Up'
+      ] as const),
+      tooltip: getPromoteMessage(seedBase, { minReps: topWeightMinReps, increase }),
     };
   }
   
@@ -524,8 +558,16 @@ export const analyzeProgression = (
   if (topWeightReps.length > 0 && Math.max(...topWeightReps) < MIN_HYPERTROPHY_REPS) {
     return { 
       type: 'demote', 
-      message: 'Decrease Weight', 
-      tooltip: `Max ${Math.max(...topWeightReps)} reps. Reduce by 5-10% to hit 6-12 rep range.`,
+      message: pickDeterministic(`${seedBase}|demote_heavy_msg`, [
+        'Decrease Weight',
+        'Reduce Load',
+        'Deload',
+        'Lighten Up',
+        'Reduce',
+        'Too Heavy',
+        'Back Off'
+      ] as const),
+      tooltip: getDemoteTooHeavyMessage(seedBase, { maxReps: Math.max(...topWeightReps) }),
     };
   }
   
@@ -533,8 +575,16 @@ export const analyzeProgression = (
   if (topWeightReps.length >= 2 && topWeightMinReps < targetReps - 3 && Math.max(...topWeightReps) >= targetReps) {
     return {
       type: 'demote',
-      message: 'Inconsistent',
-      tooltip: `Reps varied ${topWeightMinReps}-${Math.max(...topWeightReps)}. Lower weight or rest longer for consistency.`,
+      message: pickDeterministic(`${seedBase}|demote_inconsistent_msg`, [
+        'Inconsistent',
+        'Varying',
+        'Fluctuating',
+        'Unstable',
+        'Scattered',
+        'Inconsistent Output',
+        'Inconsistent Reps'
+      ] as const),
+      tooltip: getDemoteInconsistentMessage(seedBase, { minReps: topWeightMinReps, maxReps: Math.max(...topWeightReps) }),
     };
   }
 

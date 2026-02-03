@@ -1,7 +1,7 @@
 import type { WorkoutSet } from '../../types';
 import type { ExerciseAsset } from '../data/exerciseAssets';
 import { isWarmupSet } from '../analysis/setClassification';
-import { createExerciseNameResolver } from '../exercise/exerciseNameResolver';
+import { createExerciseAssetLookup } from '../exercise/exerciseAssetLookup';
 import { parseMuscleFields } from './muscleContributions';
 import { normalizeMuscleGroup, type NormalizedMuscleGroup } from './muscleNormalization';
 import { getSvgIdsForCsvMuscleName } from './muscleMapping';
@@ -15,27 +15,6 @@ export type WindowedExerciseBreakdown = {
 };
 
 type LookupAsset = (name: string) => ExerciseAsset | undefined;
-
-const createAssetLookup = (assetsMap: Map<string, ExerciseAsset>): LookupAsset => {
-  const lowerMap = new Map<string, ExerciseAsset>();
-  assetsMap.forEach((v, k) => lowerMap.set(k.toLowerCase(), v));
-
-  const allNames = Array.from(assetsMap.keys());
-  const resolver = allNames.length > 0 ? createExerciseNameResolver(allNames) : null;
-
-  return (name: string) => {
-    const raw = String(name ?? '').trim();
-    if (!raw) return undefined;
-
-    const direct = assetsMap.get(raw) || lowerMap.get(raw.toLowerCase());
-    if (direct) return direct;
-
-    if (!resolver) return undefined;
-    const resolved = resolver.resolve(raw);
-    if (!resolved?.name) return undefined;
-    return assetsMap.get(resolved.name) || lowerMap.get(resolved.name.toLowerCase());
-  };
-};
 
 const addExerciseInc = (
   exerciseMap: Map<string, { sets: number; primarySets: number; secondarySets: number }>,
@@ -105,8 +84,13 @@ export const computeWindowedExerciseBreakdown = (params: {
 }): WindowedExerciseBreakdown => {
   const { data, assetsMap, start, end, grouping, selectedSubjects } = params;
 
-  const lookupAsset = createAssetLookup(assetsMap);
+  const lookup = createExerciseAssetLookup(assetsMap);
+  const lookupAsset: LookupAsset = (name: string) => lookup.getAsset(name);
   const selected = toSelectedSet(selectedSubjects);
+
+  const assetByName = new Map<string, ExerciseAsset | null>();
+  const groupHitsByName = new Map<string, ReturnType<typeof computeGroupHitsForAsset>>();
+  const svgHitsByName = new Map<string, ReturnType<typeof computeSvgHitsForAsset>>();
 
   let total = 0;
   const exercises = new Map<string, { sets: number; primarySets: number; secondarySets: number }>();
@@ -118,11 +102,20 @@ export const computeWindowedExerciseBreakdown = (params: {
     if (d < start || d > end) continue;
 
     const exerciseName = s.exercise_title || '';
-    const asset = lookupAsset(exerciseName);
+    let asset = assetByName.get(exerciseName);
+    if (asset === undefined) {
+      asset = lookupAsset(exerciseName) ?? null;
+      assetByName.set(exerciseName, asset);
+    }
     if (!asset) continue;
 
     if (grouping === 'groups') {
-      const { primaryGroups, secondaryGroups, isFullBody } = computeGroupHitsForAsset(asset);
+      let hit = groupHitsByName.get(exerciseName);
+      if (!hit) {
+        hit = computeGroupHitsForAsset(asset);
+        groupHitsByName.set(exerciseName, hit);
+      }
+      const { primaryGroups, secondaryGroups, isFullBody } = hit;
 
       let inc = 0;
       let pInc = 0;
@@ -153,7 +146,12 @@ export const computeWindowedExerciseBreakdown = (params: {
       continue;
     }
 
-    const { primarySvgIds, secondarySvgIds } = computeSvgHitsForAsset(asset);
+    let hit = svgHitsByName.get(exerciseName);
+    if (!hit) {
+      hit = computeSvgHitsForAsset(asset);
+      svgHitsByName.set(exerciseName, hit);
+    }
+    const { primarySvgIds, secondarySvgIds } = hit;
 
     let inc = 0;
     let pInc = 0;

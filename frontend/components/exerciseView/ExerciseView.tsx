@@ -26,7 +26,7 @@ import {
 } from '../../utils/muscle/muscleMapping';
 import { HEADLESS_MUSCLE_NAMES } from '../../utils/muscle/muscleMappingConstants';
 import { ExerciseTrendMode, WeightUnit, getSmartFilterMode, TimeFilterMode } from '../../utils/storage/localStorage';
-import { summarizeExerciseHistory, analyzeExerciseTrendCore, ExerciseSessionEntry, ExerciseTrendStatus, MIN_SESSIONS_FOR_TREND } from '../../utils/analysis/exerciseTrend';
+import { summarizeExerciseHistory, analyzeExerciseTrendCore, ExerciseTrendStatus, MIN_SESSIONS_FOR_TREND, type ExerciseSessionEntry } from '../../utils/analysis/exerciseTrend';
 import { formatNumber } from '../../utils/format/formatters';
 import {
   getRechartsCategoricalTicks,
@@ -217,20 +217,23 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     return clean(evidenceLine);
   };
 
-  const selectedSessions = useMemo(() => {
-    if (!selectedStats) return [] as ExerciseSessionEntry[];
-    // If exercise has unilateral data, separate by side so we can show L/R on chart
-    const separateSides = selectedStats.hasUnilateralData ?? false;
-    return summarizeExerciseHistory(selectedStats.history, { separateSides });
-  }, [selectedStats]);
+  // Memoize summarized exercise history once per dataset
+  const summarizedHistoryByName = useMemo(() => {
+    const map = new Map<string, ExerciseSessionEntry[]>();
+    for (const s of stats) {
+      map.set(s.name, summarizeExerciseHistory(s.history));
+    }
+    return map;
+  }, [stats]);
 
   const inactiveReason = useMemo(() => {
     if (!selectedStats) return null;
 
     const activeSince = subDays(effectiveNow, 60);
-    const lastDate = selectedSessions[0]?.date ?? null;
+    const sessions = summarizedHistoryByName.get(selectedStats.name) ?? summarizeExerciseHistory(selectedStats.history);
+    const lastDate = sessions[0]?.date ?? null;
     const tooOld = !lastDate || lastDate < activeSince;
-    const notEnoughData = selectedSessions.length < MIN_SESSIONS_FOR_TREND;
+    const notEnoughData = sessions.length < MIN_SESSIONS_FOR_TREND;
 
     if (!tooOld && !notEnoughData) return null;
 
@@ -243,16 +246,18 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       tooOld,
       notEnoughData,
     };
-  }, [effectiveNow, selectedSessions, selectedStats]);
+  }, [effectiveNow, selectedStats, summarizedHistoryByName]);
 
   // Calculate date range span for selected exercise
   const exerciseSpanDays = useMemo(() => {
-    if (selectedSessions.length === 0) return 0;
-    const dates = selectedSessions.map(h => h.date.getTime());
+    if (!selectedStats) return 0;
+    const sessions = summarizedHistoryByName.get(selectedStats.name) ?? summarizeExerciseHistory(selectedStats.history);
+    if (sessions.length === 0) return 0;
+    const dates = sessions.map(h => h.date.getTime());
     const min = Math.min(...dates);
     const max = Math.max(...dates);
     return Math.max(1, Math.round((max - min) / (1000 * 60 * 60 * 24)) + 1);
-  }, [selectedSessions]);
+  }, [selectedStats, summarizedHistoryByName]);
 
   // Smart mode based on date range span
   const smartMode = useMemo(() => getSmartFilterMode(exerciseSpanDays), [exerciseSpanDays]);
@@ -276,14 +281,21 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     return () => { mounted = false; };
   }, []);
 
-  // Memoize status map to prevent recalc on every render
+  const selectedSessions = useMemo(() => {
+    if (!selectedStats) return [] as ExerciseSessionEntry[];
+    const base = summarizedHistoryByName.get(selectedStats.name) ?? summarizeExerciseHistory(selectedStats.history);
+    const separateSides = selectedStats.hasUnilateralData ?? false;
+    if (!separateSides) return base;
+    return summarizeExerciseHistory(selectedStats.history, { separateSides });
+  }, [selectedStats, summarizedHistoryByName]);
+
   const statusMap = useMemo<Record<string, StatusResult>>(() => {
     const map: Record<string, StatusResult> = Object.create(null);
     for (const s of stats) {
-      map[s.name] = analyzeExerciseTrend(s, weightUnit, { trendMode: exerciseTrendMode });
+      map[s.name] = analyzeExerciseTrend(s, weightUnit, { trendMode: exerciseTrendMode, summarizedHistory: summarizedHistoryByName.get(s.name) });
     }
     return map;
-  }, [exerciseTrendMode, stats, weightUnit]);
+  }, [exerciseTrendMode, stats, weightUnit, summarizedHistoryByName]);
 
   const lastSessionByName = useMemo(() => {
     const map = new Map<string, Date | null>();
@@ -371,7 +383,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     const eligibilityByName = new Map<string, { isEligible: boolean; inactiveLabel: string }>();
 
     for (const stat of stats) {
-      const sessions = summarizeExerciseHistory(stat.history);
+      const sessions = summarizedHistoryByName.get(stat.name) ?? [];
       const lastDate = sessions[0]?.date ?? null;
       const tooOld = !lastDate || lastDate < activeSince;
       const notEnoughData = sessions.length < MIN_SESSIONS_FOR_TREND;
@@ -386,7 +398,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       eligibleNames.add(stat.name);
 
       activeCount += 1;
-      const st = statusMap[stat.name]?.status ?? analyzeExerciseTrendCore(stat, { trendMode: exerciseTrendMode }).status;
+      const st = statusMap[stat.name]?.status ?? analyzeExerciseTrendCore(stat, { trendMode: exerciseTrendMode, summarizedHistory: sessions }).status;
       statusByName.set(stat.name, st);
       if (st === 'overload') overloadCount += 1;
       else if (st === 'stagnant') plateauCount += 1;
@@ -404,7 +416,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       eligibleNames,
       eligibilityByName,
     };
-  }, [effectiveNow, exerciseTrendMode, stats, statusMap]);
+  }, [effectiveNow, exerciseTrendMode, stats, statusMap, summarizedHistoryByName]);
 
   useEffect(() => {
     if (!trendFilter) return;
@@ -513,8 +525,9 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
   const currentCore = useMemo(() => {
     if (!selectedStats) return null;
-    return analyzeExerciseTrendCore(selectedStats, { trendMode: exerciseTrendMode });
-  }, [exerciseTrendMode, selectedStats]);
+    const summarized = summarizedHistoryByName.get(selectedStats.name);
+    return analyzeExerciseTrendCore(selectedStats, { trendMode: exerciseTrendMode, summarizedHistory: summarized });
+  }, [exerciseTrendMode, selectedStats, summarizedHistoryByName]);
 
   const selectedPrematurePrTooltip = useMemo(() => {
     if (!currentCore?.prematurePr) return null;

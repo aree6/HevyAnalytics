@@ -15,6 +15,7 @@ export const useExerciseVolumeHistory = (data: WorkoutSet[]) => {
       if (!Number.isFinite(set.weight_kg) || !Number.isFinite(set.reps)) continue;
       if ((set.weight_kg || 0) <= 0 || (set.reps || 0) <= 0) continue;
       const sessionKey = getSessionKey(set);
+      if (!sessionKey) continue;
       const exercise = set.exercise_title;
 
       if (!sessionExercises.has(sessionKey)) {
@@ -72,6 +73,7 @@ export const useExerciseBestHistory = (data: WorkoutSet[]) => {
       const exercise = set.exercise_title;
       const currentBest = runningBest.get(exercise) || 0;
       const sessionKey = getSessionKey(set);
+      if (!sessionKey) continue;
 
       if (set.weight_kg > currentBest) {
         if (!exerciseBests.has(exercise)) {
@@ -131,10 +133,12 @@ export const useExerciseVolumePrHistory = (data: WorkoutSet[]) => {
         exerciseVolumePrBests.set(exercise, []);
       }
 
+      const sessionKey = getSessionKey(set);
+      if (!sessionKey) continue;
       exerciseVolumePrBests.get(exercise)!.push({
         date: set.parsedDate!,
         volume: Number(vol.toFixed(2)),
-        sessionKey: getSessionKey(set),
+        sessionKey,
         previousBest: Number(currentBest.toFixed(2)),
         weight: set.weight_kg,
         reps: set.reps,

@@ -289,12 +289,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ data, filtersSlot, wei
   // Stats for header
   const totalSessions = sessions.length;
   const totalSets = useMemo(() => {
-    let count = 0;
-    for (const s of data) {
-      if (isWarmupSet(s)) continue;
-      count += 1;
-    }
-    return count;
+    return data.reduce((acc, s) => (isWarmupSet(s) ? acc : acc + 1), 0);
   }, [data]);
 
   // Handle page changes with scroll to top
