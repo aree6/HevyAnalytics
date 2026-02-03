@@ -191,14 +191,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     return computationCache.getOrCompute(
       'plateauAnalysis',
       fullData,
-      () => detectPlateaus(fullData, exerciseStats, effectiveNow, weightUnit, 'reactive'),
+      () => detectPlateaus(fullData, exerciseStats, weightUnit, 'reactive'),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, exerciseStats, effectiveNow, weightUnit]);
+  }, [fullData, exerciseStats, weightUnit]);
 
   const exerciseStatsMap = useMemo(() => {
     const m = new Map<string, ExerciseStats>();
     for (const s of exerciseStats) m.set(s.name, s);
+    return m;
+  }, [exerciseStats]);
+
+  const summarizedHistoryByExercise = useMemo(() => {
+    const m = new Map<string, ReturnType<typeof summarizeExerciseHistory>>();
+    for (const stat of exerciseStats) {
+      m.set(stat.name, summarizeExerciseHistory(stat.history));
+    }
     return m;
   }, [exerciseStats]);
 
@@ -207,13 +215,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
     return plateauAnalysis.plateauedExercises.filter((p) => {
       const stat = exerciseStatsMap.get(p.exerciseName);
       if (!stat) return false;
-      const sessions = summarizeExerciseHistory(stat.history);
+      const sessions = summarizedHistoryByExercise.get(p.exerciseName) ?? [];
       const lastDate = sessions[0]?.date ?? null;
       if (!lastDate) return false;
       if (sessions.length < MIN_SESSIONS_FOR_TREND) return false;
       return lastDate >= activeSince;
     });
-  }, [plateauAnalysis.plateauedExercises, exerciseStatsMap, effectiveNow]);
+  }, [plateauAnalysis.plateauedExercises, exerciseStatsMap, summarizedHistoryByExercise, effectiveNow]);
 
   const { prsData, prTrendDelta, prTrendDelta7d } = useDashboardPrTrend({
     fullData,
@@ -362,28 +370,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ dailyData, exerciseStats, 
                 </span>
               </div>
             </div>
-            <div className="overflow-x-auto -mx-2 px-2 pb-2">
-              <div className="flex gap-2" style={{ minWidth: 'min-content' }}>
-                {activePlateauExercises.map((p) => (
-                  <div key={p.exerciseName} className="min-w-[280px] flex-shrink-0">
-                    <PlateauAlert
-                      exerciseName={p.exerciseName}
-                      suggestion={p.suggestion}
-                      weeksAtSameWeight={p.weeksAtSameWeight}
-                      currentMaxWeight={p.currentMaxWeight}
-                      lastProgressDate={p.lastProgressDate}
-                      lastWeight={p.lastWeight}
-                      lastReps={p.lastReps}
-                      isBodyweightLike={p.isBodyweightLike}
-                      asset={assetsMap?.get(p.exerciseName) || assetsLowerMap?.get(p.exerciseName.toLowerCase())}
-                      weightUnit={weightUnit}
-                      now={effectiveNow}
-                      onClick={() => onExerciseClick?.(p.exerciseName)}
-                    />
-                  </div>
-                ))}
+              <div className="overflow-x-auto -mx-2 px-2 pb-2">
+                <div className="flex gap-2">
+                  {activePlateauExercises.map((p) => (
+                    <div key={p.exerciseName} className="min-w-[280px] flex-shrink-0">
+                      <PlateauAlert
+                        exerciseName={p.exerciseName}
+                        suggestion={p.suggestion}
+                        lastWeight={p.lastWeight}
+                        lastReps={p.lastReps}
+                        isBodyweightLike={p.isBodyweightLike}
+                        asset={assetsMap?.get(p.exerciseName) || assetsLowerMap?.get(p.exerciseName.toLowerCase())}
+                        weightUnit={weightUnit}
+                        onClick={() => onExerciseClick?.(p.exerciseName)}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
           </div>
         )}
 
