@@ -77,14 +77,14 @@ export const IntensityEvolutionCard = ({
   }, []);
 
   return (
-    <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl">
-      <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-3 sm:gap-0 transition-opacity duration-700 ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2 transition-opacity duration-200 hover:opacity-90">
+    <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300">
+      <div className={`flex flex-row justify-between items-center mb-3 gap-3 transition-opacity duration-700 ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
+        <h3 className="text-sm sm:text-lg font-semibold text-white flex items-center gap-2 transition-opacity duration-200 hover:opacity-90">
           <Layers className="w-5 h-5 text-orange-500 transition-opacity duration-200 hover:opacity-80" />
           <span>Training Style Evolution</span>
         </h3>
 
-        <div className="flex items-center gap-0.5 sm:gap-1 flex-nowrap sm:flex-wrap overflow-x-auto sm:overflow-visible max-w-full">
+        <div className="flex items-center justify-end gap-0.5 sm:gap-1 flex-wrap sm:flex-nowrap overflow-x-auto sm:overflow-visible max-w-full">
           <div className="bg-black/70 p-0.5 rounded-lg flex gap-0.5 border border-slate-800 transition-all duration-200 hover:border-slate-700 shrink-0">
             <button
               onClick={() => onViewToggle('area')}

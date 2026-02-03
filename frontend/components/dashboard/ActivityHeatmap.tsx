@@ -141,7 +141,7 @@ export const ActivityHeatmap = memo(({
   };
 
   return (
-    <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg flex flex-col md:flex-row gap-4 sm:gap-6 overflow-hidden">
+    <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl flex flex-col md:flex-row gap-4 sm:gap-6 overflow-hidden">
       <div className="flex-shrink-0 flex flex-col justify-between min-w-full md:min-w-[180px] border-b md:border-b-0 md:border-r border-slate-800/50 pb-4 md:pb-0 md:pr-6 md:mr-2">
         <div className="w-full h-full flex items-center">
           <div className="w-full flex items-center justify-between gap-3">

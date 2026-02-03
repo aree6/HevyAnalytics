@@ -127,9 +127,9 @@ export const WeeklySetsCard = ({
   }, [heatmapHoveredMuscle, headlessVolumes]);
 
   return (
-    <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 hover:shadow-xl min-w-0">
-      <div className="relative z-30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+    <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl min-h-[400px] sm:min-h-[480px] flex flex-col transition-all duration-300 min-w-0">
+      <div className="relative z-30 flex flex-row justify-between items-center gap-2 mb-4">
+        <h3 className="text-sm sm:text-lg font-semibold text-white flex items-center gap-2">
           <svg className="w-5 h-5 text-cyan-500" viewBox="0 0 187.064 187.064" fill="currentColor">
             <path d="M107.911,47.483c0,0.792-0.676,1.425-1.51,1.425c-0.841,0-1.514-0.64-1.514-1.425c0-0.8,0.673-1.443,1.514-1.443 C107.229,46.04,107.911,46.683,107.911,47.483z M80.666,46.04c-0.85,0-1.51,0.648-1.51,1.443c0,0.792,0.661,1.425,1.51,1.425 c0.828,0,1.51-0.64,1.51-1.425C82.176,46.683,81.487,46.04,80.666,46.04z M83.677,63.476v11.359c0,0.554,0.444,1.004,1.004,1.004 c0.548,0,0.999-0.45,0.999-1.004V63.476c0-4.323,3.504-7.839,7.837-7.839s7.843,3.516,7.843,7.839v11.789 c0,0.558,0.45,1.005,1.005,1.005c0.554,0,1.005-0.447,1.005-1.005V63.476c0-5.431-4.421-9.846-9.853-9.846 C88.091,53.63,83.677,58.045,83.677,63.476z" />
             <path d="M62.364,41.951c-6.734,5.051-12.62-0.85-12.863-1.105c-0.387-0.393-1.023-0.398-1.428-0.018c-0.387,0.386-0.399,1.017-0.024,1.416 c0.055,0.058,3.702,3.748,8.717,3.748c2.083,0,4.408-0.637,6.795-2.433c0.438-0.335,0.536-0.959,0.207-1.41 C63.436,41.708,62.8,41.619,62.364,41.951z" />
@@ -139,7 +139,7 @@ export const WeeklySetsCard = ({
           <span>Weekly sets</span>
         </h3>
 
-        <div className="flex items-center gap-1 flex-nowrap overflow-x-auto w-full sm:w-auto sm:overflow-visible">
+        <div className="flex items-center justify-end gap-1 flex-wrap sm:flex-nowrap overflow-x-auto sm:overflow-visible">
           <div className="bg-black/70 p-0.5 rounded-lg inline-flex gap-0.5 border border-slate-800 shrink-0">
             <button
               onClick={() => setWeeklySetsView('radar')}

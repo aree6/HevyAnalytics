@@ -75,9 +75,9 @@ export const MuscleTrendCard = ({
   }, [trendData]);
 
   return (
-    <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl shadow-lg min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 hover:shadow-xl min-w-0">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+    <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300 min-w-0">
+      <div className="flex flex-row justify-between items-center gap-2 mb-4">
+        <h3 className="text-sm sm:text-lg font-semibold text-white flex items-center gap-2">
           <svg className="w-5 h-5 text-emerald-500" viewBox="0 0 487.172 487.172" fill="currentColor">
             <path d="M80.147,315.971c-2.072,4.694-4.343,10.061-6.252,14.598c-12.218,29.043-24.851,59.074-72.827,113.241 c-1.556,1.757-1.394,4.443,0.364,6c0.809,0.716,1.814,1.068,2.816,1.068c1.174,0,2.343-0.484,3.183-1.432 c13.106-14.798,23.608-27.821,32.229-39.548c27.358,9.402,35.802,32.988,37.275,37.863c-11.64,8.574-24.554,18.999-39.209,31.98 c-1.757,1.557-1.92,4.242-0.363,5.999c0.84,0.948,2.009,1.433,3.183,1.433c1.002,0,2.008-0.353,2.816-1.068 c54.167-47.977,84.198-60.61,113.242-72.828c4.536-1.908,9.902-4.18,14.597-6.252c49.33-21.776,96.602-42.642,137.241-75.945 c45.114-36.972,78.352-85.822,104.602-153.736c21.52-55.68,38.239-95.378,73.17-138.174c1.484-1.818,1.214-4.496-0.604-5.98 c-1.819-1.484-4.496-1.214-5.98,0.605c-10.308,12.628-19.048,24.967-26.8,37.485c-25.962-9.067-34.761-30.935-36.751-37.047 c12.455-7.724,24.734-16.43,37.301-26.687c1.818-1.484,2.09-4.162,0.605-5.98c-1.484-1.818-4.162-2.089-5.98-0.605 c-42.797,34.931-82.494,51.65-138.174,73.17c-67.914,26.249-116.765,59.487-153.736,104.602 C122.79,219.369,101.924,266.64,80.147,315.971z"/>
             <path d="M298.64,104.485c-59.109,27.002-102.147,60.839-135.44,106.488c-1.383,1.896-0.967,4.555,0.93,5.938 c0.756,0.551,1.632,0.817,2.501,0.817c1.312,0,2.605-0.605,3.437-1.746c32.398-44.423,74.376-77.395,132.105-103.766 c2.135-0.975,3.075-3.497,2.1-5.632C303.297,104.45,300.775,103.51,298.64,104.485z"/>
@@ -86,7 +86,7 @@ export const MuscleTrendCard = ({
           <span>Muscle Analysis</span>
         </h3>
 
-        <div className="flex items-center gap-1 flex-nowrap overflow-x-auto w-full sm:w-auto sm:overflow-visible">
+        <div className="flex items-center justify-end gap-1 flex-wrap sm:flex-nowrap overflow-x-auto w-full sm:w-auto sm:overflow-visible">
           <div className="bg-black/70 p-0.5 rounded-lg inline-flex gap-0.5 border border-slate-800 shrink-0">
             <button
               onClick={() => setMuscleGrouping('groups')}
