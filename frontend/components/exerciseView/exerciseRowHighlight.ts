@@ -34,14 +34,6 @@ export const getSelectedHighlightClasses = (
             : 'bg-amber-500/10 border-amber-400/70 shadow-[0_0_0_1px_rgba(251,191,36,0.22),0_0_18px_rgba(245,158,11,0.10)]',
         thumbBorder: intensity === 'soft' ? 'border-amber-400/40' : 'border-amber-400/70',
       };
-    case 'neutral':
-      return {
-        button:
-          intensity === 'soft'
-            ? 'bg-indigo-500/5 border-indigo-400/40'
-            : 'bg-indigo-500/10 border-indigo-400/70 shadow-[0_0_0_1px_rgba(129,140,248,0.22),0_0_18px_rgba(99,102,241,0.10)]',
-        thumbBorder: intensity === 'soft' ? 'border-indigo-400/40' : 'border-indigo-400/70',
-      };
     case 'new':
     default:
       return {

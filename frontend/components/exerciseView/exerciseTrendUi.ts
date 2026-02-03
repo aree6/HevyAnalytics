@@ -17,6 +17,8 @@ const getLatestHistoryKey = (history: ExerciseHistoryEntry[]): string => {
 
 export interface StatusResult {
   status: ExerciseTrendStatus;
+  diffPct?: number;
+  core: ReturnType<typeof analyzeExerciseTrendCore>;
   color: string;
   bgColor: string;
   borderColor: string;
@@ -65,7 +67,7 @@ export const analyzeExerciseTrend = (
       `Keep logging - the algorithm gets hungry after ${MIN_SESSIONS_FOR_TREND}+ snacks.`,
       `Don\'t ghost me now! ${MIN_SESSIONS_FOR_TREND}+ sessions and I\'ll reveal your secrets.`,
       'Early data looks clean. Keep it consistent and we\'ll dial this in fast.',
-      'We\'re still learning your baseline. Keep the setup consistent and let the trend form.',
+      'We\'re still learning your starting point. Keep the setup consistent and let the trend form.',
       'Too early to judge - but the habit is forming. Stack a few more sessions.',
       'We\'re collecting signal. Same movement, same intent, better insights soon.'
     ] as const);
@@ -76,7 +78,7 @@ export const analyzeExerciseTrend = (
       'Don\'t get creative yet. Stick to the script and we\'ll both be happier.',
       'Grip, stance, depth - make it your signature move. Film it for the highlights reel.',
       'Same setup every time. Your future self will thank present you for not being chaotic.',
-      'Once we know your baseline, we can start the real training. Patience, young padawan.',
+      'Once we know your starting point, we can start the real training. Patience, young padawan.',
       'Master the basics first, then we can play with the fancy toys.',
       'No rush to be a hero. Learn the movement before you try to be Instagram famous.',
       'Walk before you run, lift before you ego-lift. The basics are boring for a reason.',
@@ -87,6 +89,8 @@ export const analyzeExerciseTrend = (
     ] as const);
     return {
       status: 'new',
+      diffPct: core.diffPct,
+      core,
       color: 'text-blue-400',
       bgColor: 'bg-blue-500/10',
       borderColor: 'border-blue-500/20',
@@ -96,64 +100,89 @@ export const analyzeExerciseTrend = (
       subtext,
       confidence: core.confidence,
       evidence: core.evidence,
-      label: 'baseline',
+      label: 'new exercise',
       isBodyweightLike: core.isBodyweightLike,
       prematurePr: core.prematurePr,
     };
   }
 
   if (core.status === 'stagnant') {
-    const minReps = core.plateau?.minReps ?? 0;
-    const maxReps = core.plateau?.maxReps ?? 0;
-    const w = core.plateau?.weight ?? 0;
-    const plateauWeight = convertWeight(w, weightUnit);
-    const suggestedNext = convertWeight(w + getStandardWeightIncrementKg(weightUnit), weightUnit);
-    const repRange = maxReps - minReps;
-    const isWideRepRange = repRange >= 4;
-    const isNarrowRepRange = repRange <= 1;
     const sessionsAtPlateau = Math.min(6, Math.max(1, stats.history.length));
 
-    const title = pickDeterministic(`${seedBase}|title`, [
+    const hasStaticPlateau = Boolean(core.plateau);
+
+    const title = pickDeterministic(`${seedBase}|title`, hasStaticPlateau ? [
       'Stuck in neutral', 'Holding steady', 'Plateau city', 'Flatlined', 'Time for a shakeup',
       'Comfort zone detected', 'Same song, same verse', 'Cruise control', 'Pattern locked', 'Stability era'
+    ] as const : [
+      'Plateauing', 'Holding steady', 'No lift-off yet', 'Trend is flat', 'Time for a nudge',
+      'Stability phase', 'Same output lately', 'Progress paused', 'Momentum stalled', 'Not moving much'
     ] as const);
 
-    const description = pickDeterministic(`${seedBase}|desc`, [
-      `You\'ve been hovering between ${minReps}-${maxReps} reps for ${sessionsAtPlateau}+ sessions. Time to shake things up!`,
-      `Stuck at ${minReps}-${maxReps} reps for ${sessionsAtPlateau}+ sessions. Your muscles need a new challenge.`,
-      `Load is static at ${plateauWeight}${weightUnit} while reps vary. Let\'s break this pattern!`,
-      `Both load (${plateauWeight}${weightUnit}) and reps (${minReps}-${maxReps}) are consistent. Your comfort zone is showing.`,
-      `Rep performance is steady at ${maxReps}. Your body adapted and got comfortable.`,
-      `Same old: ${minReps}-${maxReps} reps. Progress is taking a coffee break.`,
-      `Strength is stable at ${plateauWeight}${weightUnit}. Time to introduce a new stimulus!`,
-      `Consistent pattern: ${plateauWeight}${weightUnit} × ${minReps}-${maxReps}. Your muscles need variety.`,
-      `Progress is steady but not growing. Time to spice things up!`,
-      `Everything\'s consistent: ${plateauWeight}${weightUnit} × ${minReps}-${maxReps}. Let\'s mix it up!`,
-      `You\'re repeating the same outcome: ${plateauWeight}${weightUnit} × ${minReps}-${maxReps}. Great control, now chase growth.`,
-      `Strong and steady, but not climbing. Time to nudge the system with a new demand.`,
-      `You\'ve stabilized at ${plateauWeight}${weightUnit}. Now it\'s time to earn the next level.`,
-      `This is a true plateau: consistent output, limited change. Perfect moment for a small, strategic push.`
-    ] as const);
+    const description = (() => {
+      if (!hasStaticPlateau) {
+        return pickDeterministic(`${seedBase}|desc`, [
+          'Your recent sessions aren\'t improving yet. This is a normal phase — time for a small, deliberate push.',
+          'The trend is basically flat lately. Keep technique consistent and add one small progression lever.',
+          'No clear progress (or just a tiny dip). Treat this as feedback: recover well and progress slowly.',
+          'You\'re repeating similar performance. That\'s fine — now choose a micro-goal and beat it next session.',
+          `Output has been steady for ${sessionsAtPlateau}+ sessions. A small nudge (reps, load, rest) usually breaks it.`
+        ] as const);
+      }
 
-    const subtext = pickDeterministic(`${seedBase}|sub`, [
-      `Pick ${maxReps} reps and chase ${maxReps + 1} on ALL sets. No playing favorites with the first set only.`,
-      `Next session: add 1 rep to your first set, then make the others match. Quality over speed, speed racer.`,
-      `Standardize at ${maxReps} reps. Master it across all sets, then level up to ${suggestedNext}${weightUnit}.`,
-      `Try ${suggestedNext}${weightUnit} next session. If form gets ugly, repeat current weight like a grown-up and add a rep.`,
-      `Get fancy: pause reps, painfully slow eccentrics (3-4 seconds), or cut your rest periods in half.`,
-      `Add an extra set (same reps) or channel your inner superhero with a weighted vest.`,
-      `Double progression: repeat ${plateauWeight}${weightUnit} but add 1-2 reps across sets, then increase the weight.`,
-      `If weight jumps feel scary, repeat ${plateauWeight}${weightUnit} and hunt for +1 rep like it\'s the last donut.`,
-      `Mix it up! If doing push-ups, try incline/decline or resistance bands. Keep it tight and controlled.`,
-      `Same weight, add reps, then increase load. If bar speed is slower than a turtle, deload 10% for 2 weeks.`,
-      `Stay at ${plateauWeight}${weightUnit} and earn a bigger rep buffer. Then jump to ${suggestedNext}${weightUnit} with confidence.`,
-      `Add one variable: +1 rep, +1 set, or +5–10% rest reduction. Tiny change, big signal.`,
-      `Pick one set to push (without failing), then bring the rest up to match over the next sessions.`,
-      `If reps are inconsistent, lock a target rep count and hold it across every set for 2-3 sessions.`
-    ] as const);
+      const minReps = core.plateau?.minReps ?? 0;
+      const maxReps = core.plateau?.maxReps ?? 0;
+      const w = core.plateau?.weight ?? 0;
+      const plateauWeight = convertWeight(w, weightUnit);
+      return pickDeterministic(`${seedBase}|desc`, [
+        `You\'ve been hovering between ${minReps}-${maxReps} reps for ${sessionsAtPlateau}+ sessions. Time to shake things up!`,
+        `Stuck at ${minReps}-${maxReps} reps for ${sessionsAtPlateau}+ sessions. Your muscles need a new challenge.`,
+        `Load is static at ${plateauWeight}${weightUnit} while reps vary. Let\'s break this pattern!`,
+        `Both load (${plateauWeight}${weightUnit}) and reps (${minReps}-${maxReps}) are consistent. Your comfort zone is showing.`,
+        `Same old: ${minReps}-${maxReps} reps. Progress is taking a coffee break.`,
+        `Strength is stable at ${plateauWeight}${weightUnit}. Time to introduce a new stimulus!`,
+        `Consistent pattern: ${plateauWeight}${weightUnit} × ${minReps}-${maxReps}. Great control — now chase growth.`,
+        'This looks like a true plateau: consistent output, limited change. Perfect moment for a small, strategic push.'
+      ] as const);
+    })();
+
+    const subtext = (() => {
+      if (!hasStaticPlateau) {
+        return pickDeterministic(`${seedBase}|sub`, core.isBodyweightLike ? [
+          'Pick one lever: +1 rep total, +1 set, or slightly shorter rest. Keep the movement the same.',
+          'Set a micro-goal: beat last time by +1 rep somewhere, then repeat until it sticks.',
+          'Keep form identical and chase a tiny rep increase. Consistency turns into progress fast.',
+          'If recovery is poor, take one easy session. If recovery is good, push one set a bit harder.'
+        ] as const : [
+          'Pick one lever: +1 rep somewhere, or a small load bump next session. Don\'t change everything at once.',
+          'Lock your technique and chase a micro-win: +1 rep total or a small load increase when reps are stable.',
+          'If this feels easy, progress. If it feels grindy, recover and repeat the same load cleanly once more.',
+          'Small changes work: slightly more reps, slightly more load, or slightly more rest — choose one.'
+        ] as const);
+      }
+
+      const minReps = core.plateau?.minReps ?? 0;
+      const maxReps = core.plateau?.maxReps ?? 0;
+      const w = core.plateau?.weight ?? 0;
+      const plateauWeight = convertWeight(w, weightUnit);
+      const suggestedNext = convertWeight(w + getStandardWeightIncrementKg(weightUnit), weightUnit);
+
+      return pickDeterministic(`${seedBase}|sub`, [
+        `Pick ${maxReps} reps and chase ${maxReps + 1} on ALL sets. No playing favorites with the first set only.`,
+        `Next session: add 1 rep to your first set, then make the others match. Quality over speed.`,
+        `Standardize at ${maxReps} reps. Master it across all sets, then level up to ${suggestedNext}${weightUnit}.`,
+        `Try ${suggestedNext}${weightUnit} next session. If form gets ugly, repeat ${plateauWeight}${weightUnit} and add a rep.`,
+        'Get fancy: pause reps, slow eccentrics (3-4 seconds), or slightly shorter rests.',
+        `Double progression: repeat ${plateauWeight}${weightUnit} and add 1-2 reps across sets, then increase the weight.`,
+        `Stay at ${plateauWeight}${weightUnit} and earn a bigger rep buffer. Then jump to ${suggestedNext}${weightUnit} with confidence.`,
+        'Add one variable: +1 rep, +1 set, or +5-10% rest reduction. Tiny change, big signal.'
+      ] as const);
+    })();
 
     return {
       status: 'stagnant',
+      diffPct: core.diffPct,
+      core,
       color: 'text-amber-400',
       bgColor: 'bg-amber-500/10',
       borderColor: 'border-amber-500/20',
@@ -215,6 +244,8 @@ export const analyzeExerciseTrend = (
 
     return {
       status: 'overload',
+      diffPct: core.diffPct,
+      core,
       color: 'text-emerald-400',
       bgColor: 'bg-emerald-500/10',
       borderColor: 'border-emerald-500/20',
@@ -247,7 +278,7 @@ export const analyzeExerciseTrend = (
       'Your recent output is lower than your usual. That\'s a recovery signal, not a character flaw.',
       'This looks like accumulated fatigue. The fix is usually sleep + smart volume, not rage lifting.',
       'Performance dipped. Treat this as feedback and adjust the next 1-2 sessions.',
-      'You\'re underperforming relative to baseline. Let\'s get you back to neutral first.'
+      'You\'re underperforming relative to your usual. Let\'s get you back on track first.'
     ] as const);
 
     const subtext = pickDeterministic(`${seedBase}|sub`, [
@@ -268,6 +299,8 @@ export const analyzeExerciseTrend = (
 
     return {
       status: 'regression',
+      diffPct: core.diffPct,
+      core,
       color: 'text-rose-400',
       bgColor: 'bg-rose-500/10',
       borderColor: 'border-rose-500/20',
@@ -283,57 +316,10 @@ export const analyzeExerciseTrend = (
     };
   }
 
-  if (core.status === 'neutral') {
-    const title = pickDeterministic(`${seedBase}|title`, [
-      'Cruising along', 'Holding steady', 'Maintenance mode', 'Stable vibes', 'Chill but building',
-      'Steady state', 'Consistent output', 'Solid baseline', 'In the pocket', 'Holding the line'
-    ] as const);
-    const description = pickDeterministic(`${seedBase}|desc`, [
-      'Performance is stable. This is your launch pad for the next breakthrough.',
-      'Strength is steady. This consistency is setting you up for something big.',
-      'Reps are consistent - perfect time to get fancy with technique and work capacity.',
-      'Strength is holding steady - time to polish your form before the next climb.',
-      'Not a setback, just strategic patience. Choose your next move wisely, grasshopper.',
-      'You\'ve found your current level. Now optimize it before you level up again.',
-      'Current strength level achieved. Time to master this before chasing more.',
-      'You\'re maintaining well. Small, consistent nudges will turn this into progress.',
-      'Stable trend. This is where good programming turns into great results.',
-      'Nothing dramatic, which is good. Now you can choose a deliberate progression path.',
-      'You\'re holding steady. If you want growth, add a tiny challenge and repeat.'
-    ] as const);
-    const subtext = pickDeterministic(`${seedBase}|sub`, [
-      'Play with tempo: add 2-second pauses or painfully slow eccentrics (3-4 seconds). Feel the burn!',
-      'Focus on bar speed and control. Explosive up, controlled down. Like a boss.',
-      'Add volume strategically: extra set, shorter rest (60-90 seconds), or train more often.',
-      'Volume hack: extra back-off set, shorter rest (90-120 seconds), or increase frequency.',
-      'If this feels too easy, level up: weighted vest, harder variations, or reduce leverage.',
-      'If weight feels manageable, increase intensity: train closer to failure or add partial movements.',
-      'Perfect your technique: film yourself, connect mind to muscle, own your range of motion.',
-      'Technique check: film yourself, nail your bracing, make every rep identical.',
-      'Add structure: pick a rep target and beat it by +1 next session, then repeat.',
-      'Make one change at a time: slightly shorter rest, slightly higher reps, or a small load jump.',
-      'Aim for smoother reps and a stronger finish. Consistency now makes progress easier later.',
-      'If you want movement, set a micro-goal: +1 rep across sets or +0.5–1kg next week.'
-    ] as const);
-    return {
-      status: 'neutral',
-      color: 'text-indigo-400',
-      bgColor: 'bg-indigo-500/10',
-      borderColor: 'border-indigo-500/20',
-      icon: Minus,
-      title,
-      description,
-      subtext,
-      confidence: core.confidence,
-      evidence: core.evidence,
-      label: 'maintaining',
-      isBodyweightLike: core.isBodyweightLike,
-      prematurePr: core.prematurePr,
-    };
-  }
-
   return {
     status: core.status,
+    diffPct: core.diffPct,
+    core,
     color: 'text-slate-400',
     bgColor: 'bg-slate-500/10',
     borderColor: 'border-slate-500/20',

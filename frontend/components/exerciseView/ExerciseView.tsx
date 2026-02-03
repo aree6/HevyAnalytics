@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import {
   Search, Activity, Hourglass,
-  Dumbbell, Infinity
+  Dumbbell, Infinity, ArrowUpDown
 } from 'lucide-react';
 import { ExerciseStats } from '../../types';
 import { FANCY_FONT } from '../../utils/ui/uiConstants';
@@ -124,6 +124,8 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
   const [trendFilter, setTrendFilter] = useState<ExerciseTrendStatus | null>(null);
   // Toggle for showing unilateral (L/R) view
   const [showUnilateral, setShowUnilateral] = useState(false);
+  const [exerciseListSortMode, setExerciseListSortMode] = useState<'recent' | 'trend'>('recent');
+  const [exerciseListSortDir, setExerciseListSortDir] = useState<'desc' | 'asc'>('desc');
 
   // Auto-select most recent exercise when component loads or when no exercise is selected
   useEffect(() => {
@@ -177,6 +179,44 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     stats.find(s => s.name === selectedExerciseName),
     [stats, selectedExerciseName]);
 
+  const getTrendEvidenceTitle = (status: StatusResult | undefined, evidenceLine: string): string | undefined => {
+    if (!status) return undefined;
+    const core = status.core;
+    const c = core.calculation;
+    const clean = (t: string) => String(t).replace(/\[\[(GREEN|RED)\]\]|\[\[\/(GREEN|RED)\]\]/g, '');
+
+    const windowSize = c ? Math.max(0, c.windowSize) : 0;
+    const subject = core.isBodyweightLike ? 'reps' : 'strength';
+
+    const directionVerb = (pct: number | undefined): string => {
+      if (!Number.isFinite(pct)) return 'changed';
+      if ((pct as number) > 0) return 'increased';
+      if ((pct as number) < 0) return 'decreased';
+      return 'stayed about the same';
+    };
+
+    if (/^(Strength|Reps):\s/.test(evidenceLine)) {
+      const pct = core.diffPct;
+      const v = directionVerb(pct);
+      const valueOnly = clean(evidenceLine).replace(/^(Strength|Reps):\s*/, '');
+      if (windowSize > 0) {
+        return `Your ${subject} has ${v} by ${valueOnly} based on your last ${windowSize} sessions.`;
+      }
+      return `Your ${subject} has ${v} by ${valueOnly} based on your recent sessions.`;
+    }
+
+    if (/^Recent( reps)?:\s/.test(evidenceLine)) {
+      if (c?.historyLen && c.historyLen >= 2) {
+        const valueOnly = clean(evidenceLine).replace(/^Recent( reps)?:\s*/, '');
+        return `Your latest session ${subject === 'strength' ? 'performance' : 'reps'} changed by ${valueOnly} compared to the session right before it.`;
+      }
+      return `This is your latest-session change: ${clean(evidenceLine)}.`;
+    }
+
+    // Fallback: keep it short.
+    return clean(evidenceLine);
+  };
+
   const selectedSessions = useMemo(() => {
     if (!selectedStats) return [] as ExerciseSessionEntry[];
     // If exercise has unilateral data, separate by side so we can show L/R on chart
@@ -196,7 +236,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
     const parts: string[] = [];
     if (tooOld) parts.push('You haven\'t trained this exercise recently');
-    if (notEnoughData) parts.push('New exercise: keep logging sessions to build your baseline (check back soon for trends)');
+    if (notEnoughData) parts.push('New exercise: keep logging sessions to build your history (check back soon for trends)');
 
     return {
       parts,
@@ -324,7 +364,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     let overloadCount = 0;
     let plateauCount = 0;
     let regressionCount = 0;
-    let neutralCount = 0;
     let newCount = 0;
 
     const statusByName = new Map<string, ExerciseTrendStatus>();
@@ -339,7 +378,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       const isEligible = !tooOld && !notEnoughData;
       eligibilityByName.set(stat.name, {
         isEligible,
-        inactiveLabel: notEnoughData ? 'baseline' : 'inactive',
+        inactiveLabel: notEnoughData ? 'new exercise' : 'inactive',
       });
 
       if (!isEligible) continue;
@@ -347,12 +386,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       eligibleNames.add(stat.name);
 
       activeCount += 1;
-      const core = analyzeExerciseTrendCore(stat, { trendMode: exerciseTrendMode });
-      statusByName.set(stat.name, core.status);
-      if (core.status === 'overload') overloadCount += 1;
-      else if (core.status === 'stagnant') plateauCount += 1;
-      else if (core.status === 'regression') regressionCount += 1;
-      else if (core.status === 'neutral') neutralCount += 1;
+      const st = statusMap[stat.name]?.status ?? analyzeExerciseTrendCore(stat, { trendMode: exerciseTrendMode }).status;
+      statusByName.set(stat.name, st);
+      if (st === 'overload') overloadCount += 1;
+      else if (st === 'stagnant') plateauCount += 1;
+      else if (st === 'regression') regressionCount += 1;
       else newCount += 1;
     }
 
@@ -361,13 +399,12 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       overloadCount,
       plateauCount,
       regressionCount,
-      neutralCount,
       newCount,
       statusByName,
       eligibleNames,
       eligibilityByName,
     };
-  }, [effectiveNow, exerciseTrendMode, stats]);
+  }, [effectiveNow, exerciseTrendMode, stats, statusMap]);
 
   useEffect(() => {
     if (!trendFilter) return;
@@ -394,12 +431,28 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
         return st === trendFilter;
       })
       .sort((a, b) => {
+        // Keep eligible exercises on top
+        const aEligible = trainingStructure.eligibleNames.has(a.name);
+        const bEligible = trainingStructure.eligibleNames.has(b.name);
+        if (aEligible !== bEligible) return aEligible ? -1 : 1;
+
+        const dir = exerciseListSortDir === 'asc' ? 1 : -1;
+
+        if (exerciseListSortMode === 'trend') {
+          const ap = statusMap[a.name]?.diffPct;
+          const bp = statusMap[b.name]?.diffPct;
+          const aHas = Number.isFinite(ap);
+          const bHas = Number.isFinite(bp);
+          if (aHas && bHas && (bp as number) !== (ap as number)) return ((bp as number) - (ap as number)) * dir;
+          if (aHas !== bHas) return aHas ? -1 : 1;
+        }
+
         const at = lastSessionByName.get(a.name)?.getTime() ?? -Infinity;
         const bt = lastSessionByName.get(b.name)?.getTime() ?? -Infinity;
-        if (bt !== at) return bt - at;
+        if (bt !== at) return (bt - at) * dir;
         return a.name.localeCompare(b.name);
       }),
-    [lastSessionByName, stats, searchTerm, trendFilter, trainingStructure.eligibleNames, trainingStructure.statusByName]);
+    [exerciseListSortDir, exerciseListSortMode, lastSessionByName, stats, searchTerm, statusMap, trendFilter, trainingStructure.eligibleNames, trainingStructure.statusByName]);
 
   const capitalizeLabel = (s: string): string => {
     const trimmed = String(s ?? '').trim();
@@ -411,33 +464,22 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     if (trainingStructure.activeCount <= 0) return filtersSlot;
 
     const isSelected = (s: ExerciseTrendStatus) => trendFilter === s;
-    const chipCls = (s: ExerciseTrendStatus, tone: 'good' | 'warn' | 'bad' | 'neutral' | 'info') => {
-      const base = 'text-[10px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200';
+    const chipCls = (s: ExerciseTrendStatus, tone: 'good' | 'warn' | 'bad' | 'info') => {
+      const base = 'text-[9px] px-1.5 py-0.5 rounded font-bold border whitespace-nowrap transition-all duration-200';
       const selected = isSelected(s);
-      const hasAnyFilter = trendFilter !== null;
 
       if (selected) {
-        // Highlighted state - full opacity and enhanced styling
-        if (tone === 'good') return `${base} bg-emerald-500/20 text-emerald-200 border-emerald-400/50 shadow-lg shadow-emerald-500/20`;
-        if (tone === 'warn') return `${base} bg-amber-500/20 text-amber-200 border-amber-400/50 shadow-lg shadow-amber-500/20`;
-        if (tone === 'bad') return `${base} bg-rose-500/20 text-rose-200 border-rose-400/50 shadow-lg shadow-rose-500/20`;
-        if (tone === 'neutral') return `${base} bg-indigo-500/20 text-indigo-200 border-indigo-400/50 shadow-lg shadow-indigo-500/20`;
-        return `${base} bg-blue-500/20 text-blue-200 border-blue-400/50 shadow-lg shadow-blue-500/20`;
-      } else if (hasAnyFilter) {
-        // Dimmed state - reduced opacity when another filter is selected
-        if (tone === 'good') return `${base} bg-emerald-500/5 text-emerald-400/80 border-emerald-500/15 hover:bg-emerald-500/10 hover:text-emerald-300/90 hover:border-emerald-400/30`;
-        if (tone === 'warn') return `${base} bg-amber-500/5 text-amber-400/80 border-amber-500/15 hover:bg-amber-500/10 hover:text-amber-300/90 hover:border-amber-400/30`;
-        if (tone === 'bad') return `${base} bg-rose-500/5 text-rose-400/80 border-rose-500/15 hover:bg-rose-500/10 hover:text-rose-300/90 hover:border-rose-400/30`;
-        if (tone === 'neutral') return `${base} bg-indigo-500/5 text-indigo-400/80 border-indigo-500/15 hover:bg-indigo-500/10 hover:text-indigo-300/90 hover:border-indigo-400/30`;
-        return `${base} bg-blue-500/5 text-blue-400/80 border-blue-500/15 hover:bg-blue-500/10 hover:text-blue-300/90 hover:border-blue-400/30`;
-      } else {
-        // Normal state - full opacity when no filter is selected
-        if (tone === 'good') return `${base} bg-emerald-500/10 text-emerald-300 border-emerald-500/20 hover:border-emerald-400/40`;
-        if (tone === 'warn') return `${base} bg-amber-500/10 text-amber-300 border-amber-500/20 hover:border-amber-400/40`;
-        if (tone === 'bad') return `${base} bg-rose-500/10 text-rose-300 border-rose-500/20 hover:border-rose-400/40`;
-        if (tone === 'neutral') return `${base} bg-indigo-500/10 text-indigo-300 border-indigo-500/20 hover:border-indigo-400/40`;
-        return `${base} bg-blue-500/10 text-blue-300 border-blue-500/20 hover:border-blue-400/40`;
+        if (tone === 'good') return `${base} bg-emerald-500/20 text-emerald-200 border-emerald-400/60 ring-2 ring-emerald-500/25`;
+        if (tone === 'warn') return `${base} bg-amber-500/20 text-amber-200 border-amber-400/60 ring-2 ring-amber-500/25`;
+        if (tone === 'bad') return `${base} bg-rose-500/20 text-rose-200 border-rose-400/60 ring-2 ring-rose-500/25`;
+        return `${base} bg-blue-500/20 text-blue-200 border-blue-400/60 ring-2 ring-blue-500/25`;
       }
+
+      // Keep unselected chips readable (no fade); selection is communicated via ring + stronger border.
+      if (tone === 'good') return `${base} bg-emerald-500/10 text-emerald-300 border-emerald-500/25 hover:border-emerald-400/45`;
+      if (tone === 'warn') return `${base} bg-amber-500/10 text-amber-300 border-amber-500/25 hover:border-amber-400/45`;
+      if (tone === 'bad') return `${base} bg-rose-500/10 text-rose-300 border-rose-500/25 hover:border-rose-400/45`;
+      return `${base} bg-blue-500/10 text-blue-300 border-blue-500/25 hover:border-blue-400/45`;
     };
 
     const toggle = (s: ExerciseTrendStatus) => {
@@ -456,24 +498,15 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
           <button type="button" onClick={() => toggle('stagnant')} className={chipCls('stagnant', 'warn')}>
             {trainingStructure.plateauCount} Plateauing
           </button>
-        </div>
-
-        <div className="justify-self-center">{filtersSlot}</div>
-
-        <div className="flex items-center gap-2 justify-end min-w-0">
           <button type="button" onClick={() => toggle('regression')} className={chipCls('regression', 'bad')}>
             {trainingStructure.regressionCount} Losing
           </button>
-          <button type="button" onClick={() => toggle('neutral')} className={chipCls('neutral', 'neutral')}>
-            {trainingStructure.neutralCount} Maintaining
-          </button>
-          <button type="button" onClick={() => toggle('new')} className={chipCls('new', 'info')}>
-            {trainingStructure.newCount} Baseline
-          </button>
         </div>
+
+        <div className="justify-self-center">{filtersSlot}</div>
       </div>
     );
-  }, [filtersSlot, trainingStructure.activeCount, trainingStructure.neutralCount, trainingStructure.newCount, trainingStructure.overloadCount, trainingStructure.plateauCount, trainingStructure.regressionCount, trendFilter]);
+  }, [filtersSlot, trainingStructure.activeCount, trainingStructure.overloadCount, trainingStructure.plateauCount, trainingStructure.regressionCount, trendFilter]);
 
   const currentStatus = selectedStats ? statusMap[selectedStats.name] : null;
   const isBodyweightLike = currentStatus?.isBodyweightLike ?? false;
@@ -482,6 +515,19 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     if (!selectedStats) return null;
     return analyzeExerciseTrendCore(selectedStats, { trendMode: exerciseTrendMode });
   }, [exerciseTrendMode, selectedStats]);
+
+  const selectedPrematurePrTooltip = useMemo(() => {
+    if (!currentCore?.prematurePr) return null;
+    const spike = currentCore.prSpikePct;
+    const drop = currentCore.prDropPct;
+    if (!Number.isFinite(spike) && !Number.isFinite(drop)) {
+      return 'This looks like a PR spike that may not be sustainable yet. Keep building consistency at this level.';
+    }
+    const parts: string[] = ['This looks like a PR spike that may not be sustainable yet.'];
+    if (Number.isFinite(spike)) parts.push(`PR spike: +${(spike as number).toFixed(1)}%`);
+    if (Number.isFinite(drop)) parts.push(`After PR: ${(drop as number).toFixed(1)}%`);
+    return parts.join(' ');
+  }, [currentCore?.prematurePr, currentCore?.prDropPct, currentCore?.prSpikePct]);
 
   const chartData = useMemo(() => {
     return buildExerciseChartData({
@@ -550,24 +596,18 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
       <div className="sm:hidden">
         <div className="bg-black/70 p-2 rounded-xl">
           {trainingStructure.activeCount > 0 ? (
-            <div className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap custom-scrollbar">
-              <button type="button" onClick={() => setTrendFilter(null)} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === null ? 'bg-slate-500/20 text-slate-200 border-slate-400/50 ring-2 ring-slate-500/30 shadow-lg shadow-slate-500/20' : trendFilter !== null ? 'bg-slate-500/5 text-slate-400/80 border-slate-500/15 hover:bg-slate-500/10 hover:text-slate-300/90 hover:border-slate-400/30' : 'bg-slate-500/10 text-slate-300 border-slate-500/20 hover:border-slate-400/40'}`}>
+            <div className="grid grid-cols-4 gap-1">
+              <button type="button" onClick={() => setTrendFilter(null)} className={`w-full text-center text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === null ? 'bg-slate-500/20 text-slate-200 border-slate-400/60 ring-2 ring-slate-500/25' : 'bg-slate-500/10 text-slate-300 border-slate-500/25 hover:border-slate-400/45'}`}>
                 {trainingStructure.activeCount} active
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'overload' ? null : 'overload'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'overload' ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/50 ring-2 ring-emerald-500/30 shadow-lg shadow-emerald-500/20' : trendFilter !== null ? 'bg-emerald-500/5 text-emerald-400/80 border-emerald-500/15 hover:bg-emerald-500/10 hover:text-emerald-300/90 hover:border-emerald-400/30' : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 hover:border-emerald-400/40'}`}>
+              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'overload' ? null : 'overload'))} className={`w-full text-center text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'overload' ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/60 ring-2 ring-emerald-500/25' : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25 hover:border-emerald-400/45'}`}>
                 {trainingStructure.overloadCount} Gaining
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'stagnant' ? null : 'stagnant'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'stagnant' ? 'bg-amber-500/20 text-amber-200 border-amber-400/50 ring-2 ring-amber-500/30 shadow-lg shadow-amber-500/20' : trendFilter !== null ? 'bg-amber-500/5 text-amber-400/80 border-amber-500/15 hover:bg-amber-500/10 hover:text-amber-300/90 hover:border-amber-400/30' : 'bg-amber-500/10 text-amber-300 border-amber-500/20 hover:border-amber-400/40'}`}>
+              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'stagnant' ? null : 'stagnant'))} className={`w-full text-center text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'stagnant' ? 'bg-amber-500/20 text-amber-200 border-amber-400/60 ring-2 ring-amber-500/25' : 'bg-amber-500/10 text-amber-300 border-amber-500/25 hover:border-amber-400/45'}`}>
                 {trainingStructure.plateauCount} Plateauing
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'regression' ? null : 'regression'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'regression' ? 'bg-rose-500/20 text-rose-200 border-rose-400/50 ring-2 ring-rose-500/30 shadow-lg shadow-rose-500/20' : trendFilter !== null ? 'bg-rose-500/5 text-rose-400/80 border-rose-500/15 hover:bg-rose-500/10 hover:text-rose-300/90 hover:border-rose-400/30' : 'bg-rose-500/10 text-rose-300 border-rose-500/20 hover:border-rose-400/40'}`}>
+              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'regression' ? null : 'regression'))} className={`w-full text-center text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'regression' ? 'bg-rose-500/20 text-rose-200 border-rose-400/60 ring-2 ring-rose-500/25' : 'bg-rose-500/10 text-rose-300 border-rose-500/25 hover:border-rose-400/45'}`}>
                 {trainingStructure.regressionCount} Losing
-              </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'neutral' ? null : 'neutral'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'neutral' ? 'bg-indigo-500/20 text-indigo-200 border-indigo-400/50 ring-2 ring-indigo-500/30 shadow-lg shadow-indigo-500/20' : trendFilter !== null ? 'bg-indigo-500/5 text-indigo-400/80 border-indigo-500/15 hover:bg-indigo-500/10 hover:text-indigo-300/90 hover:border-indigo-400/30' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20 hover:border-indigo-400/40'}`}>
-                {trainingStructure.neutralCount} Maintaining
-              </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'new' ? null : 'new'))} className={`text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'new' ? 'bg-blue-500/20 text-blue-200 border-blue-400/50 ring-2 ring-blue-500/30 shadow-lg shadow-blue-500/20' : trendFilter !== null ? 'bg-blue-500/5 text-blue-400/80 border-blue-500/15 hover:bg-blue-500/10 hover:text-blue-300/90 hover:border-blue-400/30' : 'bg-blue-500/10 text-blue-300 border-blue-500/20 hover:border-blue-400/40'}`}>
-                {trainingStructure.newCount} Baseline
               </button>
             </div>
           ) : null}
@@ -601,10 +641,45 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
             <input
               type="text"
               placeholder="Search for exercises..."
-              className="w-full bg-black/70 border border-slate-700/50 rounded-lg pl-9 pr-3 py-1 sm:py-2 text-[11px] sm:text-xs text-slate-200 focus:outline-none focus:border-transparent transition-all"
+              className="w-full bg-black/70 border border-slate-700/50 rounded-lg pl-9 pr-[8.5rem] py-1 sm:py-2 text-[11px] sm:text-xs text-slate-200 focus:outline-none focus:border-transparent transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <div className="bg-black/70 p-1 rounded-lg flex gap-1 border border-slate-700/50">
+                <button
+                  type="button"
+                  onClick={() => setExerciseListSortMode('recent')}
+                  title="Sort by most recently trained"
+                  aria-label="Sort by recent"
+                  className={`px-2 py-1 rounded text-[9px] font-bold whitespace-nowrap ${exerciseListSortMode === 'recent' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}
+                >
+                  recent
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExerciseListSortMode('trend')}
+                  title="Sort by % strength change"
+                  aria-label="Sort by trend"
+                  className={`px-2 py-1 rounded text-[9px] font-bold whitespace-nowrap ${exerciseListSortMode === 'trend' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300 hover:bg-black/60'}`}
+                >
+                  %
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setExerciseListSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+                title={exerciseListSortMode === 'trend'
+                  ? (exerciseListSortDir === 'desc' ? 'Highest % to lowest' : 'Lowest % to highest')
+                  : (exerciseListSortDir === 'desc' ? 'Latest to oldest' : 'Oldest to latest')}
+                aria-label="Reverse sort direction"
+                className="p-2 rounded-lg bg-black/70 border border-slate-700/50 text-slate-500 hover:text-slate-300 hover:bg-black/60 transition-colors"
+              >
+                <ArrowUpDown className="w-3 h-3" />
+              </button>
+            </div>
           </div>
 
           {/* LIST WRAPPER */}
@@ -627,7 +702,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                 const selectedHighlight = getSelectedHighlightClasses(status.status, !isEligible ? 'soft' : 'strong');
                 const RowStatusIcon = status.icon;
                 const displayLabel = capitalizeLabel(subLabel);
-                const IneligibleStatusIcon = displayLabel === 'Baseline' ? Hourglass : null;
+                const IneligibleStatusIcon = displayLabel === 'New exercise' ? Hourglass : null;
 
                 return (
                   <button
@@ -844,7 +919,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                           {currentCore?.prematurePr ? (
                             <span
                               className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-bold whitespace-nowrap bg-orange-500/10 text-orange-400 border-orange-500/20"
-                              title="This looks like a PR spike that may not be sustainable yet. Keep building consistency at this level."
+                              title={selectedPrematurePrTooltip ?? undefined}
                               aria-label="Premature PR"
                             >
                               <span className="w-1.5 h-1.5 rounded-full bg-current" />
@@ -872,6 +947,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                             return (
                               <span
                                 key={i}
+                                title={getTrendEvidenceTitle(currentStatus, t)}
                                 className={`inline-flex items-center px-2 py-0.5 rounded-md border max-w-full ${badgeBgColor} ${badgeBorderColor} ${badgeTextColor} ${isStrengthLike ? 'font-bold' : 'font-mono'} text-[10px] whitespace-normal break-words`}
                               >
                                 {renderEvidenceWithColoredSigns(t)}
@@ -882,7 +958,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                           {currentCore?.prematurePr ? (
                             <span
                               className="sm:hidden inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-bold whitespace-nowrap bg-orange-500/10 text-orange-400 border-orange-500/20"
-                              title="This looks like a PR spike that may not be sustainable yet. Keep building consistency at this level."
+                              title={selectedPrematurePrTooltip ?? undefined}
                               aria-label="Premature PR"
                             >
                               <span className="w-1.5 h-1.5 rounded-full bg-current" />
@@ -1028,7 +1104,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
           <div className="w-full flex-1 min-h-0">
             {chartData.length === 0 ? (
               <div className="w-full h-full min-h-[260px] flex items-center justify-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg px-4 sm:px-0 text-center">
-                Building baseline — log a few more sessions to see Strength Progression.
+                Building history — log a few more sessions to see Strength Progression.
               </div>
             ) : (
               <LazyRender className="w-full h-full" placeholder={<ChartSkeleton className="h-full min-h-[260px]" />}>

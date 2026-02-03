@@ -295,9 +295,9 @@ export const HOW_IT_WORKS_SECTIONS: HowItWorksSection[] = [
           {
             type: 'ul',
             items: [
-              'Getting stronger: recent sessions are trending upward.',
-              'Plateauing: weight and reps look very similar across recent sessions.',
-              'Taking a dip: recent sessions are trending down (often fatigue, stress, or inconsistent training).',
+              'Getting stronger: a clear positive change (more than about +2%).',
+              'Plateauing: roughly stable (between about -3% and +2%).',
+              'Taking a dip: a clear drop (more than about -3%).',
               'New: not enough history yet to read a trend.',
               'Premature PR: a big spike was followed by a drop (unsustainable jump).',
             ],
