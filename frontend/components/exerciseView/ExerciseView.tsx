@@ -127,6 +127,11 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
   const [exerciseListSortMode, setExerciseListSortMode] = useState<'recent' | 'trend'>('recent');
   const [exerciseListSortDir, setExerciseListSortDir] = useState<'desc' | 'asc'>('desc');
 
+  // Ensure sort direction defaults to latest first (desc) on component mount
+  useEffect(() => {
+    setExerciseListSortDir('desc');
+  }, []);
+
   // Auto-select most recent exercise when component loads or when no exercise is selected
   useEffect(() => {
     if (!selectedExerciseName && mostRecentExerciseName) {

@@ -840,6 +840,11 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
                 Tap to see more details
               </div>
 
+              {/* Desktop instruction - below heat map */}
+              <div className="hidden sm:block text-center text-[11px] text-slate-500 mt-2 mb-8">
+                Hover over muscles to preview, click to view exercises
+              </div>
+
               {/* Color Legend - Bottom of body map */}
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
                 <div className="flex items-center gap-3 text-xs text-slate-400 bg-slate-950/75 rounded-lg px-3 py-1.5">
@@ -869,7 +874,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
         </div>
 
         {/* Right: Detail Panel - Always visible */}
-        <div className="bg-black/70 rounded-xl border border-slate-700/50 overflow-hidden">
+        <div className="bg-black/70 rounded-xl border border-slate-700/50 overflow-hidden flex flex-col h-[70vh] lg:h-0 lg:min-h-full">
           {/* Panel Header */}
           <div className="bg-black/70 border-b border-slate-800/50 p-3 flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0 flex-wrap">
@@ -983,9 +988,9 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
 
           {/* Scrollable Exercises Section */}
           {windowedSelectionBreakdown && (
-            <div className="border-t border-slate-800/30">
+            <div className="border-t border-slate-800/30 flex-1 flex flex-col min-h-0">
 
-              <div className="overflow-y-auto h-64 sm:h-80 px-4 mt-2 scroll-smooth">
+              <div className="overflow-y-auto flex-1 px-4 mt-2 scroll-smooth">
                 <div className="space-y-2 pb-4">
                   {contributingExercises.map((ex, i) => {
                     const asset = assetsMap?.get(ex.name);
@@ -1086,14 +1091,6 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
             </div>
           )}
 
-          {/* Hint when no muscle selected */}
-          {!selectedMuscle && (
-            <div className="p-4 pt-0">
-              <p className="text-xs text-slate-500 text-center py-2">
-                Click on a {viewMode === 'group' ? 'muscle group' : 'muscle'} to see its exercises
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>
