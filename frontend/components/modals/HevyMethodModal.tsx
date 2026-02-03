@@ -103,7 +103,7 @@ export const HevyMethodModal: React.FC<HevyMethodModalProps> = ({
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative w-9 h-9 rounded-lg bg-black/20 border border-slate-700/50 flex items-center justify-center flex-shrink-0">
-                  <img src="/hevy.png" alt="Hevy" className="w-6 h-6 object-contain" loading="lazy" decoding="async" />
+                  <img src="/hevy_small.webp" alt="Hevy" className="w-6 h-6 object-contain" loading="lazy" decoding="async" />
                 </div>
                 <div className="text-white font-semibold text-lg truncate">Login with Hevy</div>
               </div>
@@ -150,21 +150,21 @@ export const HevyMethodModal: React.FC<HevyMethodModalProps> = ({
             <div className="mt-3 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <img
-                  src="/step1Login.png"
+                  src="/step1Login.avif"
                   className="w-full h-auto rounded-lg border border-slate-700/60"
                   alt="Hevy login step 1"
                   loading="lazy"
                   decoding="async"
                 />
                 <img
-                  src="/step2Login.png"
+                  src="/step2Login.avif"
                   className="w-full h-auto rounded-lg border border-slate-700/60"
                   alt="Hevy login step 2"
                   loading="lazy"
                   decoding="async"
                 />
                 <img
-                  src="/step3Login.png"
+                  src="/step3Login.avif"
                   className="w-full h-auto rounded-lg border border-slate-700/60"
                   alt="Hevy login step 3"
                   loading="lazy"
@@ -174,7 +174,7 @@ export const HevyMethodModal: React.FC<HevyMethodModalProps> = ({
 
               <div className="flex justify-center">
                 <img
-                  src="/step5.png"
+                  src="/step5.avif"
                   className="w-full max-w-xs h-auto rounded-lg border border-slate-700/60"
                   alt="Set Hevy language to English"
                   loading="lazy"

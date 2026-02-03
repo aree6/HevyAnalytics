@@ -8,15 +8,15 @@ interface ReviewsCarouselProps {
 }
 
 const REVIEW_IMAGES = [
-  assetPath('/carousel/1.webp'),
-  assetPath('/carousel/2.webp'),
-  assetPath('/carousel/3.webp'),
-  assetPath('/carousel/4.webp'),
-  assetPath('/carousel/5.webp'),
-  assetPath('/carousel/6.webp'),
-  assetPath('/carousel/7.webp'),
-  assetPath('/carousel/8.webp'),
-  assetPath('/carousel/9.webp'),
+  assetPath('/carousel/1.avif'),
+  assetPath('/carousel/2.avif'),
+  assetPath('/carousel/3.avif'),
+  assetPath('/carousel/4.avif'),
+  assetPath('/carousel/5.avif'),
+  assetPath('/carousel/6.avif'),
+  assetPath('/carousel/7.avif'),
+  assetPath('/carousel/8.avif'),
+  assetPath('/carousel/9.avif'),
 ];
 
 export const ReviewsCarousel: React.FC<ReviewsCarouselProps> = ({ className = '' }) => {

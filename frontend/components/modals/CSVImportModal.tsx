@@ -231,7 +231,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
             {showNonEnglishHevyDateHelp ? (
               <div className="mt-3">
                 <img
-                  src="/step5.png"
+                  src="/step5.avif"
                   className="w-full max-w-sm h-auto rounded-lg border border-red-500/20 mx-auto"
                   alt="Hevy export language must be English"
                   loading="lazy"
@@ -429,15 +429,15 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
                   {platform === 'hevy' ? (
                     <div className="mt-3 space-y-3">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        <img src="/Step1.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Hevy export step 1" loading="lazy" decoding="async" />
-                        <img src="/Step2.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Hevy export step 2" loading="lazy" decoding="async" />
-                        <img src="/Step3.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Hevy export step 3" loading="lazy" decoding="async" />
-                        <img src="/Step4.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Hevy export step 4" loading="lazy" decoding="async" />
+                        <img src="/Step1.avif" className="w-full h-auto rounded-lg border border-slate-700" alt="Hevy export step 1" loading="lazy" decoding="async" />
+                        <img src="/Step2.avif" className="w-full h-auto rounded-lg border border-slate-700" alt="Hevy export step 2" loading="lazy" decoding="async" />
+                        <img src="/Step3.avif" className="w-full h-auto rounded-lg border border-slate-700" alt="Hevy export step 3" loading="lazy" decoding="async" />
+                        <img src="/Step4.avif" className="w-full h-auto rounded-lg border border-slate-700" alt="Hevy export step 4" loading="lazy" decoding="async" />
                       </div>
 
                       <div className="flex justify-center">
                         <img
-                          src="/step5.png"
+                          src="/step5.avif"
                           className="w-full max-w-xs h-auto rounded-lg border border-slate-700/60"
                           alt="Set Hevy export language to English"
                           loading="lazy"
@@ -452,9 +452,9 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({
                   ) : platform === 'strong' ? (
                     <div className="mt-3 space-y-3">
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <img src="/StrongStep1.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Strong export step 1" loading="lazy" decoding="async" />
-                        <img src="/StrongStep2.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Strong export step 2" loading="lazy" decoding="async" />
-                        <img src="/StrongStep3.png" className="w-full h-auto rounded-lg border border-slate-700" alt="Strong export step 3" loading="lazy" decoding="async" />
+                        <img src="/StrongStep1.avif" className="w-full h-auto rounded-lg border border-slate-700" alt="Strong export step 1" loading="lazy" decoding="async" />
+                        <img src="/StrongStep2.avif" className="w-full h-auto rounded-lg border border-slate-700" alt="Strong export step 2" loading="lazy" decoding="async" />
+                        <img src="/StrongStep3.avif" className="w-full h-auto rounded-lg border border-slate-700" alt="Strong export step 3" loading="lazy" decoding="async" />
                       </div>
                     </div>
                   ) : (

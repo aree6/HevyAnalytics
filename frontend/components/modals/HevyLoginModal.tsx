@@ -276,21 +276,21 @@ export const HevyLoginModal: React.FC<HevyLoginModalProps> = ({
             <>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <img
-                  src="/step1Login.png"
+                  src="/step1Login.avif"
                   className="w-full h-auto rounded-lg border border-slate-700/60"
                   alt="Hevy login step 1"
                   loading="lazy"
                   decoding="async"
                 />
                 <img
-                  src="/step2Login.png"
+                  src="/step2Login.avif"
                   className="w-full h-auto rounded-lg border border-slate-700/60"
                   alt="Hevy login step 2"
                   loading="lazy"
                   decoding="async"
                 />
                 <img
-                  src="/step3Login.png"
+                  src="/step3Login.avif"
                   className="w-full h-auto rounded-lg border border-slate-700/60"
                   alt="Hevy login step 3"
                   loading="lazy"
@@ -299,7 +299,7 @@ export const HevyLoginModal: React.FC<HevyLoginModalProps> = ({
               </div>
               <div className="flex justify-center">
                 <img
-                  src="/step5.png"
+                  src="/step5.avif"
                   className="w-full max-w-xs h-auto rounded-lg border border-slate-700/60"
                   alt="Set Hevy language to English"
                   loading="lazy"
