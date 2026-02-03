@@ -124,7 +124,7 @@ export const VolumeComparisonCard: React.FC<{
                   }`}
                 />
                 <img
-                  src={assetPath(`/comparisonImages/${comparison.filename}`)}
+                  src={assetPath(`/comparisonImages/${comparison.filename.replace(/\.svg$/, '.avif')}`)}
                   alt={comparison.item.label}
                   className="relative w-40 h-40 sm:w-52 sm:h-52 object-contain drop-shadow-lg"
                   loading="eager"
