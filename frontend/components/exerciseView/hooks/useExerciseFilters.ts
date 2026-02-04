@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { ExerciseStats } from '../../../types';
 import { analyzeExerciseTrendCore, ExerciseTrendStatus, MIN_SESSIONS_FOR_TREND, summarizeExerciseHistory } from '../../../utils/analysis/exerciseTrend';
 import type { ExerciseTrendMode } from '../../../utils/storage/localStorage';
@@ -56,7 +56,7 @@ export function useExerciseFilters({
   const [viewModeOverride, setViewModeOverride] = useState<'all' | 'weekly' | 'monthly' | 'yearly' | null>(null);
 
   // Ensure sort direction defaults to latest first on mount
-  useMemo(() => {
+  useEffect(() => {
     setExerciseListSortDir('desc');
   }, []);
 
@@ -162,7 +162,7 @@ export function useExerciseFilters({
         const bEligible = trainingStructure.eligibleNames.has(b.name);
         if (aEligible !== bEligible) return aEligible ? -1 : 1;
 
-        const dir = exerciseListSortDir === 'asc' ? 1 : -1;
+        const dir = exerciseListSortDir === 'desc' ? 1 : -1;
 
         if (exerciseListSortMode === 'trend') {
           const ap = statusMap[a.name]?.diffPct;
