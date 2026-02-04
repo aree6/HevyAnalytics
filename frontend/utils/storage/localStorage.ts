@@ -163,37 +163,6 @@ export const clearBodyMapGender = (): void => {
   }
 };
 
-// EMA (Exponential Moving Average) preference
-// Default is enabled because it helps users see the underlying trend signal through noisy sessions.
-const EMA_ENABLED_KEY = 'hevy_analytics_ema_enabled';
-
-export const saveEmaEnabled = (enabled: boolean): void => {
-  try {
-    localStorage.setItem(EMA_ENABLED_KEY, enabled ? 'true' : 'false');
-  } catch (error) {
-    console.error('Failed to save EMA enabled flag to local storage:', error);
-  }
-};
-
-export const getEmaEnabled = (): boolean => {
-  try {
-    const v = localStorage.getItem(EMA_ENABLED_KEY);
-    if (v === null) return true;
-    return v === 'true';
-  } catch (error) {
-    console.error('Failed to retrieve EMA enabled flag from local storage:', error);
-    return true;
-  }
-};
-
-export const clearEmaEnabled = (): void => {
-  try {
-    localStorage.removeItem(EMA_ENABLED_KEY);
-  } catch (error) {
-    console.error('Failed to clear EMA enabled flag from local storage:', error);
-  }
-};
-
 export const savePreferencesConfirmed = (confirmed: boolean): void => {
   try {
     localStorage.setItem(PREFERENCES_CONFIRMED_KEY, confirmed ? 'true' : 'false');
@@ -219,7 +188,7 @@ export const clearPreferencesConfirmed = (): void => {
   }
 };
 
-export type ThemeMode = 'light' | 'medium-dark' | 'midnight-dark' | 'pure-black' | 'svg';
+export type ThemeMode = 'light' | 'medium-dark' | 'midnight-dark' | 'pure-black';
 
 const THEME_MODE_KEY = 'hevy_analytics_theme_mode';
 
@@ -234,7 +203,8 @@ export const saveThemeMode = (mode: ThemeMode): void => {
 export const getThemeMode = (): ThemeMode => {
   try {
     const mode = localStorage.getItem(THEME_MODE_KEY);
-    return mode === 'light' || mode === 'medium-dark' || mode === 'midnight-dark' || mode === 'pure-black' || mode === 'svg'
+    // Back-compat: legacy 'svg' (texture) theme is treated as 'pure-black'.
+    return mode === 'light' || mode === 'medium-dark' || mode === 'midnight-dark' || mode === 'pure-black'
       ? mode
       : 'pure-black';
   } catch (error) {
@@ -317,4 +287,3 @@ export const clearDateMode = (): void => {
     console.error('Failed to clear date mode from local storage:', error);
   }
 };
-

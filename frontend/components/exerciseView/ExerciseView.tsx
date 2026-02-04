@@ -33,7 +33,7 @@ import {
   getRechartsTickIndexMap,
   RECHARTS_XAXIS_PADDING,
 } from '../../utils/chart/chartEnhancements';
-import { addEmaSeries, DEFAULT_EMA_HALF_LIFE_DAYS } from '../../utils/analysis/ema';
+
 
 import { calculateExerciseDeltas } from './exerciseDeltas';
 import { buildExerciseChartData } from './exerciseChartData';
@@ -42,6 +42,46 @@ import { getSelectedHighlightClasses } from './exerciseRowHighlight';
 import { analyzeExerciseTrend, type StatusResult } from './exerciseTrendUi';
 import { ConfidenceBadge } from './ExerciseBadges';
 import { CustomTooltip } from './ExerciseChartTooltip';
+
+// Helper to parse color markers from evidence strings
+// Format: [[GREEN]]+value[[/GREEN]] or [[RED]]-value[[/RED]]
+const renderEvidenceWithColoredSigns = (text: string): React.ReactNode => {
+  const parts: React.ReactNode[] = [];
+  const regex = /\[\[(GREEN|RED)\]\](.+?)\[\[\/(GREEN|RED)\]\]/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    // Add text before the colored section
+    if (match.index > lastIndex) {
+      parts.push(<span key={`text-${lastIndex}`}>{text.slice(lastIndex, match.index)}</span>);
+    }
+
+    // Add the colored value
+    const color = match[1]; // GREEN or RED
+    const value = match[2];
+    const colorClass = color === 'GREEN' ? 'text-emerald-400' : 'text-rose-400';
+    parts.push(
+      <span key={`colored-${match.index}`} className={colorClass}>
+        {value}
+      </span>
+    );
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text after last match
+  if (lastIndex < text.length) {
+    parts.push(<span key={`text-end`}>{text.slice(lastIndex)}</span>);
+  }
+
+  // If no markers found, return the text as-is
+  if (parts.length === 0) {
+    return text;
+  }
+
+  return <>{parts}</>;
+};
 import { StrengthProgressionValueDot } from './StrengthProgressionValueDot';
 import { ExerciseThumbnail } from '../common/ExerciseThumbnail';
 
@@ -183,7 +223,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
   // Reset override when exercise changes
   // Effective view mode: override if set, otherwise default to last-year range.
-  const viewMode = viewModeOverride ?? 'yearly';
+  const viewMode = viewModeOverride ?? 'monthly';
   const setViewMode = setViewModeOverride;
 
   useEffect(() => {
@@ -259,7 +299,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
   }, [selectedExerciseMuscleInfo.volumes]);
 
   const selectedExerciseHeadlessMaxVolume = useMemo(() => {
-    return Math.max(1, ...Array.from(selectedExerciseHeadlessVolumes.values()));
+    return Math.max(1, ...(Array.from(selectedExerciseHeadlessVolumes.values()) as number[]));
   }, [selectedExerciseHeadlessVolumes]);
 
   const [exerciseBodyMapHoveredMuscle, setExerciseBodyMapHoveredMuscle] = useState<string | null>(null);
@@ -461,13 +501,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     return chartData.some((d: any) => d.leftOneRepMax !== undefined || d.rightOneRepMax !== undefined);
   }, [chartData, selectedStats?.hasUnilateralData]);
 
-  const chartDataWithEma = useMemo(() => {
-    const key = isBodyweightLike ? 'reps' : 'oneRepMax';
-    return addEmaSeries(chartData as any, key, 'emaValue', {
-      halfLifeDays: DEFAULT_EMA_HALF_LIFE_DAYS,
-      timestampKey: 'timestamp',
-    });
-  }, [chartData, isBodyweightLike]);
+  const chartDataWithEma = chartData;
 
   const xTicks = useMemo(() => {
     return getRechartsCategoricalTicks(chartDataWithEma, (row: any) => row?.date);
@@ -806,9 +840,10 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
                         <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
                           <ConfidenceBadge confidence={currentStatus.confidence} />
+                          {/* Premature PR badge - hidden on mobile, shown on sm+ */}
                           {currentCore?.prematurePr ? (
                             <span
-                              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-bold whitespace-nowrap bg-orange-500/10 text-orange-400 border-orange-500/20"
+                              className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-bold whitespace-nowrap bg-orange-500/10 text-orange-400 border-orange-500/20"
                               title="This looks like a PR spike that may not be sustainable yet. Keep building consistency at this level."
                               aria-label="Premature PR"
                             >
@@ -824,18 +859,36 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                       </p>
 
                       {currentStatus.evidence && currentStatus.evidence.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
+                        <div className="mt-2 flex flex-wrap gap-1.5 items-center">
                           {currentStatus.evidence.slice(0, 2).map((t, i) => {
                             const isStrengthLike = /^(Strength|Reps):\s/.test(t);
+                            // Check if evidence has positive or negative markers to determine badge color
+                            const hasPositiveMarker = t.includes('[[GREEN]]');
+                            const hasNegativeMarker = t.includes('[[RED]]');
+                            // Determine badge colors based on the value sign
+                            const badgeBgColor = hasPositiveMarker ? 'bg-emerald-500/10' : hasNegativeMarker ? 'bg-rose-500/10' : currentStatus.bgColor;
+                            const badgeBorderColor = hasPositiveMarker ? 'border-emerald-500/20' : hasNegativeMarker ? 'border-rose-500/20' : currentStatus.borderColor;
+                            const badgeTextColor = hasPositiveMarker ? 'text-emerald-400' : hasNegativeMarker ? 'text-rose-400' : isStrengthLike ? currentStatus.color : 'text-slate-300';
                             return (
                               <span
                                 key={i}
-                                className={`inline-flex items-center px-2 py-0.5 rounded-md border max-w-full ${currentStatus.bgColor} ${currentStatus.borderColor} ${isStrengthLike ? currentStatus.color : 'text-slate-300'} ${isStrengthLike ? 'font-bold' : 'font-mono'} text-[10px] whitespace-normal break-words`}
+                                className={`inline-flex items-center px-2 py-0.5 rounded-md border max-w-full ${badgeBgColor} ${badgeBorderColor} ${badgeTextColor} ${isStrengthLike ? 'font-bold' : 'font-mono'} text-[10px] whitespace-normal break-words`}
                               >
-                                {t}
+                                {renderEvidenceWithColoredSigns(t)}
                               </span>
                             );
                           })}
+                          {/* Premature PR badge - shown on mobile only, after evidence */}
+                          {currentCore?.prematurePr ? (
+                            <span
+                              className="sm:hidden inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-bold whitespace-nowrap bg-orange-500/10 text-orange-400 border-orange-500/20"
+                              title="This looks like a PR spike that may not be sustainable yet. Keep building consistency at this level."
+                              aria-label="Premature PR"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                              Premature PR
+                            </span>
+                          ) : null}
                         </div>
                       )}
 
@@ -1034,7 +1087,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                           stroke="#3b82f6"
                           strokeWidth={2.5}
                           fill="url(#color1RM)"
-                          dot={{ r: 3, fill: '#3b82f6', strokeWidth: 0 }}
+                          dot={false}
                           activeDot={{ r: 5, strokeWidth: 0 }}
                           isAnimationActive={true}
                           animationDuration={1000}
@@ -1070,7 +1123,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                           stroke="#06b6d4"
                           strokeWidth={2.5}
                           fill="url(#colorLeftRM)"
-                          dot={{ r: 3, fill: '#06b6d4', strokeWidth: 0 }}
+                          dot={false}
                           activeDot={{ r: 5, strokeWidth: 0, fill: '#06b6d4' }}
                           isAnimationActive={true}
                           animationDuration={1000}
@@ -1084,7 +1137,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
                           stroke="#8b5cf6"
                           strokeWidth={2.5}
                           fill="url(#colorRightRM)"
-                          dot={{ r: 3, fill: '#8b5cf6', strokeWidth: 0 }}
+                          dot={false}
                           activeDot={{ r: 5, strokeWidth: 0, fill: '#8b5cf6' }}
                           isAnimationActive={true}
                           animationDuration={1000}

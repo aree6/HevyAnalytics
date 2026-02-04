@@ -54,33 +54,7 @@
   --uniform-btn-border-hover-rgb: 255 255 255;
 }
 
-html[data-theme='svg'] body {
-  background: transparent;
-}
 
-html[data-theme='svg'] {
-  --app-bg: #020617;
-  --app-fg: #f1f5f9;
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --heatmap-hue: 5;
-  --panel-rgb: 0 0 0;
-  --border-rgb: 71 85 105;
-  --outline-rgb: 0 0 0;
-
-  --overlay-rgb: 0 0 0;
-  --overlay-90-alpha: 0.9;
-  --tint-rgb: 255 255 255;
-}
-
-html[data-theme='svg'] {
-  background: transparent;
-}
-
-html[data-theme='svg'] #root {
-  background: transparent;
-}
 
 html[data-theme='medium-dark'] {
   --app-bg: #070c18;

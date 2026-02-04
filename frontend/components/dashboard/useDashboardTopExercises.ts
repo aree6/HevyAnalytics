@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
-import { startOfDay, subDays } from 'date-fns';
+import { subDays } from 'date-fns';
 import type { ExerciseStats, WorkoutSet } from '../../types';
 import { getTopExercisesRadial, getTopExercisesOverTime } from '../../utils/analysis/analytics';
 import { calculateDelta } from '../../utils/analysis/insights';
 import { isWarmupSet } from '../../utils/analysis/setClassification';
-import { getSessionKey } from '../../utils/date/dateUtils';
+import { DEFAULT_CHART_MAX_POINTS, getRollingWindowStartForMode, getSessionKey, pickChartAggregation } from '../../utils/date/dateUtils';
 import { computationCache } from '../../utils/storage/computationCache';
 
 const safePct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
@@ -135,16 +135,8 @@ export const useDashboardTopExercises = (args: {
   const topExercisesOverTimeData = useMemo(() => {
     const names = (topExercisesBarData.length > 0 ? topExercisesBarData : topExercisesData).map((e) => e.name);
     const rangeMode = topExerciseMode;
-    const mode: 'daily' | 'weekly' | 'monthly' =
-      rangeMode === 'all' ? allAggregationMode : rangeMode === 'yearly' ? 'weekly' : 'daily';
-    const windowStart =
-      rangeMode === 'weekly'
-        ? startOfDay(subDays(effectiveNow, 6))
-        : rangeMode === 'monthly'
-          ? startOfDay(subDays(effectiveNow, 29))
-          : rangeMode === 'yearly'
-            ? startOfDay(subDays(effectiveNow, 364))
-            : null;
+
+    const windowStart = getRollingWindowStartForMode(rangeMode as any, effectiveNow);
     const filtered =
       windowStart
         ? fullData.filter((s) => {
@@ -152,6 +144,26 @@ export const useDashboardTopExercises = (args: {
             return !!d && d >= windowStart;
           })
         : fullData;
+
+    const preferred: 'daily' | 'weekly' | 'monthly' =
+      rangeMode === 'all' ? allAggregationMode : rangeMode === 'yearly' ? 'weekly' : 'daily';
+
+    let minTs = Number.POSITIVE_INFINITY;
+    let maxTs = Number.NEGATIVE_INFINITY;
+    for (const s of filtered) {
+      const d = s.parsedDate;
+      if (!d) continue;
+      const ts = d.getTime();
+      if (!Number.isFinite(ts)) continue;
+      if (ts < minTs) minTs = ts;
+      if (ts > maxTs) maxTs = ts;
+    }
+
+    const mode: 'daily' | 'weekly' | 'monthly' =
+      Number.isFinite(minTs) && Number.isFinite(maxTs) && maxTs > minTs
+        ? pickChartAggregation({ minTs, maxTs, preferred, maxPoints: DEFAULT_CHART_MAX_POINTS })
+        : preferred;
+
     const namesKey = names.join('|');
     return computationCache.getOrCompute(
       `topExercisesOverTime:${rangeMode}:${mode}:${namesKey}:${effectiveNow.getTime()}`,

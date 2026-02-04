@@ -93,11 +93,13 @@ export const ExerciseThumbnail: React.FC<ExerciseThumbnailProps> = ({
                 ref={containerRef}
                 className={`${className} overflow-hidden relative bg-black`}
             >
+                {/* White background layer to prevent transparency issues with video frames */}
+                <div className="absolute inset-0 bg-white z-0" />
                 <video
                     ref={videoRef}
                     src={videoSrc}
                     poster={imgSrc}
-                    className={imageClassName}
+                    className={`${imageClassName} relative z-10`}
                     muted
                     loop
                     playsInline

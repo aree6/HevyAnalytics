@@ -1,4 +1,19 @@
-import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, subDays, differenceInCalendarDays, differenceInWeeks, differenceInMonths, differenceInYears, isValid } from 'date-fns';
+import {
+  format,
+  startOfDay,
+  startOfWeek,
+  startOfMonth,
+  startOfYear,
+  subDays,
+  subWeeks,
+  subMonths,
+  subYears,
+  differenceInCalendarDays,
+  differenceInWeeks,
+  differenceInMonths,
+  differenceInYears,
+  isValid,
+} from 'date-fns';
 import { WorkoutSet } from '../../types';
 import type { TimeFilterMode } from '../storage/localStorage';
 
@@ -12,9 +27,57 @@ export const getRollingWindowDaysForMode = (mode: TimeFilterMode): number | null
 };
 
 export const getRollingWindowStartForMode = (mode: TimeFilterMode, now: Date): Date | null => {
-  const days = getRollingWindowDaysForMode(mode);
-  if (!days) return null;
-  return startOfDay(subDays(now, days - 1));
+  // For trend charts, show the current rolling window AND the previous window.
+  // This keeps charts aligned with the "vs prev" deltas (rolling windows) while
+  // giving users enough context to validate what they're seeing.
+  //
+  // weekly  => last 14 days (current 7d + previous 7d)
+  // monthly => last 60 days (current 30d + previous 30d)
+  // yearly  => last 730 days (current 365d + previous 365d)
+  if (mode === 'weekly') return startOfDay(subDays(now, 13));
+  if (mode === 'monthly') return startOfDay(subDays(now, 59));
+  if (mode === 'yearly') return startOfDay(subDays(now, 729));
+  return null;
+};
+
+export type ChartAggregation = 'daily' | 'weekly' | 'monthly';
+
+// Target max plotted points for time-series charts.
+// Lower values force more aggressive bucketing (fewer points).
+export const DEFAULT_CHART_MAX_POINTS = 30;
+
+export const pickChartAggregation = (args: {
+  /** earliest timestamp (ms) */
+  minTs: number;
+  /** latest timestamp (ms) */
+  maxTs: number;
+  /** preferred granularity (used when it fits) */
+  preferred: ChartAggregation;
+  /** hard cap for plotted points */
+  maxPoints: number;
+}): ChartAggregation => {
+  const { minTs, maxTs, preferred, maxPoints } = args;
+
+  if (!Number.isFinite(minTs) || !Number.isFinite(maxTs) || maxTs <= minTs) return preferred;
+
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const spanDays = Math.max(1, Math.floor((maxTs - minTs) / msPerDay) + 1);
+
+  const estimatePoints = (agg: ChartAggregation) => {
+    if (agg === 'daily') return spanDays;
+    if (agg === 'weekly') return Math.ceil(spanDays / 7);
+    return Math.ceil(spanDays / 30);
+  };
+
+  const order: ChartAggregation[] = ['daily', 'weekly', 'monthly'];
+  const startIdx = Math.max(0, order.indexOf(preferred));
+
+  for (let i = startIdx; i < order.length; i += 1) {
+    const candidate = order[i];
+    if (estimatePoints(candidate) <= maxPoints) return candidate;
+  }
+
+  return 'monthly';
 };
 
 export const formatRollingWindowAbbrev = (days: number): string => {

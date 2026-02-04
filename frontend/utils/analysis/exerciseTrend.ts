@@ -59,10 +59,19 @@ const keepDynamicEvidence = (xs: string[] | undefined): string[] | undefined => 
   return filtered.length > 0 ? filtered : undefined;
 };
 
+// Helper to format numbers with color markers for UI rendering
+// [[GREEN]]+value[[/GREEN]] for positive, [[RED]]-value[[/RED]] for negative
+const fmtSignedWithColor = (value: string, isPositive: boolean): string => {
+  const color = isPositive ? 'GREEN' : 'RED';
+  return `[[${color}]]${value}[[/${color}]]`;
+};
+
 const fmtSignedPct = (pct: number): string => {
   if (!Number.isFinite(pct)) return '0.0%';
-  const sign = pct > 0 ? '+' : '';
-  return `${sign}${pct.toFixed(1)}%`;
+  const isPositive = pct > 0;
+  const sign = isPositive ? '+' : '';
+  const value = `${sign}${pct.toFixed(1)}%`;
+  return fmtSignedWithColor(value, isPositive);
 };
 
 const getTrendThresholds = (
@@ -287,9 +296,11 @@ export const analyzeExerciseTrendCore = (
     if (isBodyweightLike) {
       const deltaReps = Math.round(recentDeltaAbs);
       if (Math.abs(deltaReps) < 1) return undefined;
-      const sign = deltaReps > 0 ? '+' : '';
+      const isPositive = deltaReps > 0;
+      const sign = isPositive ? '+' : '';
+      const coloredValue = fmtSignedWithColor(`${sign}${deltaReps}`, isPositive);
       const tag = recentDirectionTag(diffAbs, deltaReps);
-      return tag ? `Recent reps: ${sign}${deltaReps} (${tag})` : `Recent reps: ${sign}${deltaReps}`;
+      return tag ? `Recent reps: ${coloredValue} (${tag})` : `Recent reps: ${coloredValue}`;
     }
     if (Math.abs(recentDeltaPct) < 0.5) return undefined;
 

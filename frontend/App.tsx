@@ -42,7 +42,6 @@ import { formatDayYearContraction, formatHumanReadableDate, getEffectiveNowFromW
 import { getDataAgeInfo } from './hooks/usePreferences';
 import { trackPageView } from './utils/integrations/ga';
 import { setContext, trackEvent } from './utils/integrations/analytics';
-import { ThemedBackground } from './components/theme/ThemedBackground';
 import {
   getDataSourceChoice,
   saveDataSourceChoice,
@@ -939,10 +938,8 @@ const App: React.FC = () => {
   return (
     <div
       className="flex flex-col min-h-[100svh] h-[100dvh] overscroll-none bg-transparent text-[color:var(--app-fg)] font-sans"
-      style={{ background: mode === 'svg' ? 'transparent' : 'var(--app-bg)' }}
+      style={{ background: 'var(--app-bg)' }}
     >
-      <ThemedBackground />
-
       {onboarding?.intent === 'initial' ? null : (
         <>
           {/* Top Header Navigation */}

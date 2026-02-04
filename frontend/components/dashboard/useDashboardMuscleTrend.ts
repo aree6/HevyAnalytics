@@ -4,7 +4,7 @@ import type { WorkoutSet } from '../../types';
 import type { ExerciseAsset } from '../../utils/data/exerciseAssets';
 import { isWarmupSet } from '../../utils/analysis/setClassification';
 import { calculateDelta } from '../../utils/analysis/insights';
-import { getSessionKey, formatLastRollingWindow } from '../../utils/date/dateUtils';
+import { DEFAULT_CHART_MAX_POINTS, getRollingWindowStartForMode, getSessionKey, formatLastRollingWindow } from '../../utils/date/dateUtils';
 import { getMuscleVolumeTimeSeries, getMuscleVolumeTimeSeriesDetailed } from '../../utils/muscle/muscleAnalytics';
 import { getMuscleContributionsFromAsset } from '../../utils/muscle/muscleContributions';
 import { bucketRollingWeeklySeriesToMonths, bucketRollingWeeklySeriesToWeeks } from '../../utils/muscle/rollingSeriesBucketing';
@@ -48,14 +48,20 @@ export const useDashboardMuscleTrend = (args: {
       return n > 140 ? bucketRollingWeeklySeriesToMonths(base as any) : bucketRollingWeeklySeriesToWeeks(base as any);
     }
 
-    const days = musclePeriod === 'weekly' ? 7 : musclePeriod === 'yearly' ? 365 : 30;
-    const windowStart = startOfDay(subDays(effectiveNow, days - 1)).getTime();
+    const windowStart = getRollingWindowStartForMode(
+      musclePeriod === 'yearly' ? 'yearly' : musclePeriod === 'weekly' ? 'weekly' : 'monthly',
+      effectiveNow
+    );
+    const windowStartTs = windowStart ? windowStart.getTime() : null;
     const windowed = {
-      data: (base.data || []).filter((row: any) => (typeof row?.timestamp === 'number' ? row.timestamp : 0) >= windowStart),
+      data: windowStartTs ? (base.data || []).filter((row: any) => (typeof row?.timestamp === 'number' ? row.timestamp : 0) >= windowStartTs) : (base.data || []),
       keys: base.keys || [],
     };
 
-    return musclePeriod === 'weekly' ? windowed : bucketRollingWeeklySeriesToWeeks(windowed as any);
+    // Base series is weekly (rolling). Bucket down only when needed.
+    const maxPoints = DEFAULT_CHART_MAX_POINTS;
+    if (windowed.data.length <= maxPoints) return windowed as any;
+    return windowed.data.length > 140 ? bucketRollingWeeklySeriesToMonths(windowed as any) : bucketRollingWeeklySeriesToWeeks(windowed as any);
   }, [fullData, assetsMap, musclePeriod, effectiveNow]);
 
   const muscleSeriesMuscles = useMemo(() => {
@@ -72,14 +78,19 @@ export const useDashboardMuscleTrend = (args: {
       return n > 140 ? bucketRollingWeeklySeriesToMonths(base as any) : bucketRollingWeeklySeriesToWeeks(base as any);
     }
 
-    const days = musclePeriod === 'weekly' ? 7 : musclePeriod === 'yearly' ? 365 : 30;
-    const windowStart = startOfDay(subDays(effectiveNow, days - 1)).getTime();
+    const windowStart = getRollingWindowStartForMode(
+      musclePeriod === 'yearly' ? 'yearly' : musclePeriod === 'weekly' ? 'weekly' : 'monthly',
+      effectiveNow
+    );
+    const windowStartTs = windowStart ? windowStart.getTime() : null;
     const windowed = {
-      data: (base.data || []).filter((row: any) => (typeof row?.timestamp === 'number' ? row.timestamp : 0) >= windowStart),
+      data: windowStartTs ? (base.data || []).filter((row: any) => (typeof row?.timestamp === 'number' ? row.timestamp : 0) >= windowStartTs) : (base.data || []),
       keys: base.keys || [],
     };
 
-    return musclePeriod === 'weekly' ? windowed : bucketRollingWeeklySeriesToWeeks(windowed as any);
+    const maxPoints = DEFAULT_CHART_MAX_POINTS;
+    if (windowed.data.length <= maxPoints) return windowed as any;
+    return windowed.data.length > 140 ? bucketRollingWeeklySeriesToMonths(windowed as any) : bucketRollingWeeklySeriesToWeeks(windowed as any);
   }, [fullData, assetsMap, musclePeriod, effectiveNow]);
 
   const trendData = muscleGrouping === 'groups' ? muscleSeriesGroups.data : muscleSeriesMuscles.data;

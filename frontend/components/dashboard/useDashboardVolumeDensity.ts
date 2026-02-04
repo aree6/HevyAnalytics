@@ -11,6 +11,8 @@ import {
   formatWeekContraction,
   getRollingWindowDaysForMode,
   getRollingWindowStartForMode,
+  DEFAULT_CHART_MAX_POINTS,
+  pickChartAggregation,
 } from '../../utils/date/dateUtils';
 import { getDisplayVolume } from '../../utils/format/volumeDisplay';
 import { computationCache } from '../../utils/storage/computationCache';
@@ -29,11 +31,32 @@ export const useDashboardVolumeDensity = (args: {
 } => {
   const { dailyData, rangeMode, smartMode, weightUnit, effectiveNow, dashboardInsights } = args;
 
+  const pickAutoMode = (data: DailySummary[], preferred: 'all' | 'weekly' | 'monthly'): 'all' | 'weekly' | 'monthly' => {
+    if (data.length <= 0) return preferred;
+
+    let minTs = Number.POSITIVE_INFINITY;
+    let maxTs = Number.NEGATIVE_INFINITY;
+    for (const d of data) {
+      const ts = d.timestamp;
+      if (!Number.isFinite(ts) || ts <= 0) continue;
+      if (ts < minTs) minTs = ts;
+      if (ts > maxTs) maxTs = ts;
+    }
+
+    const prefAgg: 'daily' | 'weekly' | 'monthly' = preferred === 'all' ? 'daily' : preferred;
+    const agg =
+      Number.isFinite(minTs) && Number.isFinite(maxTs) && maxTs > minTs
+        ? pickChartAggregation({ minTs, maxTs, preferred: prefAgg, maxPoints: DEFAULT_CHART_MAX_POINTS })
+        : prefAgg;
+
+    return agg === 'daily' ? 'all' : agg;
+  };
+
   const volumeDurationData = useMemo(() => {
     const windowStartTs = getRollingWindowStartForMode(rangeMode, effectiveNow)?.getTime() ?? null;
     const source = windowStartTs ? dailyData.filter((d) => d.timestamp >= windowStartTs) : dailyData;
 
-    const mode =
+    const baseMode: 'all' | 'weekly' | 'monthly' =
       rangeMode === 'all'
         ? smartMode === 'all'
           ? 'all'
@@ -41,6 +64,8 @@ export const useDashboardVolumeDensity = (args: {
         : rangeMode === 'yearly'
           ? 'weekly'
           : 'all';
+
+    const mode = pickAutoMode(source, baseMode);
 
     return computationCache.getOrCompute(
       `volumeDurationData:${rangeMode}:${mode}:${weightUnit}:${effectiveNow.getTime()}`,

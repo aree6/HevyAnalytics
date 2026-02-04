@@ -1,5 +1,4 @@
 import React from 'react';
-import { ThemedBackground } from '../theme/ThemedBackground';
 import { Navigation } from '../layout/Navigation';
 import { assetPath } from '../../constants';
 import { clientOnly } from 'vike-react/clientOnly';
@@ -53,8 +52,6 @@ export const InfoShell: React.FC<InfoShellProps> = ({ activeNav = null, title, s
 
   return (
     <div className="min-h-screen bg-black text-white font-sans">
-      <ThemedBackground />
-
       <div className="fixed inset-0 z-[1] pointer-events-none">
         <LightRays
           fallback={null}

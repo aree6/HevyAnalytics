@@ -12,9 +12,9 @@
           var key = 'hevy_analytics_theme_mode';
           var stored = localStorage.getItem(key);
           var mode =
-            stored === 'light' || stored === 'medium-dark' || stored === 'midnight-dark' || stored === 'svg'
+            stored === 'light' || stored === 'medium-dark' || stored === 'midnight-dark' || stored === 'pure-black'
               ? stored
-              : 'svg';
+              : 'pure-black';
           document.documentElement.dataset.theme = mode;
           document.documentElement.style.colorScheme = mode === 'light' ? 'light' : 'dark';
         } catch (e) {

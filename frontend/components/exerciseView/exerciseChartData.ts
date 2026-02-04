@@ -3,6 +3,8 @@ import {
   formatDayContraction,
   getDateKey,
   getRollingWindowStartForMode,
+  DEFAULT_CHART_MAX_POINTS,
+  pickChartAggregation,
   TimePeriod,
 } from '../../utils/date/dateUtils';
 import { ExerciseSessionEntry } from '../../utils/analysis/exerciseTrend';
@@ -67,75 +69,22 @@ export const buildExerciseChartData = (args: {
   const windowStart = getRollingWindowStartForMode(viewMode, effectiveNow);
   const source = windowStart ? history.filter((h) => h.date >= windowStart) : history;
 
-  // For unilateral exercises, group by timestamp and merge L/R data
-  const buildUnilateralData = (entries: ExerciseSessionEntry[]): ExerciseChartDataPoint[] => {
-    const byTimestamp = new Map<number, ExerciseChartDataPoint>();
-
-    for (const h of entries) {
-      const ts = h.date.getTime();
-      const dateStr = formatDayContraction(h.date);
-
-      let point = byTimestamp.get(ts);
-      if (!point) {
-        point = {
-          timestamp: ts,
-          date: dateStr,
-          sets: 0,
-          volume: 0,
-        };
-        byTimestamp.set(ts, point);
-      }
-
-      point.sets = (point.sets || 0) + h.sets;
-      point.volume = (point.volume || 0) + h.volume;
-
-      if (h.side === 'left') {
-        point.leftOneRepMax = convertWeight(h.oneRepMax, weightUnit);
-        point.leftWeight = convertWeight(h.weight, weightUnit);
-        point.leftReps = h.maxReps;
-      } else if (h.side === 'right') {
-        point.rightOneRepMax = convertWeight(h.oneRepMax, weightUnit);
-        point.rightWeight = convertWeight(h.weight, weightUnit);
-        point.rightReps = h.maxReps;
-      } else {
-        // Bilateral or no side specified - use as combined
-        point.oneRepMax = convertWeight(h.oneRepMax, weightUnit);
-        point.weight = convertWeight(h.weight, weightUnit);
-        point.reps = h.maxReps;
-      }
-
-      // Calculate combined PR
-      const isPr = isBodyweightLike
-        ? Number.isFinite(globalMaxReps) && h.maxReps >= globalMaxReps - eps
-        : Number.isFinite(globalMaxWeight) && h.weight >= globalMaxWeight - eps;
-      if (isPr) point.isPr = true;
-    }
-
-    return Array.from(byTimestamp.values()).sort((a, b) => a.timestamp - b.timestamp);
-  };
-
-  if (viewMode === 'weekly' || viewMode === 'monthly') {
-    if (showSeparateSides) {
-      return buildUnilateralData(source);
-    }
-
-    return source.map((h) => {
-      const isPr = isBodyweightLike
-        ? Number.isFinite(globalMaxReps) && h.maxReps >= globalMaxReps - eps
-        : Number.isFinite(globalMaxWeight) && h.weight >= globalMaxWeight - eps;
-
-      return {
-        timestamp: h.date.getTime(),
-        date: formatDayContraction(h.date),
-        weight: convertWeight(h.weight, weightUnit),
-        oneRepMax: convertWeight(h.oneRepMax, weightUnit),
-        reps: h.maxReps,
-        sets: h.sets,
-        volume: h.volume,
-        isPr,
-      };
-    });
+  let minTs = Number.POSITIVE_INFINITY;
+  let maxTs = Number.NEGATIVE_INFINITY;
+  for (const h of source) {
+    const ts = h.date.getTime();
+    if (!Number.isFinite(ts)) continue;
+    if (ts < minTs) minTs = ts;
+    if (ts > maxTs) maxTs = ts;
   }
+
+  const preferred: 'daily' | 'weekly' | 'monthly' =
+    viewMode === 'all' ? allAggregationMode : viewMode === 'yearly' ? 'weekly' : 'daily';
+
+  const agg: 'daily' | 'weekly' | 'monthly' =
+    Number.isFinite(minTs) && Number.isFinite(maxTs) && maxTs > minTs
+      ? pickChartAggregation({ minTs, maxTs, preferred, maxPoints: DEFAULT_CHART_MAX_POINTS })
+      : preferred;
 
   const buildBucketedSeries = (period: TimePeriod): ExerciseChartDataPoint[] => {
     if (showSeparateSides) {
@@ -275,15 +224,16 @@ export const buildExerciseChartData = (args: {
   };
 
   if (viewMode === 'yearly') {
-    return buildBucketedSeries('weekly');
+    return buildBucketedSeries(agg === 'monthly' ? 'monthly' : 'weekly');
+  }
+
+  if (viewMode === 'weekly' || viewMode === 'monthly') {
+    // Always bucket within the window so multiple sessions per day don't become multiple points.
+    return buildBucketedSeries(agg === 'monthly' ? 'monthly' : agg === 'weekly' ? 'weekly' : 'daily');
   }
 
   if (viewMode === 'all') {
-    if (allAggregationMode === 'daily') {
-      return buildBucketedSeries('daily');
-    }
-
-    return buildBucketedSeries(allAggregationMode === 'weekly' ? 'weekly' : 'monthly');
+    return buildBucketedSeries(agg === 'monthly' ? 'monthly' : agg === 'weekly' ? 'weekly' : 'daily');
   }
 
   return [];

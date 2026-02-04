@@ -361,13 +361,6 @@ export const UserPreferencesModal: React.FC<UserPreferencesModalProps> = ({
                     label="Light"
                     icon={<Sun className="w-3.5 h-3.5" />}
                   />
-                  <CompactThemeOption
-                    mode="svg"
-                    currentMode={themeMode}
-                    onClick={() => onThemeModeChange('svg')}
-                    label="Texture"
-                    icon={<Palette className="w-3.5 h-3.5" />}
-                  />
                 </div>
               </div>
             </div>

@@ -26,8 +26,6 @@ import {
   HeatmapTheme,
   getHeatmapTheme,
   saveHeatmapTheme,
-  getEmaEnabled,
-  saveEmaEnabled,
   DateMode,
   getDateMode,
   saveDateMode,
@@ -48,7 +46,6 @@ export interface UserPreferences {
   bodyMapGender: StoredBodyMapGender;
   themeMode: ThemeMode;
   heatmapTheme: HeatmapTheme;
-  emaEnabled: boolean;
   dateMode: DateMode;
   exerciseTrendMode: ExerciseTrendMode;
 }
@@ -62,7 +59,6 @@ export interface PreferencesActions {
   setBodyMapGender: (gender: StoredBodyMapGender) => void;
   setThemeMode: (mode: ThemeMode) => void;
   setHeatmapTheme: (theme: HeatmapTheme) => void;
-  setEmaEnabled: (enabled: boolean) => void;
   setDateMode: (mode: DateMode) => void;
   setExerciseTrendMode: (mode: ExerciseTrendMode) => void;
 }
@@ -76,7 +72,6 @@ export const getAllPreferences = (): UserPreferences => ({
   bodyMapGender: getBodyMapGender(),
   themeMode: getThemeMode(),
   heatmapTheme: getHeatmapTheme(),
-  emaEnabled: getEmaEnabled(),
   dateMode: getDateMode(),
   exerciseTrendMode: getExerciseTrendMode(),
 });
@@ -117,10 +112,6 @@ export const usePreferences = (): PreferencesActions => {
     saveHeatmapTheme(theme);
   }, []);
 
-  const setEmaEnabled = useCallback((enabled: boolean) => {
-    saveEmaEnabled(enabled);
-  }, []);
-
   const setDateMode = useCallback((mode: DateMode) => {
     saveDateMode(mode);
   }, []);
@@ -134,10 +125,9 @@ export const usePreferences = (): PreferencesActions => {
     setBodyMapGender,
     setThemeMode,
     setHeatmapTheme,
-    setEmaEnabled,
     setDateMode,
     setExerciseTrendMode,
-  }), [setWeightUnit, setBodyMapGender, setThemeMode, setHeatmapTheme, setEmaEnabled, setDateMode, setExerciseTrendMode]);
+  }), [setWeightUnit, setBodyMapGender, setThemeMode, setHeatmapTheme, setDateMode, setExerciseTrendMode]);
 };
 
 /**

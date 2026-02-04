@@ -2,7 +2,6 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Github, Info, ArrowUp } from 'lucide-react';
 import type { DataSourceChoice } from '../../utils/dataSources/types';
-import { ThemedBackground } from '../theme/ThemedBackground';
 import { Navigation } from '../layout/Navigation';
 import PlatformDock from './PlatformDock';
 import { ReviewsCarousel } from './ReviewsCarousel';
@@ -76,7 +75,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
       transition={{ duration: 0.3, ease: 'easeOut' }}
       className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-slate-950 text-slate-200 font-sans"
     >
-      <ThemedBackground />
       {/* Light Rays Effect */}
       <div className="absolute inset-0 z-[1] pointer-events-none">
         <LightRays

@@ -269,7 +269,7 @@ export const WeeklySetsCard = ({
                   />
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    formatter={(value: number) => [Number(value).toFixed(1), 'Sets/wk']}
+                    formatter={(value: number) => [`${Number(value).toFixed(1)} sets/wk`]}
                   />
                 </RadarChart>
               </ResponsiveContainer>
@@ -304,7 +304,7 @@ export const WeeklySetsCard = ({
                           {weeklySetsHoverMeta.name}
                         </div>
                         <div className="text-[10px] text-center font-semibold whitespace-nowrap text-white">
-                          {`${weeklySetsHoverMeta.value.toFixed(1)}/wk`}
+                          {`${weeklySetsHoverMeta.value.toFixed(1)} sets/wk`}
                         </div>
                       </div>
                     )}
@@ -362,9 +362,9 @@ export const WeeklySetsCard = ({
         <InsightLine>
           {weeklySetsInsight ? (
             <>
-              <TrendBadge label={<BadgeLabel main={`~${Number(weeklySetsInsight.total).toFixed(1)}/wk${weeklySetsInsight.durationLabel}`} />} tone="info" />
+              <TrendBadge label={<BadgeLabel main={`~${Number(weeklySetsInsight.total).toFixed(1)} sets/wk${weeklySetsInsight.durationLabel}`} />} tone="info" />
               <TrendBadge
-                label={`Top: ${weeklySetsInsight.top.subject} ${Number(weeklySetsInsight.top.value).toFixed(1)}/wk`}
+                label={`Top: ${weeklySetsInsight.top.subject} ${Number(weeklySetsInsight.top.value).toFixed(1)} sets/wk`}
                 tone="neutral"
               />
               <TrendBadge

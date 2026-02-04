@@ -14,8 +14,7 @@ import {
 import type { TimeFilterMode, WeightUnit } from '../../utils/storage/localStorage';
 import { formatNumber, formatSignedNumber } from '../../utils/format/formatters';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../../utils/format/deltaFormat';
-import { addEmaSeries, DEFAULT_EMA_HALF_LIFE_DAYS } from '../../utils/analysis/ema';
-import { getRechartsXAxisInterval, RECHARTS_XAXIS_PADDING } from '../../utils/chart/chartEnhancements';
+import { getRechartsTickIndexMap, getRechartsXAxisInterval, IndexFilteredDot, RECHARTS_XAXIS_PADDING } from '../../utils/chart/chartEnhancements';
 import {
   BadgeLabel,
   ChartDescription,
@@ -62,11 +61,12 @@ export const VolumeDensityCard = ({
   const metaLabel = volumeDensityTrend?.meta ?? fallbackMeta;
 
   const chartData = useMemo(() => {
-    return addEmaSeries(volumeDurationData, 'volumePerSet', 'emaVolumePerSet', {
-      halfLifeDays: DEFAULT_EMA_HALF_LIFE_DAYS,
-      timestampKey: 'timestamp',
-    });
+    return volumeDurationData;
   }, [volumeDurationData]);
+
+  const tickIndexMap = useMemo(() => {
+    return getRechartsTickIndexMap(chartData.length);
+  }, [chartData.length]);
 
   return (
     <div className="bg-black/70 border border-slate-700/50 p-4 sm:p-6 rounded-xl min-h-[400px] sm:min-h-[520px] flex flex-col transition-all duration-300">
@@ -182,7 +182,6 @@ export const VolumeDensityCard = ({
               formatter={(val: number, name) => {
                 const v = formatNumber(Number(val), { maxDecimals: 1 });
                 if (name === `Volume per Set (${weightUnit})`) return [`${v} ${weightUnit}`, name];
-                if (name === 'EMA') return [`${v} ${weightUnit}`, 'EMA'];
                 if (name === 'Set Count') return [`${val} sets`, name];
                 return [val, name];
               }}
@@ -195,7 +194,7 @@ export const VolumeDensityCard = ({
                 stroke="#8b5cf6"
                 strokeWidth={3}
                 fill="url(#gDensityArea)"
-                dot={{ r: 3, fill: '#8b5cf6' }}
+                dot={<IndexFilteredDot r={3} fill="#8b5cf6" stroke="#8b5cf6" strokeWidth={0} showAtIndexMap={tickIndexMap} />}
                 activeDot={{ r: 5, strokeWidth: 0 }}
                 animationDuration={1500}
               />
@@ -208,18 +207,6 @@ export const VolumeDensityCard = ({
                 animationDuration={1500}
               />
             )}
-            <Line
-              type="monotone"
-              dataKey="emaVolumePerSet"
-              name="EMA"
-              stroke="#8b5cf6"
-              strokeOpacity={0.95}
-              strokeWidth={2.25}
-              strokeDasharray="6 4"
-              dot={false}
-              activeDot={{ r: 4, strokeWidth: 0 }}
-              animationDuration={1500}
-            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

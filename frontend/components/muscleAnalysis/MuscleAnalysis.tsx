@@ -42,7 +42,6 @@ import { LazyRender } from '../ui/LazyRender';
 import { ChartSkeleton } from '../ui/ChartSkeleton';
 import { Tooltip as HoverTooltip, TooltipData } from '../ui/Tooltip';
 import { CHART_TOOLTIP_STYLE, RADAR_TICK_FILL } from '../../utils/ui/uiConstants';
-import { addEmaSeries, DEFAULT_EMA_HALF_LIFE_DAYS } from '../../utils/analysis/ema';
 import { formatNumber } from '../../utils/format/formatters';
 import { computationCache } from '../../utils/storage/computationCache';
 import { computeWindowedExerciseBreakdown } from '../../utils/muscle/windowedExerciseBreakdown';
@@ -149,12 +148,13 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
     if (!allTimeWindowStart) return null;
     if (weeklySetsWindow === 'all') return allTimeWindowStart;
 
+    // Show current period + previous period (2x window) for better visual comparison
     const candidate =
       weeklySetsWindow === '7d'
-        ? subDays(effectiveNow, 7)
+        ? subDays(effectiveNow, 14)   // current week + previous week
         : weeklySetsWindow === '30d'
-          ? subDays(effectiveNow, 30)
-          : subDays(effectiveNow, 365);
+          ? subDays(effectiveNow, 60) // current month + previous month
+          : subDays(effectiveNow, 730); // current year + previous year
 
     // Clamp to the user's first workout date so we don't include pre-history empty time.
     return allTimeWindowStart > candidate ? allTimeWindowStart : candidate;
@@ -454,12 +454,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
     });
   }, [assetsMap, data, windowStart, effectiveNow, weeklySetsWindow, viewMode, selectedSubjectKeys]);
 
-  const trendDataWithEma = useMemo(() => {
-    return addEmaSeries(trendData as any[], 'sets', 'emaSets', {
-      halfLifeDays: DEFAULT_EMA_HALF_LIFE_DAYS,
-      timestampKey: 'timestamp',
-    });
-  }, [trendData]);
+  const trendDataWithEma = trendData;
 
   const volumeDelta = weeklySetsDelta;
 
@@ -813,7 +808,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
                     />
                     <RechartsTooltip
                       contentStyle={CHART_TOOLTIP_STYLE}
-                      formatter={(value: number) => [Number(value).toFixed(1), 'Sets/wk']}
+                      formatter={(value: number) => [`${Number(value).toFixed(1)} sets/wk`]}
                     />
                   </RadarChart>
                 </ResponsiveContainer>
@@ -945,8 +940,8 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
                       <AreaChart data={trendDataWithEma}>
                         <defs>
                           <linearGradient id="muscleColorGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(var(--heatmap-hue), 75%, 50%)" stopOpacity={0.4} />
-                            <stop offset="95%" stopColor="hsl(var(--heatmap-hue), 75%, 50%)" stopOpacity={0} />
+                            <stop offset="5%" stopColor={volumeDelta?.direction === 'down' ? '#f43f5e' : '#10b981'} stopOpacity={0.4} />
+                            <stop offset="95%" stopColor={volumeDelta?.direction === 'down' ? '#f43f5e' : '#10b981'} stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <XAxis
@@ -961,30 +956,17 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
                         <RechartsTooltip
                           contentStyle={CHART_TOOLTIP_STYLE}
                           labelStyle={{ color: 'var(--text-primary)' }}
-                          formatter={(value: number, name: string) => {
+                          formatter={(value: number) => {
                             const v = formatNumber(Number(value), { maxDecimals: 1 });
-                            if (name === 'EMA') return [v, 'EMA'];
-                            return [v, 'Sets'];
+                            return [`${v} sets/wk`];
                           }}
                         />
                         <Area
                           type="monotone"
                           dataKey="sets"
-                          stroke="hsl(var(--heatmap-hue), 75%, 50%)"
+                          stroke={volumeDelta?.direction === 'down' ? '#f43f5e' : '#10b981'}
                           strokeWidth={2}
                           fill="url(#muscleColorGradient)"
-                        />
-
-                        <Area
-                          type="monotone"
-                          dataKey="emaSets"
-                          name="EMA"
-                          stroke="hsl(var(--heatmap-hue), 75%, 50%)"
-                          strokeOpacity={0.95}
-                          strokeWidth={2}
-                          strokeDasharray="6 4"
-                          fillOpacity={0}
-                          fill="transparent"
                         />
                       </AreaChart>
                     </ResponsiveContainer>

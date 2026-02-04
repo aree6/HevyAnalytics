@@ -15,7 +15,6 @@ export const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, l
   if (active && payload && payload.length) {
     const unit = weightUnit || 'kg';
     const oneRM = payload.find((p: any) => p.dataKey === 'oneRepMax')?.value;
-    const emaValue = payload.find((p: any) => p.dataKey === 'emaValue')?.value;
     const lifted = payload.find((p: any) => p.dataKey === 'weight')?.value;
     const reps = payload.find((p: any) => p.dataKey === 'reps')?.value;
 
@@ -64,15 +63,6 @@ export const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, l
                 </div>
               )}
 
-              {typeof emaValue === 'number' && (
-                <p className="text-xs text-slate-300 flex items-center gap-2">
-                  <span className="w-2 h-0.5 bg-white/80"></span>
-                  EMA:{' '}
-                  <span style={FANCY_FONT}>
-                    {typeof reps === 'number' ? fmt1(emaValue) : `${fmt1(emaValue)} ${unit}`}
-                  </span>
-                </p>
-              )}
             </>
           )}
 

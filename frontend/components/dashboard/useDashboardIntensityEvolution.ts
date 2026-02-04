@@ -8,6 +8,8 @@ import {
   formatLastRollingWindow,
   getRollingWindowDaysForMode,
   getRollingWindowStartForMode,
+  DEFAULT_CHART_MAX_POINTS,
+  pickChartAggregation,
 } from '../../utils/date/dateUtils';
 import { computationCache } from '../../utils/storage/computationCache';
 import type { TimeFilterMode } from '../../utils/storage/localStorage';
@@ -26,8 +28,6 @@ export const useDashboardIntensityEvolution = (args: {
   const { fullData, rangeMode, allAggregationMode, effectiveNow } = args;
 
   const intensityData = useMemo(() => {
-    const mode: 'daily' | 'weekly' | 'monthly' =
-      rangeMode === 'all' ? allAggregationMode : rangeMode === 'yearly' ? 'weekly' : 'daily';
     const windowStart = getRollingWindowStartForMode(rangeMode, effectiveNow);
     const filtered = windowStart
       ? fullData.filter((s) => {
@@ -35,6 +35,25 @@ export const useDashboardIntensityEvolution = (args: {
           return !!d && d >= windowStart;
         })
       : fullData;
+
+    const preferred: 'daily' | 'weekly' | 'monthly' =
+      rangeMode === 'all' ? allAggregationMode : rangeMode === 'yearly' ? 'weekly' : 'daily';
+
+    let minTs = Number.POSITIVE_INFINITY;
+    let maxTs = Number.NEGATIVE_INFINITY;
+    for (const s of filtered) {
+      const d = s.parsedDate;
+      if (!d) continue;
+      const ts = d.getTime();
+      if (!Number.isFinite(ts)) continue;
+      if (ts < minTs) minTs = ts;
+      if (ts > maxTs) maxTs = ts;
+    }
+
+    const mode: 'daily' | 'weekly' | 'monthly' =
+      Number.isFinite(minTs) && Number.isFinite(maxTs) && maxTs > minTs
+        ? pickChartAggregation({ minTs, maxTs, preferred, maxPoints: DEFAULT_CHART_MAX_POINTS })
+        : preferred;
 
     return computationCache.getOrCompute(
       `intensityEvolution:${rangeMode}:${mode}:${effectiveNow.getTime()}`,

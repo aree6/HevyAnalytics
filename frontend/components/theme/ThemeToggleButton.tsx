@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Moon, Palette, Sparkles, Sun } from 'lucide-react';
+import { Moon, Sparkles, Sun } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 
 const labelForMode = (mode: string) => {
@@ -12,8 +12,6 @@ const labelForMode = (mode: string) => {
       return 'Midnight';
     case 'pure-black':
       return 'Pure Black';
-    case 'svg':
-      return 'Texture';
     default:
       return 'Theme';
   }
@@ -30,19 +28,19 @@ export const ThemeToggleButton: React.FC<{ className?: string; compact?: boolean
     if (mode === 'medium-dark') return { Icon: Moon, label: 'Medium' };
     if (mode === 'midnight-dark') return { Icon: Sparkles, label: 'Midnight' };
     if (mode === 'pure-black') return { Icon: Moon, label: 'Pure Black' };
-    return { Icon: Palette, label: 'Texture' };
+    return { Icon: Moon, label: 'Theme' };
   }, [mode]);
 
   const title = `Theme: ${labelForMode(mode)} (click to cycle)`;
 
   const getDotPosition = (index: number) => {
-    const themeOrder = ['pure-black', 'light', 'midnight-dark', 'medium-dark', 'svg'];
+    const themeOrder = ['pure-black', 'light', 'midnight-dark', 'medium-dark'];
     const currentIndex = themeOrder.indexOf(mode);
     const dotIndex = themeOrder.indexOf(
       index === 0 ? 'pure-black' :
       index === 1 ? 'light' :
       index === 2 ? 'midnight-dark' :
-      index === 3 ? 'medium-dark' : 'svg'
+      'medium-dark'
     );
     return dotIndex === currentIndex;
   };
@@ -62,7 +60,7 @@ export const ThemeToggleButton: React.FC<{ className?: string; compact?: boolean
         <Icon className="w-4 h-4" />
         {/* Theme indicator dots */}
         <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 flex gap-0.5">
-          {[0, 1, 2, 3, 4].map((index) => (
+          {[0, 1, 2, 3].map((index) => (
             <div
               key={index}
               className={`w-1 h-1 rounded-full transition-all duration-200 ${

@@ -12,6 +12,27 @@ export {
 } from './rechartsAxis';
 
 
+export const IndexFilteredDot = (props: any) => {
+  const {
+    cx,
+    cy,
+    index,
+    showAtIndexMap,
+    r = 3,
+    fill = 'var(--text-muted)',
+    stroke = fill,
+    strokeWidth = 1,
+  } = props;
+
+  if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+
+  const hasIndexMap = showAtIndexMap && typeof showAtIndexMap === 'object';
+  if (hasIndexMap && !showAtIndexMap[index]) return null;
+
+  return <circle cx={cx} cy={cy} r={r} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />;
+};
+
+
 // Custom dot component to show values above data points
 export const ValueDot = (props: any) => {
   const {

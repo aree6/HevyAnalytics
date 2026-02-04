@@ -14,7 +14,6 @@ import {
 import type { TimeFilterMode } from '../../utils/storage/localStorage';
 import { formatSignedNumber } from '../../utils/format/formatters';
 import { formatDeltaPercentage, getDeltaFormatPreset } from '../../utils/format/deltaFormat';
-import { addEmaSeries, DEFAULT_EMA_HALF_LIFE_DAYS } from '../../utils/analysis/ema';
 import {
   BadgeLabel,
   ChartDescription,
@@ -58,10 +57,7 @@ export const PrTrendCard = ({
   const primaryMeta = formatVsPrevRollingWindow(primaryWindowDays);
 
   const chartData = useMemo(() => {
-    return addEmaSeries(prsData, 'count', 'emaCount', {
-      halfLifeDays: DEFAULT_EMA_HALF_LIFE_DAYS,
-      timestampKey: 'timestamp',
-    });
+    return prsData;
   }, [prsData]);
 
   const xTicks = useMemo(() => {
@@ -176,7 +172,6 @@ export const PrTrendCard = ({
                 cursor={view === 'bar' ? ({ fill: 'rgb(var(--overlay-rgb) / 0.12)' } as any) : ({ stroke: 'rgb(var(--border-rgb) / 0.35)' } as any)}
                 labelFormatter={(l, p) => (p as any)?.[0]?.payload?.tooltipLabel || l}
                 formatter={(val: number, name) => {
-                  if (name === 'EMA') return [Math.round(val), 'EMA'];
                   if (name === 'PRs') return [Math.round(val), 'PRs'];
                   return [Math.round(val), name];
                 }}
@@ -196,18 +191,6 @@ export const PrTrendCard = ({
               ) : (
                 <Bar dataKey="count" name="PRs" fill="#eab308" radius={[8, 8, 0, 0]} animationDuration={1500} />
               )}
-              <Line
-                type="monotone"
-                dataKey="emaCount"
-                name="EMA"
-                stroke="#eab308"
-                strokeOpacity={0.95}
-                strokeWidth={2.25}
-                strokeDasharray="6 4"
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 0 }}
-                animationDuration={1500}
-              />
             </ComposedChart>
           </ResponsiveContainer>
         </LazyRender>
