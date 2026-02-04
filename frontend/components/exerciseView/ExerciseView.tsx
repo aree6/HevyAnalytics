@@ -42,6 +42,8 @@ import { getSelectedHighlightClasses } from './exerciseRowHighlight';
 import { analyzeExerciseTrend, type StatusResult } from './exerciseTrendUi';
 import { ConfidenceBadge } from './ExerciseBadges';
 import { CustomTooltip } from './ExerciseChartTooltip';
+import { useExerciseSelection } from './hooks/useExerciseSelection';
+import { useExerciseFilters } from './hooks/useExerciseFilters';
 
 // Helper to parse color markers from evidence strings
 // Format: [[GREEN]]+value[[/GREEN]] or [[RED]]-value[[/RED]]
@@ -101,66 +103,6 @@ interface ExerciseViewProps {
 }
 
 export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, highlightedExercise, onHighlightApplied, onExerciseClick, weightUnit = 'kg' as WeightUnit, exerciseTrendMode, bodyMapGender = 'male', stickyHeader = false, now }) => {
-  // Find the most recent exercise for auto-selection
-  const mostRecentExerciseName = useMemo(() => {
-    if (stats.length === 0) return "";
-
-    // Find exercise with most recent session
-    let mostRecentName = stats[0].name;
-    let mostRecentDate: Date | null = null;
-
-    for (const stat of stats) {
-      const lastSession = stat.history[0]?.date || null;
-      if (lastSession && (!mostRecentDate || lastSession > mostRecentDate)) {
-        mostRecentDate = lastSession;
-        mostRecentName = stat.name;
-      }
-    }
-
-    return mostRecentName;
-  }, [stats]);
-
-  const [selectedExerciseName, setSelectedExerciseName] = useState<string>(highlightedExercise || mostRecentExerciseName || "");
-  const [trendFilter, setTrendFilter] = useState<ExerciseTrendStatus | null>(null);
-  // Toggle for showing unilateral (L/R) view
-  const [showUnilateral, setShowUnilateral] = useState(false);
-  const [exerciseListSortMode, setExerciseListSortMode] = useState<'recent' | 'trend'>('recent');
-  const [exerciseListSortDir, setExerciseListSortDir] = useState<'desc' | 'asc'>('desc');
-
-  // Ensure sort direction defaults to latest first (desc) on component mount
-  useEffect(() => {
-    setExerciseListSortDir('desc');
-  }, []);
-
-  // Auto-select most recent exercise when component loads or when no exercise is selected
-  useEffect(() => {
-    if (!selectedExerciseName && mostRecentExerciseName) {
-      setSelectedExerciseName(mostRecentExerciseName);
-    }
-  }, [selectedExerciseName, mostRecentExerciseName]);
-
-  const exerciseButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-
-  // Update selection when highlightedExercise changes
-  useEffect(() => {
-    if (!highlightedExercise) return;
-
-    const trimmed = highlightedExercise.trim();
-    const exact = stats.find(s => s.name === trimmed)?.name;
-    const caseInsensitive = exact
-      ? exact
-      : stats.find(s => s.name.trim().toLowerCase() === trimmed.toLowerCase())?.name;
-
-    if (!caseInsensitive) return;
-
-    setSelectedExerciseName(caseInsensitive);
-    requestAnimationFrame(() => {
-      const el = exerciseButtonRefs.current[caseInsensitive];
-      el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    });
-    onHighlightApplied?.();
-  }, [highlightedExercise, onHighlightApplied, stats]);
-
   const computedEffectiveNow = useMemo(() => {
     return computeEffectiveNowFromStats(stats);
   }, [stats]);
@@ -168,9 +110,44 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
   const effectiveNow = useMemo(() => {
     return resolveEffectiveNow(computedEffectiveNow, now);
   }, [computedEffectiveNow, now]);
-  const [searchTerm, setSearchTerm] = useState("");
+
+  const {
+    selectedExerciseName,
+    setSelectedExerciseName,
+    exerciseButtonRefs,
+    mostRecentExerciseName,
+  } = useExerciseSelection({
+    stats,
+    highlightedExercise,
+    onHighlightApplied,
+  });
+
+  const {
+    searchTerm,
+    setSearchTerm,
+    trendFilter,
+    setTrendFilter,
+    exerciseListSortMode,
+    setExerciseListSortMode,
+    exerciseListSortDir,
+    setExerciseListSortDir,
+    showUnilateral,
+    setShowUnilateral,
+    viewModeOverride,
+    setViewModeOverride,
+    filteredExercises,
+    statusMap,
+    trainingStructure,
+    lastSessionByName,
+    summarizedHistoryByName,
+  } = useExerciseFilters({
+    stats,
+    weightUnit: weightUnit ?? 'kg',
+    exerciseTrendMode,
+    effectiveNow,
+  });
+
   const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
-  const [viewModeOverride, setViewModeOverride] = useState<TimeFilterMode | null>(null);
   const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
 
   // Create fuzzy asset lookup that can resolve exercise name variations
@@ -221,15 +198,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     // Fallback: keep it short.
     return clean(evidenceLine);
   };
-
-  // Memoize summarized exercise history once per dataset
-  const summarizedHistoryByName = useMemo(() => {
-    const map = new Map<string, ExerciseSessionEntry[]>();
-    for (const s of stats) {
-      map.set(s.name, summarizeExerciseHistory(s.history));
-    }
-    return map;
-  }, [stats]);
 
   const inactiveReason = useMemo(() => {
     if (!selectedStats) return null;
@@ -294,35 +262,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     return summarizeExerciseHistory(selectedStats.history, { separateSides });
   }, [selectedStats, summarizedHistoryByName]);
 
-  const statusMap = useMemo<Record<string, StatusResult>>(() => {
-    const map: Record<string, StatusResult> = Object.create(null);
-    for (const s of stats) {
-      map[s.name] = analyzeExerciseTrend(s, weightUnit, { trendMode: exerciseTrendMode, summarizedHistory: summarizedHistoryByName.get(s.name) });
-    }
-    return map;
-  }, [exerciseTrendMode, stats, weightUnit, summarizedHistoryByName]);
-
-  const lastSessionByName = useMemo(() => {
-    const map = new Map<string, Date | null>();
-    for (const s of stats) {
-      let last: Date | null = null;
-      for (const h of s.history) {
-        const d = h.date;
-        if (!d) continue;
-
-        const ts = d.getTime();
-        if (!Number.isFinite(ts) || ts <= 0) continue;
-
-        const y = d.getFullYear();
-        if (y <= 1970 || y >= 2100) continue;
-
-        if (!last || ts > last.getTime()) last = d;
-      }
-      map.set(s.name, last);
-    }
-    return map;
-  }, [stats]);
-
   const selectedExerciseMuscleInfo = useMemo(() => {
     const exData = selectedStats ? lookupExerciseMuscleData(selectedStats.name, exerciseMuscleData) : undefined;
     const { volumes, maxVolume } = getExerciseMuscleVolumes(exData);
@@ -374,102 +313,40 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     return ratio >= 0.55 ? '#ffffff' : '#0f172a';
   };
 
-  const trainingStructure = useMemo(() => {
-    const activeSince = subDays(effectiveNow, 60);
+  const isSelectedEligible = useMemo(() => {
+    if (!selectedStats) return true;
+    return trainingStructure.eligibilityByName.get(selectedStats.name)?.isEligible ?? false;
+  }, [selectedStats, trainingStructure.eligibilityByName]);
 
-    let activeCount = 0;
-    let overloadCount = 0;
-    let plateauCount = 0;
-    let regressionCount = 0;
-    let newCount = 0;
+  // Calculate deltas for selected exercise
+  const exerciseDeltas = useMemo(() => {
+    if (!selectedStats || selectedStats.history.length < 2) return null;
+    return calculateExerciseDeltas(selectedStats.history);
+  }, [selectedStats]);
 
-    const statusByName = new Map<string, ExerciseTrendStatus>();
-    const eligibleNames = new Set<string>();
-    const eligibilityByName = new Map<string, { isEligible: boolean; inactiveLabel: string }>();
+  // Stats for header
+  const sessionsCount = selectedStats ? selectedSessions.length : 0;
 
-    for (const stat of stats) {
-      const sessions = summarizedHistoryByName.get(stat.name) ?? [];
-      const lastDate = sessions[0]?.date ?? null;
-      const tooOld = !lastDate || lastDate < activeSince;
-      const notEnoughData = sessions.length < MIN_SESSIONS_FOR_TREND;
-      const isEligible = !tooOld && !notEnoughData;
-      eligibilityByName.set(stat.name, {
-        isEligible,
-        inactiveLabel: notEnoughData ? 'new exercise' : 'inactive',
-      });
 
-      if (!isEligible) continue;
+  const bestRepsImprovement = useMemo(() => {
+    if (selectedSessions.length === 0) return 0;
+    const reps: number[] = selectedSessions.map((s) => s.maxReps);
+    const unique: number[] = Array.from(new Set<number>(reps)).sort((a, b) => b - a);
+    if (unique.length < 2) return 0;
+    return unique[0] - unique[1];
+  }, [selectedSessions]);
 
-      eligibleNames.add(stat.name);
+  const repsDeltaFromLastSession = useMemo(() => {
+    if (selectedSessions.length < 2) return 0;
+    return (selectedSessions[0]?.maxReps ?? 0) - (selectedSessions[1]?.maxReps ?? 0);
+  }, [selectedSessions]);
 
-      activeCount += 1;
-      const st = statusMap[stat.name]?.status ?? analyzeExerciseTrendCore(stat, { trendMode: exerciseTrendMode, summarizedHistory: sessions }).status;
-      statusByName.set(stat.name, st);
-      if (st === 'overload') overloadCount += 1;
-      else if (st === 'stagnant') plateauCount += 1;
-      else if (st === 'regression') regressionCount += 1;
-      else newCount += 1;
-    }
-
-    return {
-      activeCount,
-      overloadCount,
-      plateauCount,
-      regressionCount,
-      newCount,
-      statusByName,
-      eligibleNames,
-      eligibilityByName,
-    };
-  }, [effectiveNow, exerciseTrendMode, stats, statusMap, summarizedHistoryByName]);
-
-  useEffect(() => {
-    if (!trendFilter) return;
-    if (!selectedStats) return;
-    if (!trainingStructure.eligibleNames.has(selectedStats.name)) {
-      const firstEligible = Array.from(trainingStructure.eligibleNames)[0];
-      if (firstEligible) setSelectedExerciseName(firstEligible);
-      return;
-    }
-    const s = trainingStructure.statusByName.get(selectedStats.name);
-    if (s && s !== trendFilter) {
-      const firstMatch = Array.from(trainingStructure.statusByName.entries()).find(([, st]) => st === trendFilter)?.[0];
-      if (firstMatch) setSelectedExerciseName(firstMatch);
-    }
-  }, [selectedStats, trendFilter, trainingStructure.eligibleNames, trainingStructure.statusByName]);
-
-  const filteredExercises = useMemo(() =>
-    stats
-      .filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
-      .filter(s => {
-        if (!trendFilter) return true;
-        if (!trainingStructure.eligibleNames.has(s.name)) return false;
-        const st = trainingStructure.statusByName.get(s.name);
-        return st === trendFilter;
-      })
-      .sort((a, b) => {
-        // Keep eligible exercises on top
-        const aEligible = trainingStructure.eligibleNames.has(a.name);
-        const bEligible = trainingStructure.eligibleNames.has(b.name);
-        if (aEligible !== bEligible) return aEligible ? -1 : 1;
-
-        const dir = exerciseListSortDir === 'asc' ? 1 : -1;
-
-        if (exerciseListSortMode === 'trend') {
-          const ap = statusMap[a.name]?.diffPct;
-          const bp = statusMap[b.name]?.diffPct;
-          const aHas = Number.isFinite(ap);
-          const bHas = Number.isFinite(bp);
-          if (aHas && bHas && (bp as number) !== (ap as number)) return ((bp as number) - (ap as number)) * dir;
-          if (aHas !== bHas) return aHas ? -1 : 1;
-        }
-
-        const at = lastSessionByName.get(a.name)?.getTime() ?? -Infinity;
-        const bt = lastSessionByName.get(b.name)?.getTime() ?? -Infinity;
-        if (bt !== at) return (bt - at) * dir;
-        return a.name.localeCompare(b.name);
-      }),
-    [exerciseListSortDir, exerciseListSortMode, lastSessionByName, stats, searchTerm, statusMap, trendFilter, trainingStructure.eligibleNames, trainingStructure.statusByName]);
+  const avgRepsLast3 = useMemo(() => {
+    if (selectedSessions.length === 0) return 0;
+    const last3 = selectedSessions.slice(0, 3);
+    const sum = last3.reduce((acc, s) => acc + s.maxReps, 0);
+    return sum / last3.length;
+  }, [selectedSessions]);
 
   const capitalizeLabel = (s: string): string => {
     const trimmed = String(s ?? '').trim();
@@ -500,7 +377,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
     };
 
     const toggle = (s: ExerciseTrendStatus) => {
-      setTrendFilter(prev => (prev === s ? null : s));
+      setTrendFilter(trendFilter === s ? null : s);
     };
 
     return (
@@ -523,7 +400,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
         <div className="justify-self-center">{filtersSlot}</div>
       </div>
     );
-  }, [filtersSlot, trainingStructure.activeCount, trainingStructure.overloadCount, trainingStructure.plateauCount, trainingStructure.regressionCount, trendFilter]);
+  }, [filtersSlot, trainingStructure.activeCount, trainingStructure.overloadCount, trainingStructure.plateauCount, trainingStructure.regressionCount, trendFilter, setTrendFilter]);
 
   const currentStatus = selectedStats ? statusMap[selectedStats.name] : null;
   const isBodyweightLike = currentStatus?.isBodyweightLike ?? false;
@@ -574,40 +451,6 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
   const tickIndexMap = useMemo(() => {
     return getRechartsTickIndexMap(chartDataWithEma.length);
   }, [chartDataWithEma.length]);
-  const isSelectedEligible = useMemo(() => {
-    if (!selectedStats) return true;
-    return trainingStructure.eligibilityByName.get(selectedStats.name)?.isEligible ?? false;
-  }, [selectedStats, trainingStructure.eligibilityByName]);
-
-  // Calculate deltas for selected exercise
-  const exerciseDeltas = useMemo(() => {
-    if (!selectedStats || selectedStats.history.length < 2) return null;
-    return calculateExerciseDeltas(selectedStats.history);
-  }, [selectedStats]);
-
-  // Stats for header
-  const sessionsCount = selectedStats ? selectedSessions.length : 0;
-
-
-  const bestRepsImprovement = useMemo(() => {
-    if (selectedSessions.length === 0) return 0;
-    const reps: number[] = selectedSessions.map((s) => s.maxReps);
-    const unique: number[] = Array.from(new Set<number>(reps)).sort((a, b) => b - a);
-    if (unique.length < 2) return 0;
-    return unique[0] - unique[1];
-  }, [selectedSessions]);
-
-  const repsDeltaFromLastSession = useMemo(() => {
-    if (selectedSessions.length < 2) return 0;
-    return (selectedSessions[0]?.maxReps ?? 0) - (selectedSessions[1]?.maxReps ?? 0);
-  }, [selectedSessions]);
-
-  const avgRepsLast3 = useMemo(() => {
-    if (selectedSessions.length === 0) return 0;
-    const last3 = selectedSessions.slice(0, 3);
-    const sum = last3.reduce((acc, s) => acc + s.maxReps, 0);
-    return sum / last3.length;
-  }, [selectedSessions]);
 
   return (
     <div className="flex flex-col gap-2 w-full text-slate-200 pb-10">
@@ -618,13 +461,13 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
               <button type="button" onClick={() => setTrendFilter(null)} className={`w-full text-center text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === null ? 'bg-slate-500/20 text-slate-200 border-slate-400/60 ring-2 ring-slate-500/25' : 'bg-slate-500/10 text-slate-300 border-slate-500/25 hover:border-slate-400/45'}`}>
                 {trainingStructure.activeCount} active
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'overload' ? null : 'overload'))} className={`w-full text-center text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'overload' ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/60 ring-2 ring-emerald-500/25' : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25 hover:border-emerald-400/45'}`}>
+              <button type="button" onClick={() => setTrendFilter(trendFilter === 'overload' ? null : 'overload')} className={`w-full text-center text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'overload' ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/60 ring-2 ring-emerald-500/25' : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25 hover:border-emerald-400/45'}`}>
                 {trainingStructure.overloadCount} Gaining
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'stagnant' ? null : 'stagnant'))} className={`w-full text-center text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'stagnant' ? 'bg-amber-500/20 text-amber-200 border-amber-400/60 ring-2 ring-amber-500/25' : 'bg-amber-500/10 text-amber-300 border-amber-500/25 hover:border-amber-400/45'}`}>
+              <button type="button" onClick={() => setTrendFilter(trendFilter === 'stagnant' ? null : 'stagnant')} className={`w-full text-center text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'stagnant' ? 'bg-amber-500/20 text-amber-200 border-amber-400/60 ring-2 ring-amber-500/25' : 'bg-amber-500/10 text-amber-300 border-amber-500/25 hover:border-amber-400/45'}`}>
                 {trainingStructure.plateauCount} Plateauing
               </button>
-              <button type="button" onClick={() => setTrendFilter(prev => (prev === 'regression' ? null : 'regression'))} className={`w-full text-center text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'regression' ? 'bg-rose-500/20 text-rose-200 border-rose-400/60 ring-2 ring-rose-500/25' : 'bg-rose-500/10 text-rose-300 border-rose-500/25 hover:border-rose-400/45'}`}>
+              <button type="button" onClick={() => setTrendFilter(trendFilter === 'regression' ? null : 'regression')} className={`w-full text-center text-[9px] px-2 py-1 rounded font-bold border whitespace-nowrap transition-all duration-200 ${trendFilter === 'regression' ? 'bg-rose-500/20 text-rose-200 border-rose-400/60 ring-2 ring-rose-500/25' : 'bg-rose-500/10 text-rose-300 border-rose-500/25 hover:border-rose-400/45'}`}>
                 {trainingStructure.regressionCount} Losing
               </button>
             </div>
@@ -688,7 +531,7 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({ stats, filtersSlot, 
 
               <button
                 type="button"
-                onClick={() => setExerciseListSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+                onClick={() => setExerciseListSortDir(exerciseListSortDir === 'desc' ? 'asc' : 'desc')}
                 title={exerciseListSortMode === 'trend'
                   ? (exerciseListSortDir === 'desc' ? 'Highest % to lowest' : 'Lowest % to highest')
                   : (exerciseListSortDir === 'desc' ? 'Latest to oldest' : 'Oldest to latest')}

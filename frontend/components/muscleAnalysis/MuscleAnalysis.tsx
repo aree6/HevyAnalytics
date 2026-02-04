@@ -1,11 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { WorkoutSet } from '../../types';
 import { BodyMap, BodyMapGender } from '../bodyMap/BodyMap';
 import { ViewHeader } from '../layout/ViewHeader';
-import { differenceInCalendarDays, subDays } from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns';
 import {
-  loadExerciseMuscleData,
-  calculateMuscleVolume,
   SVG_MUSCLE_NAMES,
   ExerciseMuscleData,
   MuscleVolumeEntry,
@@ -18,7 +16,6 @@ import { getExerciseAssets, ExerciseAsset } from '../../utils/data/exerciseAsset
 import { ExerciseThumbnail } from '../common/ExerciseThumbnail';
 import { getSvgMuscleVolumeTimeSeriesRolling, getMuscleVolumeTimeSeriesRolling } from '../../utils/muscle/rollingVolumeCalculator';
 import { bucketRollingWeeklySeriesToWeeks } from '../../utils/muscle/rollingSeriesBucketing';
-import { getEffectiveNowFromWorkoutData } from '../../utils/date/dateUtils';
 import { isWarmupSet } from '../../utils/analysis/setClassification';
 import {
   computeWeeklySetsDashboardData,
@@ -47,15 +44,12 @@ import { formatNumber } from '../../utils/format/formatters';
 import { computationCache } from '../../utils/storage/computationCache';
 import { computeWindowedExerciseBreakdown } from '../../utils/muscle/windowedExerciseBreakdown';
 import { getRechartsXAxisInterval, RECHARTS_XAXIS_PADDING } from '../../utils/chart/chartEnhancements';
-import { useLocation, useNavigate } from 'react-router-dom';
 import {
   SVG_TO_MUSCLE_GROUP,
   MUSCLE_GROUP_ORDER,
   getSvgIdsForGroup,
   getGroupForSvgId,
-  QuickFilterCategory,
   QUICK_FILTER_LABELS,
-  QUICK_FILTER_GROUPS,
   getSvgIdsForQuickFilter,
   getHeadlessIdForDetailedSvgId,
   HEADLESS_ID_TO_DETAILED_SVG_IDS,
@@ -69,6 +63,9 @@ import {
   computeWeeklySetsSummary,
   computeWeeklySetsDelta,
 } from './weeklySetsMetrics';
+import { useMuscleSelection } from './hooks/useMuscleSelection';
+import { useMuscleVolumeData } from './hooks/useMuscleVolumeData';
+import type { QuickFilterCategory } from './hooks/useMuscleSelection';
 
 interface MuscleAnalysisProps {
   data: WorkoutSet[];
@@ -99,134 +96,46 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
   bodyMapGender = 'male',
   now,
 }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const [exerciseMuscleData, setExerciseMuscleData] = useState<Map<string, ExerciseMuscleData>>(new Map());
-  const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [hoveredMuscle, setHoveredMuscle] = useState<string | null>(null);
-  const [muscleVolume, setMuscleVolume] = useState<Map<string, MuscleVolumeEntry>>(new Map());
-  const [assetsMap, setAssetsMap] = useState<Map<string, ExerciseAsset> | null>(null);
-  const [weeklySetsWindow, setWeeklySetsWindow] = useState<WeeklySetsWindow>('30d');
-  const [viewMode, setViewMode] = useState<ViewMode>('headless');
   const [weeklySetsChartView, setWeeklySetsChartView] = useState<'heatmap' | 'radar'>('heatmap');
-  const [activeQuickFilter, setActiveQuickFilter] = useState<QuickFilterCategory | null>(null);
   const [hoverTooltip, setHoverTooltip] = useState<TooltipData | null>(null);
 
-  // In group mode, selectedMuscle stores the group name (e.g. "Back"), but we still want the URL to
-  // round-trip through the underlying SVG id that was clicked.
-  const selectedSvgIdForUrlRef = useRef<string | null>(null);
+  const {
+    selectedMuscle,
+    setSelectedMuscle,
+    viewMode,
+    setViewMode,
+    weeklySetsWindow,
+    setWeeklySetsWindow,
+    activeQuickFilter,
+    setActiveQuickFilter,
+    selectedSvgIdForUrlRef,
+    clearSelectionUrl,
+    updateSelectionUrl,
+    handleViewModeChange,
+    handleQuickFilterClick,
+    clearSelection,
+  } = useMuscleSelection({
+    initialMuscle,
+    initialWeeklySetsWindow,
+    onInitialMuscleConsumed,
+    isLoading: false,
+  });
 
-  const clearSelectionUrl = useCallback(() => {
-    navigate({ pathname: location.pathname, search: '' });
-  }, [navigate, location.pathname]);
-
-  const updateSelectionUrl = useCallback(
-    (opts: { svgId: string; mode: ViewMode; window: WeeklySetsWindow }) => {
-      const params = new URLSearchParams();
-      params.set('muscle', opts.svgId);
-      params.set('view', opts.mode);
-      params.set('window', opts.window);
-      navigate({ pathname: location.pathname, search: `?${params.toString()}` });
-    },
-    [navigate, location.pathname]
-  );
-
-  const effectiveNow = useMemo(() => now ?? getEffectiveNowFromWorkoutData(data), [now, data]);
-
-  const allTimeWindowStart = useMemo(() => {
-    let start: Date | null = null;
-    for (const s of data) {
-      const d = s.parsedDate;
-      if (!d) continue;
-      if (!start || d < start) start = d;
-    }
-    return start;
-  }, [data]);
-
-  const windowStart = useMemo(() => {
-    if (!allTimeWindowStart) return null;
-    if (weeklySetsWindow === 'all') return allTimeWindowStart;
-
-    // Show current period + previous period (2x window) for better visual comparison
-    const candidate =
-      weeklySetsWindow === '7d'
-        ? subDays(effectiveNow, 14)   // current week + previous week
-        : weeklySetsWindow === '30d'
-          ? subDays(effectiveNow, 60) // current month + previous month
-          : subDays(effectiveNow, 730); // current year + previous year
-
-    // Clamp to the user's first workout date so we don't include pre-history empty time.
-    return allTimeWindowStart > candidate ? allTimeWindowStart : candidate;
-  }, [weeklySetsWindow, effectiveNow, allTimeWindowStart]);
-
-  const getChipTextColor = useCallback((sets: number, maxSets: number): string => {
-    const ratio = sets / Math.max(maxSets, 1);
-    return ratio >= 0.55 ? '#ffffff' : '#0f172a';
-  }, []);
-
-  // Load exercise muscle data and assets on mount
-  useEffect(() => {
-    loadExerciseMuscleData().then(loadedData => {
-      setExerciseMuscleData(loadedData);
-      setIsLoading(false);
-    });
-    getExerciseAssets()
-      .then(m => setAssetsMap(m))
-      .catch(() => setAssetsMap(new Map()));
-  }, []);
-
-  // Calculate muscle volumes whenever data or windowStart changes
-  useEffect(() => {
-    if (exerciseMuscleData.size === 0 || data.length === 0) {
-      setMuscleVolume(new Map());
-      return;
-    }
-
-    // Filter data based on selected window to ensure BodyMap matches the time period
-    let processedData = data;
-    if (windowStart) {
-      processedData = data.filter(s => s.parsedDate && s.parsedDate >= windowStart);
-    }
-
-    calculateMuscleVolume(processedData, exerciseMuscleData).then(setMuscleVolume);
-  }, [data, exerciseMuscleData, windowStart]);
-
-  // Apply initial muscle selection from dashboard navigation
-  useEffect(() => {
-    if (initialMuscle && !isLoading) {
-      setViewMode(initialMuscle.viewMode);
-      selectedSvgIdForUrlRef.current = initialMuscle.muscleId;
-      if (initialMuscle.viewMode === 'group') {
-        // For group mode, get the group name from the muscle ID
-        const group = MUSCLE_GROUP_DISPLAY[initialMuscle.muscleId];
-        if (group && group !== 'Other') {
-          setSelectedMuscle(group);
-        }
-      } else if (initialMuscle.viewMode === 'headless') {
-        // For headless mode, URL can contain either a headless id (preferred) or a detailed svg id.
-        const headless = (HEADLESS_MUSCLE_NAMES as any)[initialMuscle.muscleId]
-          ? (initialMuscle.muscleId as HeadlessMuscleId)
-          : getHeadlessIdForDetailedSvgId(initialMuscle.muscleId);
-        if (headless) {
-          setSelectedMuscle(headless);
-          // Ensure we keep URL round-trippable with a stable headless id.
-          selectedSvgIdForUrlRef.current = headless;
-        }
-      } else {
-        setSelectedMuscle(initialMuscle.muscleId);
-      }
-      onInitialMuscleConsumed?.();
-    }
-  }, [initialMuscle, isLoading, onInitialMuscleConsumed]);
-
-  // Apply initial weekly sets window from dashboard navigation
-  useEffect(() => {
-    if (initialWeeklySetsWindow && !isLoading) {
-      setWeeklySetsWindow(initialWeeklySetsWindow);
-    }
-  }, [initialWeeklySetsWindow, isLoading]);
+  const {
+    exerciseMuscleData,
+    muscleVolume,
+    isLoading,
+    assetsMap,
+    windowStart,
+    effectiveNow,
+    allTimeWindowStart,
+    getChipTextColor,
+  } = useMuscleVolumeData({
+    data,
+    weeklySetsWindow,
+    now,
+  });
 
   // Window-based heatmap volumes that update based on selected time filter
   const weeklySetsDashboardMuscles = useMemo(() => {
@@ -653,29 +562,6 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
 
     return [...getSvgIdsForGroup(group)];
   }, [hoveredMuscle, viewMode]);
-
-  // Clear selection when switching view modes
-  const handleViewModeChange = useCallback((mode: ViewMode) => {
-    setSelectedMuscle(null);
-    setActiveQuickFilter(null);
-    setViewMode(mode);
-    selectedSvgIdForUrlRef.current = null;
-    clearSelectionUrl();
-  }, [clearSelectionUrl]);
-
-  // Handle quick filter click - auto-select muscles in category
-  const handleQuickFilterClick = useCallback((category: QuickFilterCategory) => {
-    if (activeQuickFilter === category) {
-      setActiveQuickFilter(null);
-    } else {
-      // Headless view supports quick filters by mapping to headless ids.
-      if (viewMode === 'group') setViewMode('headless');
-      setActiveQuickFilter(category);
-      setSelectedMuscle(null);
-      selectedSvgIdForUrlRef.current = null;
-      clearSelectionUrl();
-    }
-  }, [activeQuickFilter, viewMode, clearSelectionUrl]);
 
   if (isLoading) {
     return (

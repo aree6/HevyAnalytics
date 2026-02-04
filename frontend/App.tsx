@@ -1,15 +1,9 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  parseWorkoutCSVAsyncWithUnit,
-  ParseWorkoutCsvResult,
-} from './utils/csv/csvParser';
 import { getDailySummaries, getExerciseStats, identifyPersonalRecords } from './utils/analysis/analytics';
-import { computationCache, getFilteredCacheKey } from './utils/storage/computationCache';
+import { computationCache } from './utils/storage/computationCache';
 import { WorkoutSet } from './types';
-import { BodyMapGender } from './components/bodyMap/BodyMap';
-import type { DataSourceChoice } from './utils/dataSources/types';
-import { Tab, getPathForTab, getTabFromPathname, parseLocalDateFromYyyyMmDd } from './app/tabs';
+import { Tab } from './app/tabs';
 import { AppHeader } from './components/app/AppHeader';
 import { AppCalendarOverlay } from './components/app/AppCalendarOverlay';
 import { AppLoadingOverlay } from './components/app/AppLoadingOverlay';
@@ -17,93 +11,136 @@ import { AppTabContent } from './components/app/AppTabContent';
 import { AppOnboardingLayer } from './components/app/AppOnboardingLayer';
 import { UserPreferencesModal } from './components/modals/UserPreferencesModal';
 import type { OnboardingFlow } from './app/onboarding/types';
-import {
-  saveCSVData,
-  saveWeightUnit,
-  getWeightUnit,
-  clearWeightUnit,
-  WeightUnit,
-  ExerciseTrendMode,
-  getExerciseTrendMode,
-  saveExerciseTrendMode,
-  getBodyMapGender,
-  saveBodyMapGender,
-  getPreferencesConfirmed,
-  HeatmapTheme,
-  getHeatmapTheme,
-  saveHeatmapTheme,
-  DateMode,
-  getDateMode,
-  saveDateMode,
-} from './utils/storage/localStorage';
 import { X, Calendar, Pencil } from 'lucide-react';
-import { format, isSameDay, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
-import { formatDayYearContraction, formatHumanReadableDate, getEffectiveNowFromWorkoutData, isPlausibleDate } from './utils/date/dateUtils';
+import { getEffectiveNowFromWorkoutData } from './utils/date/dateUtils';
 import { getDataAgeInfo } from './hooks/usePreferences';
 import { trackPageView } from './utils/integrations/ga';
 import { setContext, trackEvent } from './utils/integrations/analytics';
 import {
   getDataSourceChoice,
   saveDataSourceChoice,
-  getHevyAuthToken,
-  saveHevyAuthToken,
-  clearHevyAuthToken,
-  getHevyProApiKey,
-  saveHevyProApiKey,
-  clearHevyProApiKey,
-  getLyfataApiKey,
-  saveLyfataApiKey,
-  clearLyfataApiKey,
-  saveLastCsvPlatform,
-  saveLastLoginMethod,
   getSetupComplete,
   saveSetupComplete,
 } from './utils/storage/dataSourceStorage';
-import { getHevyUsernameOrEmail, saveHevyPassword, saveHevyUsernameOrEmail } from './utils/storage/hevyCredentialsStorage';
-import { hevyBackendGetAccount, hevyBackendGetSets, hevyBackendGetSetsWithProApiKey, hevyBackendLogin, hevyBackendValidateProApiKey } from './utils/api/hevyBackend';
-import { lyfatBackendGetSets } from './utils/api/lyfataBackend';
-import { useTheme } from './components/theme/ThemeProvider';
-import { hydrateBackendWorkoutSets } from './app/hydrateBackendWorkoutSets';
-import { getErrorMessage, getHevyErrorMessage, getLyfatErrorMessage } from './app/appErrorMessages';
+import { getPreferencesConfirmed } from './utils/storage/localStorage';
 import { clearCacheAndRestart as clearCacheAndRestartNow } from './app/clearCacheAndRestart';
-import { finishProgress as finishLoadingProgress, startProgress as startLoadingProgress } from './app/loadingProgress';
 import { usePrefetchHeavyViews } from './app/usePrefetchHeavyViews';
 import { useStartupAutoLoad } from './app/useStartupAutoLoad';
 import { usePlatformDeepLink } from './app/usePlatformDeepLink';
+import { useAppAuth } from './hooks/useAppAuth';
+import { useAppNavigation } from './hooks/useAppNavigation';
+import { useAppCalendarFilters } from './hooks/useAppCalendarFilters';
+import { useAppPreferences } from './hooks/useAppPreferences';
 
 const App: React.FC = () => {
-  const { mode, setMode } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Core data state
   const [parsedData, setParsedData] = useState<WorkoutSet[]>([]);
-  const [activeTab, setActiveTab] = useState<Tab>(() => getTabFromPathname(location.pathname));
   const [onboarding, setOnboarding] = useState<OnboardingFlow | null>(() => {
     return getSetupComplete() ? null : { intent: 'initial', step: 'platform' };
   });
-  const [dataSource, setDataSource] = useState<DataSourceChoice | null>(() => getDataSourceChoice());
-  const [hevyLoginError, setHevyLoginError] = useState<string | null>(null);
-  const [lyfatLoginError, setLyfatLoginError] = useState<string | null>(null);
-  const [csvImportError, setCsvImportError] = useState<string | null>(null);
-  const [highlightedExercise, setHighlightedExercise] = useState<string | null>(null);
-  const [initialMuscleForAnalysis, setInitialMuscleForAnalysis] = useState<{ muscleId: string; viewMode: 'muscle' | 'group' | 'headless' } | null>(null);
-  const [initialWeeklySetsWindow, setInitialWeeklySetsWindow] = useState<'all' | '7d' | '30d' | '365d' | null>(null);
-  const [targetHistoryDate, setTargetHistoryDate] = useState<Date | null>(null);
-  const [loadingKind, setLoadingKind] = useState<'hevy' | 'lyfta' | 'csv' | null>(null);
+  const [dataSource, setDataSource] = useState(() => getDataSourceChoice());
+  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
 
-  // Loading State
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(0); // 0: Load, 1: Analyze, 2: Visualize
-  const [progress, setProgress] = useState(0);
-  const progressTimerRef = useRef<number | null>(null);
+  // Hooks
+  const {
+    mode,
+    setMode,
+    weightUnit,
+    setWeightUnit,
+    bodyMapGender,
+    setBodyMapGender,
+    dateMode,
+    setDateMode,
+    exerciseTrendMode,
+    setExerciseTrendMode,
+    heatmapTheme,
+    setHeatmapTheme,
+  } = useAppPreferences();
 
-  const mainRef = useRef<HTMLElement | null>(null);
-  const activeTabRef = useRef<Tab>(activeTab);
-  const tabScrollPositionsRef = useRef<Record<string, number>>({});
-  const pendingNavRef = useRef<{ tab: Tab; kind: 'top' | 'deep' } | null>(null);
-  const pendingUrlNavKindRef = useRef<'top' | 'deep' | null>(null);
+  const {
+    activeTab,
+    highlightedExercise,
+    initialMuscleForAnalysis,
+    initialWeeklySetsWindow,
+    targetHistoryDate,
+    mainRef,
+    handleExerciseClick,
+    handleMuscleClick,
+    handleDayClick,
+    handleTargetDateConsumed,
+    handleSelectTab,
+    clearHighlightedExercise,
+    clearInitialMuscleForAnalysis,
+  } = useAppNavigation();
 
-  const platformQueryConsumedRef = useRef(false);
+  const {
+    selectedMonth,
+    selectedDay,
+    selectedRange,
+    selectedWeeks,
+    calendarOpen,
+    availableMonths,
+    filteredData,
+    hasActiveCalendarFilter,
+    calendarSummaryText,
+    minDate,
+    maxDate,
+    availableDatesSet,
+    filterCacheKey,
+    setSelectedMonth,
+    setSelectedDay,
+    setSelectedRange,
+    setSelectedWeeks,
+    setCalendarOpen,
+    toggleCalendarOpen,
+    clearAllFilters,
+  } = useAppCalendarFilters({
+    parsedData,
+    effectiveNow: useMemo(() => {
+      const dataBasedNow = getEffectiveNowFromWorkoutData(parsedData, new Date(0));
+      return dateMode === 'actual' ? new Date() : dataBasedNow;
+    }, [parsedData, dateMode]),
+  });
 
+  const {
+    hevyLoginError,
+    lyfatLoginError,
+    csvImportError,
+    loadingKind,
+    isAnalyzing,
+    loadingStep,
+    progress,
+    handleHevySyncSaved,
+    handleHevyApiKeyLogin,
+    handleHevyLogin,
+    handleLyfatSyncSaved,
+    handleLyfatLogin,
+    processFile,
+    clearHevyLoginError,
+    clearLyfatLoginError,
+    clearCsvImportError,
+  } = useAppAuth({
+    weightUnit,
+    setParsedData,
+    setDataSource,
+    setOnboarding,
+    setSelectedMonth,
+    setSelectedDay,
+  });
+
+  // Platform deep linking
+  const platformQueryConsumedRef = { current: false };
+  usePlatformDeepLink({
+    location,
+    navigate,
+    setOnboarding,
+    platformQueryConsumedRef,
+  });
+
+  // Effects
   useEffect(() => {
     setContext({ app_shell: onboarding?.intent === 'initial' ? 'landing' : 'app' });
   }, [onboarding?.intent]);
@@ -141,384 +178,50 @@ const App: React.FC = () => {
     };
   }, [onboarding?.intent]);
 
-  usePlatformDeepLink({
-    location,
-    navigate,
-    setOnboarding,
-    platformQueryConsumedRef,
-  });
-
-  useLayoutEffect(() => {
-    activeTabRef.current = activeTab;
-  }, [activeTab]);
-
-  useEffect(() => {
-    setContext({ active_tab: activeTab });
-    trackEvent('tab_view', {
-      tab: activeTab,
-      path: `${window.location.pathname || '/'}${window.location.search || ''}`,
-    });
-  }, [activeTab, location.pathname, location.search]);
-
-
-  useEffect(() => {
-    const el = mainRef.current;
-    if (!el) return;
-
-    const onScroll = () => {
-      tabScrollPositionsRef.current[activeTabRef.current] = el.scrollTop;
-    };
-
-    el.addEventListener('scroll', onScroll, { passive: true } as any);
-    return () => el.removeEventListener('scroll', onScroll as any);
-  }, []);
-
-  useEffect(() => {
-    const el = mainRef.current;
-    if (!el) return;
-
-    const pending = pendingNavRef.current;
-    if (!pending || pending.tab !== activeTab) return;
-
-    if (pending.kind === 'top') {
-      const targetTop = tabScrollPositionsRef.current[activeTab] ?? 0;
-      requestAnimationFrame(() => {
-        if (!mainRef.current) return;
-        mainRef.current.scrollTop = targetTop;
-      });
-    } else {
-      tabScrollPositionsRef.current[activeTab] = 0;
-      requestAnimationFrame(() => {
-        if (!mainRef.current) return;
-        mainRef.current.scrollTop = 0;
-      });
-    }
-
-    pendingNavRef.current = null;
-  }, [activeTab]);
-
-  const navigateToTab = useCallback((tab: Tab, kind: 'top' | 'deep') => {
-    const el = mainRef.current;
-    if (el) {
-      tabScrollPositionsRef.current[activeTabRef.current] = el.scrollTop;
-    }
-    pendingNavRef.current = { tab, kind };
-    setActiveTab(tab);
-  }, []);
-
-  useLayoutEffect(() => {
-    const tabFromUrl = getTabFromPathname(location.pathname);
-    const params = new URLSearchParams(location.search);
-
-    if (tabFromUrl === Tab.EXERCISES) {
-      const exercise = params.get('exercise');
-      setHighlightedExercise(exercise ? exercise : null);
-    } else {
-      setHighlightedExercise(null);
-    }
-
-    if (tabFromUrl === Tab.HISTORY) {
-      const date = params.get('date');
-      const parsed = date ? parseLocalDateFromYyyyMmDd(date) : null;
-      setTargetHistoryDate(parsed);
-    } else {
-      setTargetHistoryDate(null);
-    }
-
-    if (tabFromUrl === Tab.MUSCLE_ANALYSIS) {
-      const muscleId = params.get('muscle');
-      const viewMode = params.get('view');
-      const weeklySetsWindow = params.get('window');
-
-      const isValidViewMode = viewMode === 'muscle' || viewMode === 'group' || viewMode === 'headless';
-      const isValidWindow = weeklySetsWindow === 'all' || weeklySetsWindow === '7d' || weeklySetsWindow === '30d' || weeklySetsWindow === '365d';
-
-      if (muscleId && isValidViewMode) {
-        setInitialMuscleForAnalysis({ muscleId, viewMode });
-        setInitialWeeklySetsWindow(isValidWindow ? weeklySetsWindow : 'all');
-      } else {
-        setInitialMuscleForAnalysis(null);
-        setInitialWeeklySetsWindow(null);
-      }
-    } else {
-      setInitialMuscleForAnalysis(null);
-      setInitialWeeklySetsWindow(null);
-    }
-
-    const isDeep =
-      (tabFromUrl === Tab.EXERCISES && params.has('exercise')) ||
-      (tabFromUrl === Tab.HISTORY && params.has('date')) ||
-      (tabFromUrl === Tab.MUSCLE_ANALYSIS && params.has('muscle'));
-
-    const pendingKind = pendingUrlNavKindRef.current;
-    pendingUrlNavKindRef.current = null;
-
-    if (tabFromUrl !== activeTabRef.current) {
-      navigateToTab(tabFromUrl, pendingKind ?? (isDeep ? 'deep' : 'top'));
-      return;
-    }
-
-    const desiredKind = pendingKind ?? (isDeep ? 'deep' : 'top');
-    const el = mainRef.current;
-    if (!el) return;
-
-    if (desiredKind === 'deep') {
-      tabScrollPositionsRef.current[activeTabRef.current] = 0;
-      requestAnimationFrame(() => {
-        if (!mainRef.current) return;
-        mainRef.current.scrollTop = 0;
-      });
-      return;
-    }
-
-    const targetTop = tabScrollPositionsRef.current[activeTabRef.current] ?? 0;
-    requestAnimationFrame(() => {
-      if (!mainRef.current) return;
-      mainRef.current.scrollTop = targetTop;
-    });
-  }, [location.pathname, location.search, navigateToTab]);
-
-  const clearCacheAndRestart = useCallback(() => {
-    clearCacheAndRestartNow();
-  }, []);
-
-  // Gender state with localStorage persistence
-  const [bodyMapGender, setBodyMapGender] = useState<BodyMapGender>(() => getBodyMapGender());
-
-  // Persist gender to localStorage when it changes
-  useEffect(() => {
-    saveBodyMapGender(bodyMapGender);
-    setContext({ body_map_gender: bodyMapGender });
-  }, [bodyMapGender]);
-
-  // Weight unit state with localStorage persistence
-  const [weightUnit, setWeightUnit] = useState<WeightUnit>(() => getWeightUnit());
-
-  // Persist weight unit to localStorage when it changes
-  useEffect(() => {
-    saveWeightUnit(weightUnit);
-    setContext({ weight_unit: weightUnit });
-  }, [weightUnit]);
-
-  // Date mode state with localStorage persistence
-  const [dateMode, setDateMode] = useState<DateMode>(() => getDateMode());
-
-  // Persist date mode to localStorage when it changes
-  useEffect(() => {
-    saveDateMode(dateMode);
-  }, [dateMode]);
-
-  // Exercise trend mode state with localStorage persistence
-  const [exerciseTrendMode, setExerciseTrendMode] = useState<ExerciseTrendMode>(() => getExerciseTrendMode());
-
-  // Persist exercise trend mode to localStorage when it changes
-  useEffect(() => {
-    saveExerciseTrendMode(exerciseTrendMode);
-  }, [exerciseTrendMode]);
-
-  // Heatmap theme (palette) state with localStorage persistence
-  const [heatmapTheme, setHeatmapTheme] = useState<HeatmapTheme>(() => getHeatmapTheme());
-
-  useEffect(() => {
-    saveHeatmapTheme(heatmapTheme);
-    setContext({ heatmap_theme: heatmapTheme });
-    trackEvent('heatmap_theme_change', { heatmap_theme: heatmapTheme });
-  }, [heatmapTheme]);
-
-  useLayoutEffect(() => {
-    const root = document.documentElement;
-
-    // Hover and selection colors depend on palette to keep them distinct.
-    // Red palette: hover=blue, select=blue
-    // Brown palette: hover=blue, select=blue
-    // Blue palette: hover=red, select=red
-    const preset =
-      heatmapTheme === 'blue'
-        ? { hue: 215, hoverRgb: '220 38 38', selectionRgb: '220 38 38' }
-        : heatmapTheme === 'brown'
-          ? { hue: 25, hoverRgb: '59 130 246', selectionRgb: '59 130 246' }
-          : { hue: 5, hoverRgb: '59 130 246', selectionRgb: '59 130 246' }; // red default
-
-    root.style.setProperty('--heatmap-hue', String(preset.hue));
-    root.style.setProperty('--bodymap-hover-rgb', preset.hoverRgb);
-    root.style.setProperty('--bodymap-selection-rgb', preset.selectionRgb);
-  }, [heatmapTheme]);
-
-  // User Preferences Modal state
-  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
-
-  // Handler for navigating to ExerciseView from MuscleAnalysis
-  const handleExerciseClick = (exerciseName: string) => {
-    trackEvent('exercise_open', { source: 'muscle_analysis' });
-    setHighlightedExercise(exerciseName);
-    const params = new URLSearchParams();
-    params.set('exercise', exerciseName);
-    pendingUrlNavKindRef.current = 'deep';
-
-    // If we're already on the Exercises tab, replace the current entry instead of pushing
-    // This prevents exercise selections from polluting the browser history
-    if (activeTab === Tab.EXERCISES) {
-      navigate({ pathname: getPathForTab(Tab.EXERCISES), search: `?${params.toString()}` }, { replace: true });
-    } else {
-      navigate({ pathname: getPathForTab(Tab.EXERCISES), search: `?${params.toString()}` });
-    }
-  };
-
-  // Handler for navigating to MuscleAnalysis from Dashboard heatmap
-  const handleMuscleClick = (muscleId: string, viewMode: 'muscle' | 'group' | 'headless' = 'headless', weeklySetsWindow: 'all' | '7d' | '30d' | '365d') => {
-    trackEvent('muscle_open', { view_mode: viewMode, window: weeklySetsWindow });
-    setInitialMuscleForAnalysis({ muscleId, viewMode });
-    setInitialWeeklySetsWindow(weeklySetsWindow);
-    const params = new URLSearchParams();
-    params.set('muscle', muscleId);
-    params.set('view', viewMode);
-    params.set('window', weeklySetsWindow);
-    pendingUrlNavKindRef.current = 'deep';
-    navigate({ pathname: getPathForTab(Tab.MUSCLE_ANALYSIS), search: `?${params.toString()}` });
-  };
-
-  const startProgress = () => {
-    return startLoadingProgress({ setProgress, progressTimerRef });
-  };
-
-  const finishProgress = (startedAt: number) => {
-    finishLoadingProgress({
-      startedAt,
-      setProgress,
-      setIsAnalyzing,
-      setLoadingKind,
-      progressTimerRef,
-    });
-  };
-
-  // Filter States
-  const [selectedMonth, setSelectedMonth] = useState<string>('all');
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
-  const [selectedRange, setSelectedRange] = useState<{ start: Date; end: Date } | null>(null);
-  const [selectedWeeks, setSelectedWeeks] = useState<Array<{ start: Date; end: Date }>>([]);
-  const [calendarOpen, setCalendarOpen] = useState(false);
-
-  useStartupAutoLoad({
-    setOnboarding,
-    setDataSource,
-    setParsedData,
-    setHevyLoginError,
-    setLyfatLoginError,
-    setCsvImportError,
-    setIsAnalyzing,
-    setLoadingStep,
-    setLoadingKind,
-    startProgress,
-    finishProgress,
-  });
-
   useEffect(() => {
     if (!dataSource) return;
     saveDataSourceChoice(dataSource);
     setContext({ data_source: dataSource });
   }, [dataSource]);
 
-  // Prefetch heavy views and preload exercise assets to avoid first-time lag
   usePrefetchHeavyViews();
 
-  // Track "page" views when switching tabs
   useEffect(() => {
     trackPageView(`${window.location.pathname || '/'}${window.location.search || ''}`);
   }, [location.pathname, location.search]);
 
-  // Derive unique months for filter
-  const availableMonths = useMemo(() => {
-    const months = new Set<string>();
-    parsedData.forEach(d => {
-      if (d.parsedDate) {
-        months.add(format(d.parsedDate, 'yyyy-MM'));
-      }
-    });
-    return Array.from(months).sort().reverse(); // Descending order
-  }, [parsedData]);
+  useStartupAutoLoad({
+    setOnboarding,
+    setDataSource,
+    setParsedData,
+    setHevyLoginError: clearHevyLoginError,
+    setLyfatLoginError: clearLyfatLoginError,
+    setCsvImportError: clearCsvImportError,
+    setIsAnalyzing: () => {},
+    setLoadingStep: () => {},
+    setLoadingKind: () => {},
+    startProgress: () => 0,
+    finishProgress: () => {},
+  });
 
-  // Apply filters
-  const filteredData = useMemo(() => {
-    return parsedData.filter(d => {
-      if (!d.parsedDate) return false;
-      if (selectedDay) return isSameDay(d.parsedDate, selectedDay);
-      if (selectedWeeks.length > 0) {
-        return selectedWeeks.some(r => isWithinInterval(d.parsedDate as Date, {
-          start: startOfDay(r.start),
-          end: endOfDay(r.end),
-        }));
-      }
-      if (selectedRange) {
-        return isWithinInterval(d.parsedDate as Date, {
-          start: startOfDay(selectedRange.start),
-          end: endOfDay(selectedRange.end),
-        });
-      }
-      if (selectedMonth !== 'all') return format(d.parsedDate, 'yyyy-MM') === selectedMonth;
-      return true;
-    });
-  }, [parsedData, selectedMonth, selectedDay, selectedRange, selectedWeeks]);
-
-  // Data-based "now" - the date of the most recent workout
-  const dataBasedNow = useMemo(() => {
-    return getEffectiveNowFromWorkoutData(parsedData, new Date(0));
-  }, [parsedData]);
-
-  // Data age info - useful for warnings when using actual date mode with old data
-  const dataAgeInfo = useMemo(() => {
-    return getDataAgeInfo(dataBasedNow);
-  }, [dataBasedNow]);
-
-  // Effective "now" - respects user's date mode preference
-  // 'effective' mode: uses the latest workout date (default, better for relative time displays)
-  // 'actual' mode: uses the real current date
-  const effectiveNow = useMemo(() => {
-    return dateMode === 'actual' ? new Date() : dataBasedNow;
-  }, [dataBasedNow, dateMode]);
-
-  const filteredDataBasedNow = useMemo(() => {
-    return getEffectiveNowFromWorkoutData(filteredData, new Date(0));
-  }, [filteredData]);
-
+  // Data computations
   const filteredEffectiveNow = useMemo(() => {
-    return dateMode === 'actual' ? new Date() : filteredDataBasedNow;
-  }, [filteredDataBasedNow, dateMode]);
+    const dataBasedNow = getEffectiveNowFromWorkoutData(filteredData, new Date(0));
+    return dateMode === 'actual' ? new Date() : dataBasedNow;
+  }, [filteredData, dateMode]);
 
-  // Calendar boundaries and available dates (for blur/disable)
-  const { minDate, maxDate, availableDatesSet } = useMemo(() => {
-    let minTs = Number.POSITIVE_INFINITY;
-    let maxTs = 0;
-    const set = new Set<string>();
-    parsedData.forEach(d => {
-      if (!d.parsedDate) return;
-      const ts = d.parsedDate.getTime();
-      if (ts < minTs) minTs = ts;
-      if (ts > maxTs) maxTs = ts;
-      set.add(format(d.parsedDate, 'yyyy-MM-dd'));
-    });
-    const today = new Date();
-    const minDate = isFinite(minTs) ? startOfDay(new Date(minTs)) : null;
-    const maxInData = maxTs > 0 ? endOfDay(new Date(maxTs)) : null;
-    const maxDate = maxInData ?? (isPlausibleDate(effectiveNow) ? endOfDay(effectiveNow) : endOfDay(today));
-    return { minDate, maxDate, availableDatesSet: set };
-  }, [effectiveNow, parsedData]);
+  const dataAgeInfo = useMemo(() => {
+    const dataBasedNow = getEffectiveNowFromWorkoutData(parsedData, new Date(0));
+    return getDataAgeInfo(dataBasedNow);
+  }, [parsedData]);
 
-  // Cache key for filter-dependent computations
-  const filterCacheKey = useMemo(() => getFilteredCacheKey('filter', {
-    month: selectedMonth,
-    day: selectedDay,
-    range: selectedRange,
-    weeks: selectedWeeks,
-  }), [selectedMonth, selectedDay, selectedRange, selectedWeeks]);
-
-  // Use computation cache for expensive analytics - persists across tab switches
   const dailySummaries = useMemo(() => {
     const cacheKey = `dailySummaries:${filterCacheKey}`;
     return computationCache.getOrCompute(
       cacheKey,
       filteredData,
       () => getDailySummaries(filteredData),
-      { ttl: 10 * 60 * 1000 } // 10 minute TTL
+      { ttl: 10 * 60 * 1000 }
     );
   }, [filteredData, filterCacheKey]);
 
@@ -532,16 +235,7 @@ const App: React.FC = () => {
     );
   }, [filteredData, filterCacheKey]);
 
-  const hasActiveCalendarFilter = !!selectedDay || selectedWeeks.length > 0 || !!selectedRange;
-
-  const calendarSummaryText = useMemo(() => {
-    if (selectedDay) return formatHumanReadableDate(selectedDay, { now: effectiveNow });
-    if (selectedRange) return `${formatDayYearContraction(selectedRange.start)} – ${formatDayYearContraction(selectedRange.end)}`;
-    if (selectedWeeks.length === 1) return `${formatDayYearContraction(selectedWeeks[0].start)} – ${formatDayYearContraction(selectedWeeks[0].end)}`;
-    if (selectedWeeks.length > 1) return `Weeks: ${selectedWeeks.length}`;
-    return 'No filter';
-  }, [effectiveNow, selectedDay, selectedRange, selectedWeeks]);
-
+  // Filter controls UI
   const filterControls = (
     <div
       className={`relative flex items-center gap-2 rounded-lg px-3 py-2 h-10 shadow-sm transition-all duration-300 ${hasActiveCalendarFilter
@@ -580,11 +274,7 @@ const App: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => {
-              setSelectedRange(null);
-              setSelectedDay(null);
-              setSelectedWeeks([]);
-            }}
+            onClick={clearAllFilters}
             className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-black/50 hover:bg-white/5 border border-slate-700/50 text-slate-200 transition-colors"
             title="Clear filter"
             aria-label="Clear filter"
@@ -594,7 +284,7 @@ const App: React.FC = () => {
         </div>
       ) : (
         <button
-          onClick={() => setCalendarOpen(!calendarOpen)}
+          onClick={toggleCalendarOpen}
           className="inline-flex items-center gap-2 h-8 px-2 rounded-md bg-black/50 hover:bg-white/5 border border-slate-700/50 text-xs font-semibold text-slate-200 whitespace-nowrap transition-colors"
         >
           <Calendar className="w-4 h-4 text-slate-400" />
@@ -610,33 +300,26 @@ const App: React.FC = () => {
     </div>
   );
 
-  // Handler for heatmap click
-  const handleDayClick = (date: Date) => {
-    setTargetHistoryDate(date);
-    const params = new URLSearchParams();
-    params.set('date', format(date, 'yyyy-MM-dd'));
-    pendingUrlNavKindRef.current = 'deep';
-    navigate({ pathname: getPathForTab(Tab.HISTORY), search: `?${params.toString()}` });
-  };
+  // Handlers
+  const clearCacheAndRestart = useCallback(() => {
+    clearCacheAndRestartNow();
+  }, []);
 
-  const handleTargetDateConsumed = () => {
-    setTargetHistoryDate(null);
-  };
-
-  const handleHistoryDayTitleClick = (date: Date) => {
+  const handleHistoryDayTitleClick = useCallback((date: Date) => {
     setSelectedDay(date);
     setSelectedRange(null);
     setSelectedWeeks([]);
     setSelectedMonth('all');
-    pendingUrlNavKindRef.current = 'deep';
-    navigate(getPathForTab(Tab.MUSCLE_ANALYSIS));
-  };
+    // Navigate to muscle analysis
+    handleSelectTab(Tab.MUSCLE_ANALYSIS);
+  }, [setSelectedDay, setSelectedRange, setSelectedWeeks, setSelectedMonth, handleSelectTab]);
 
-  const handleOpenUpdateFlow = () => {
+  const handleOpenUpdateFlow = useCallback(() => {
     trackEvent('update_flow_open', { data_source: dataSource ?? 'unknown' });
-    setCsvImportError(null);
-    setHevyLoginError(null);
-    setLyfatLoginError(null);
+    clearCsvImportError();
+    clearHevyLoginError();
+    clearLyfatLoginError();
+    
     if (dataSource === 'strong') {
       setOnboarding({ intent: 'update', step: 'strong_prefs', platform: 'strong' });
       return;
@@ -666,274 +349,7 @@ const App: React.FC = () => {
       return;
     }
     setOnboarding({ intent: 'update', step: 'platform' });
-  };
-
-  const handleSelectTab = (tab: Tab) => {
-    setHighlightedExercise(null);
-    setInitialMuscleForAnalysis(null);
-    navigate(getPathForTab(tab));
-  };
-
-  const handleHevySyncSaved = () => {
-    const savedProKey = getHevyProApiKey();
-    if (savedProKey) {
-      setHevyLoginError(null);
-      setLoadingKind('hevy');
-      setIsAnalyzing(true);
-      setLoadingStep(0);
-      const startedAt = startProgress();
-
-      Promise.resolve()
-        .then(() => {
-          setLoadingStep(1);
-          return hevyBackendGetSetsWithProApiKey<WorkoutSet>(savedProKey);
-        })
-        .then((resp) => {
-          setLoadingStep(2);
-          const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
-          const enriched = identifyPersonalRecords(hydrated);
-          setParsedData(enriched);
-          saveLastLoginMethod('hevy', 'apiKey', getHevyUsernameOrEmail() ?? undefined);
-          setDataSource('hevy');
-          saveSetupComplete(true);
-          setOnboarding(null);
-        })
-        .catch((err) => {
-          clearHevyProApiKey();
-          setHevyLoginError(getHevyErrorMessage(err));
-        })
-        .finally(() => {
-          finishProgress(startedAt);
-        });
-      return;
-    }
-
-    const token = getHevyAuthToken();
-    if (!token) return;
-
-    setHevyLoginError(null);
-    setLoadingKind('hevy');
-    setIsAnalyzing(true);
-    setLoadingStep(0);
-    const startedAt = startProgress();
-
-    hevyBackendGetAccount(token)
-      .then(({ username }) => {
-        setLoadingStep(1);
-        return hevyBackendGetSets<WorkoutSet>(token, username);
-      })
-      .then((resp) => {
-        setLoadingStep(2);
-        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
-        const enriched = identifyPersonalRecords(hydrated);
-        setParsedData(enriched);
-        saveLastLoginMethod('hevy', 'credentials', getHevyUsernameOrEmail() ?? undefined);
-        setDataSource('hevy');
-        saveSetupComplete(true);
-        setOnboarding(null);
-      })
-      .catch((err) => {
-        clearHevyAuthToken();
-        setHevyLoginError(getHevyErrorMessage(err));
-      })
-      .finally(() => {
-        finishProgress(startedAt);
-      });
-  };
-
-  const handleHevyApiKeyLogin = (apiKey: string) => {
-    const trimmed = apiKey.trim();
-    if (!trimmed) {
-      setHevyLoginError('Missing API key.');
-      return;
-    }
-
-    trackEvent('hevy_sync_start', { method: 'pro_api_key' });
-
-    setHevyLoginError(null);
-    setLoadingKind('hevy');
-    setIsAnalyzing(true);
-    setLoadingStep(0);
-    const startedAt = startProgress();
-
-    Promise.resolve()
-      .then(() => hevyBackendValidateProApiKey(trimmed))
-      .then((valid) => {
-        if (!valid) throw new Error('Invalid API key. Please check your Hevy Pro API key and try again.');
-        saveHevyProApiKey(trimmed);
-        saveLastLoginMethod('hevy', 'apiKey', getHevyUsernameOrEmail() ?? undefined);
-        setLoadingStep(1);
-        return hevyBackendGetSetsWithProApiKey<WorkoutSet>(trimmed);
-      })
-      .then((resp) => {
-        setLoadingStep(2);
-        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
-        const enriched = identifyPersonalRecords(hydrated);
-        setParsedData(enriched);
-        setDataSource('hevy');
-        saveSetupComplete(true);
-        setOnboarding(null);
-      })
-      .catch((err) => {
-        trackEvent('hevy_sync_error', { method: 'pro_api_key' });
-        clearHevyProApiKey();
-        setHevyLoginError(getHevyErrorMessage(err));
-      })
-      .finally(() => {
-        finishProgress(startedAt);
-      });
-  };
-
-  const handleHevyLogin = (emailOrUsername: string, password: string) => {
-    trackEvent('hevy_sync_start', { method: 'credentials' });
-    setHevyLoginError(null);
-    setLoadingKind('hevy');
-    setIsAnalyzing(true);
-    setLoadingStep(0);
-    const startedAt = startProgress();
-
-    hevyBackendLogin(emailOrUsername, password)
-      .then((r) => {
-        if (!r.auth_token) throw new Error('Missing auth token');
-        saveHevyAuthToken(r.auth_token);
-        const trimmed = emailOrUsername.trim();
-        saveHevyUsernameOrEmail(trimmed);
-        saveLastLoginMethod('hevy', 'credentials', trimmed);
-        return Promise.all([
-          saveHevyPassword(password).catch(() => {
-          }),
-          hevyBackendGetAccount(r.auth_token),
-        ]).then(([, { username }]) => ({ token: r.auth_token, username }));
-      })
-      .then(({ token, username }) => {
-        setLoadingStep(1);
-        return hevyBackendGetSets<WorkoutSet>(token, username);
-      })
-      .then((resp) => {
-        setLoadingStep(2);
-        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
-        const enriched = identifyPersonalRecords(hydrated);
-        setParsedData(enriched);
-        setDataSource('hevy');
-        saveSetupComplete(true);
-        setOnboarding(null);
-      })
-      .catch((err) => {
-        trackEvent('hevy_sync_error', { method: 'credentials' });
-        setHevyLoginError(getHevyErrorMessage(err));
-      })
-      .finally(() => {
-        finishProgress(startedAt);
-      });
-  };
-
-  const handleLyfatSyncSaved = () => {
-    const apiKey = getLyfataApiKey();
-    if (!apiKey) return;
-
-    trackEvent('lyfta_sync_start', { method: 'saved_api_key' });
-
-    setLyfatLoginError(null);
-    setLoadingKind('lyfta');
-    setIsAnalyzing(true);
-    setLoadingStep(0);
-    const startedAt = startProgress();
-
-    lyfatBackendGetSets<WorkoutSet>(apiKey)
-      .then((resp) => {
-        setLoadingStep(2);
-        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
-        const enriched = identifyPersonalRecords(hydrated);
-        setParsedData(enriched);
-        setDataSource('lyfta');
-        saveSetupComplete(true);
-        setOnboarding(null);
-      })
-      .catch((err) => {
-        trackEvent('lyfta_sync_error', { method: 'saved_api_key' });
-        clearLyfataApiKey();
-        setLyfatLoginError(getLyfatErrorMessage(err));
-      })
-      .finally(() => {
-        finishProgress(startedAt);
-      });
-  };
-
-  const handleLyfatLogin = (apiKey: string) => {
-    trackEvent('lyfta_sync_start', { method: 'api_key' });
-    setLyfatLoginError(null);
-    setLoadingKind('lyfta');
-    setIsAnalyzing(true);
-    setLoadingStep(0);
-    const startedAt = startProgress();
-
-    lyfatBackendGetSets<WorkoutSet>(apiKey)
-      .then((resp) => {
-        setLoadingStep(2);
-        trackEvent('lyfta_sync_success', { method: 'api_key', workouts: resp.meta?.workouts });
-        saveLyfataApiKey(apiKey);
-        saveLastLoginMethod('lyfta', 'apiKey');
-        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
-        const enriched = identifyPersonalRecords(hydrated);
-        setParsedData(enriched);
-        setDataSource('lyfta');
-        saveSetupComplete(true);
-        setOnboarding(null);
-      })
-      .catch((err) => {
-        trackEvent('lyfta_sync_error', { method: 'api_key' });
-        setLyfatLoginError(getLyfatErrorMessage(err));
-      })
-      .finally(() => {
-        finishProgress(startedAt);
-      });
-  };
-
-  const processFile = (file: File, platform: DataSourceChoice, unitOverride?: WeightUnit) => {
-    trackEvent('csv_import_start', { platform, unit: unitOverride ?? weightUnit });
-    setLoadingKind('csv');
-    setIsAnalyzing(true);
-    setLoadingStep(0);
-    const startedAt = startProgress();
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result;
-      if (typeof text === 'string') {
-        setCsvImportError(null);
-        setLoadingStep(1);
-        const unit = unitOverride ?? weightUnit;
-        parseWorkoutCSVAsyncWithUnit(text, { unit })
-          .then((result: ParseWorkoutCsvResult) => {
-            setLoadingStep(2);
-            const enriched = identifyPersonalRecords(result.sets);
-            trackEvent('csv_import_success', {
-              platform,
-              unit,
-              sets: result.sets?.length,
-              enriched_sets: enriched?.length,
-            });
-            setParsedData(enriched);
-            saveCSVData(text);
-            saveLastCsvPlatform(platform);
-            saveLastLoginMethod(platform, 'csv', platform === 'hevy' ? (getHevyUsernameOrEmail() ?? undefined) : undefined);
-            setDataSource(platform);
-            saveSetupComplete(true);
-            setOnboarding(null);
-          })
-          .catch((err) => {
-            trackEvent('csv_import_error', { platform });
-            setCsvImportError(getErrorMessage(err));
-          })
-          .finally(() => {
-            setSelectedMonth('all');
-            setSelectedDay(null);
-            finishProgress(startedAt);
-          });
-      }
-    };
-    reader.readAsText(file);
-  };
+  }, [dataSource, clearCsvImportError, clearHevyLoginError, clearLyfatLoginError, setOnboarding]);
 
   return (
     <div
@@ -942,20 +358,15 @@ const App: React.FC = () => {
     >
       {onboarding?.intent === 'initial' ? null : (
         <>
-          {/* Top Header Navigation */}
           <AppHeader
             activeTab={activeTab}
             onSelectTab={handleSelectTab}
             onOpenUpdateFlow={handleOpenUpdateFlow}
             onOpenPreferences={() => setPreferencesModalOpen(true)}
             calendarOpen={calendarOpen}
-            onToggleCalendarOpen={() => setCalendarOpen((v) => !v)}
+            onToggleCalendarOpen={toggleCalendarOpen}
             hasActiveCalendarFilter={hasActiveCalendarFilter}
-            onClearCalendarFilter={() => {
-              setSelectedDay(null);
-              setSelectedRange(null);
-              setSelectedWeeks([]);
-            }}
+            onClearCalendarFilter={clearAllFilters}
           />
 
           {calendarOpen && (
@@ -965,7 +376,10 @@ const App: React.FC = () => {
               selectedDay={selectedDay}
               selectedRange={selectedRange}
               selectedWeeks={selectedWeeks}
-              effectiveNow={effectiveNow}
+              effectiveNow={useMemo(() => {
+                const dataBasedNow = getEffectiveNowFromWorkoutData(parsedData, new Date(0));
+                return dateMode === 'actual' ? new Date() : dataBasedNow;
+              }, [parsedData, dateMode])}
               minDate={minDate}
               maxDate={maxDate}
               availableDatesSet={availableDatesSet}
@@ -999,11 +413,7 @@ const App: React.FC = () => {
                 setSelectedWeeks([]);
                 setCalendarOpen(false);
               }}
-              onClear={() => {
-                setSelectedRange(null);
-                setSelectedDay(null);
-                setSelectedWeeks([]);
-              }}
+              onClear={clearAllFilters}
               onApply={({ range }) => {
                 if (range) {
                   setSelectedRange(range);
@@ -1024,7 +434,7 @@ const App: React.FC = () => {
             filteredData={filteredData}
             filtersSlot={desktopFilterControls}
             highlightedExercise={highlightedExercise}
-            onHighlightApplied={() => setHighlightedExercise(null)}
+            onHighlightApplied={clearHighlightedExercise}
             onDayClick={handleDayClick}
             onMuscleClick={handleMuscleClick}
             onExerciseClick={handleExerciseClick}
@@ -1033,10 +443,7 @@ const App: React.FC = () => {
             onTargetHistoryDateConsumed={handleTargetDateConsumed}
             initialMuscleForAnalysis={initialMuscleForAnalysis}
             initialWeeklySetsWindow={initialWeeklySetsWindow}
-            onInitialMuscleConsumed={() => {
-              setInitialMuscleForAnalysis(null);
-              setInitialWeeklySetsWindow(null);
-            }}
+            onInitialMuscleConsumed={clearInitialMuscleForAnalysis}
             bodyMapGender={bodyMapGender}
             weightUnit={weightUnit}
             exerciseTrendMode={exerciseTrendMode}
@@ -1045,7 +452,6 @@ const App: React.FC = () => {
         </>
       )}
 
-      {/* User Preferences Modal */}
       <UserPreferencesModal
         isOpen={preferencesModalOpen}
         onClose={() => setPreferencesModalOpen(false)}
@@ -1074,11 +480,11 @@ const App: React.FC = () => {
         hevyLoginError={hevyLoginError}
         lyfatLoginError={lyfatLoginError}
         onSetOnboarding={(next) => setOnboarding(next)}
-        onSetBodyMapGender={(g) => setBodyMapGender(g)}
-        onSetWeightUnit={(u) => setWeightUnit(u)}
-        onSetCsvImportError={(msg) => setCsvImportError(msg)}
-        onSetHevyLoginError={(msg) => setHevyLoginError(msg)}
-        onSetLyfatLoginError={(msg) => setLyfatLoginError(msg)}
+        onSetBodyMapGender={setBodyMapGender}
+        onSetWeightUnit={setWeightUnit}
+        onSetCsvImportError={clearCsvImportError}
+        onSetHevyLoginError={clearHevyLoginError}
+        onSetLyfatLoginError={clearLyfatLoginError}
         onClearCacheAndRestart={clearCacheAndRestart}
         onProcessFile={processFile}
         onHevyLogin={handleHevyLogin}
@@ -1088,7 +494,6 @@ const App: React.FC = () => {
         onLyfatSyncSaved={handleLyfatSyncSaved}
       />
 
-      {/* Loading Overlay */}
       <AppLoadingOverlay
         open={isAnalyzing}
         loadingKind={loadingKind}

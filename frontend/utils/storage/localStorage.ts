@@ -1,289 +1,131 @@
-import LZString from 'lz-string';
-const STORAGE_KEY = 'hevy_analytics_csv_data';
+import { createStorageManager, createCompressedStorageManager } from './createStorageManager';
 
-/**
- * Save CSV data to local storage
- */
-export const saveCSVData = (csvData: string): void => {
-  try {
-    const compressed = LZString.compressToUTF16(csvData);
-    localStorage.setItem(STORAGE_KEY, compressed);
-  } catch (error) {
-    console.error('Failed to save CSV data to local storage:', error);
-  }
-};
+// CSV Data Storage (compressed)
+const CSV_STORAGE_KEY = 'hevy_analytics_csv_data';
+const csvStorage = createCompressedStorageManager(CSV_STORAGE_KEY);
 
-/**
- * Retrieve CSV data from local storage
- */
-export const getCSVData = (): string | null => {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (data === null) return null;
-    const decompressed = LZString.decompressFromUTF16(data);
-    return decompressed !== null ? decompressed : data;
-  } catch (error) {
-    console.error('Failed to retrieve CSV data from local storage:', error);
-    return null;
-  }
-};
+export const saveCSVData = csvStorage.set;
+export const getCSVData = csvStorage.get;
+export const hasCSVData = csvStorage.has;
+export const clearCSVData = csvStorage.clear;
 
-/**
- * Check if CSV data exists in local storage
- */
-export const hasCSVData = (): boolean => {
-  return getCSVData() !== null;
-};
-
-/**
- * Clear CSV data from local storage
- */
-export const clearCSVData = (): void => {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    console.error('Failed to clear CSV data from local storage:', error);
-  }
-};
-
-export type TimeFilterMode = 'all' | 'weekly' | 'monthly' | 'yearly';
-
-/**
- * Determine a reasonable aggregation mode for the *All* range based on total span (in days).
- *
- * Note: This does not represent the UI range selection (which can include 'yearly'); it's a
- * bucketing hint for long spans so charts stay readable.
- */
-export const getSmartFilterMode = (spanDays: number): TimeFilterMode => {
-  if (spanDays < 35) return 'all';      // <5 weeks → show all
-  if (spanDays < 150) return 'weekly';  // 5 weeks to ~5 months → weekly
-  return 'monthly';                      // 5+ months → monthly
-};
-
+// Exercise Trend Mode
 export type ExerciseTrendMode = 'stable' | 'reactive';
 
-const EXERCISE_TREND_MODE_KEY = 'hevy_analytics_exercise_trend_mode';
-
-export const saveExerciseTrendMode = (mode: ExerciseTrendMode): void => {
-  try {
-    localStorage.setItem(EXERCISE_TREND_MODE_KEY, mode);
-  } catch (error) {
-    console.error('Failed to save exercise trend mode to local storage:', error);
-  }
-};
-
-export const getExerciseTrendMode = (): ExerciseTrendMode => {
-  try {
-    const mode = localStorage.getItem(EXERCISE_TREND_MODE_KEY);
+const trendModeStorage = createStorageManager<ExerciseTrendMode>({
+  key: 'hevy_analytics_exercise_trend_mode',
+  defaultValue: 'reactive',
+  migrator: (stored) => {
     // Migration:
     // - Old version stored 'default' for the stable algorithm.
     // - New version uses 'stable' and makes 'reactive' the default for new users.
-    if (mode === 'reactive') return 'reactive';
-    if (mode === 'stable') return 'stable';
-    if (mode === 'default') return 'stable';
-    return 'reactive';
-  } catch (error) {
-    console.error('Failed to retrieve exercise trend mode from local storage:', error);
-    return 'reactive';
-  }
-};
+    if (stored === 'reactive') return 'reactive';
+    if (stored === 'stable') return 'stable';
+    if (stored === 'default') return 'stable';
+    return null;
+  },
+});
 
-export const clearExerciseTrendMode = (): void => {
-  try {
-    localStorage.removeItem(EXERCISE_TREND_MODE_KEY);
-  } catch (error) {
-    console.error('Failed to clear exercise trend mode from local storage:', error);
-  }
-};
+export const saveExerciseTrendMode = trendModeStorage.set;
+export const getExerciseTrendMode = trendModeStorage.get;
+export const clearExerciseTrendMode = trendModeStorage.clear;
 
-// Weight Unit Preference Storage
+// Weight Unit Preference
 export type WeightUnit = 'kg' | 'lbs';
-const WEIGHT_UNIT_KEY = 'hevy_analytics_weight_unit';
 
-const BODY_MAP_GENDER_KEY = 'hevy_analytics_body_map_gender';
+const weightUnitStorage = createStorageManager<WeightUnit>({
+  key: 'hevy_analytics_weight_unit',
+  defaultValue: 'kg',
+  validator: (v) => (v === 'kg' || v === 'lbs') ? v : null,
+});
+
+export const saveWeightUnit = weightUnitStorage.set;
+export const getWeightUnit = weightUnitStorage.get;
+export const clearWeightUnit = weightUnitStorage.clear;
+
+// Body Map Gender
 export type StoredBodyMapGender = 'male' | 'female';
 
-const PREFERENCES_CONFIRMED_KEY = 'hevy_analytics_preferences_confirmed';
+const bodyMapGenderStorage = createStorageManager<StoredBodyMapGender>({
+  key: 'hevy_analytics_body_map_gender',
+  defaultValue: 'male',
+  validator: (v) => (v === 'male' || v === 'female') ? v : null,
+});
 
-/**
- * Save weight unit preference to local storage
- */
-export const saveWeightUnit = (unit: WeightUnit): void => {
-  try {
-    localStorage.setItem(WEIGHT_UNIT_KEY, unit);
-  } catch (error) {
-    console.error('Failed to save weight unit to local storage:', error);
-  }
-};
+export const saveBodyMapGender = bodyMapGenderStorage.set;
+export const getBodyMapGender = bodyMapGenderStorage.get;
+export const clearBodyMapGender = bodyMapGenderStorage.clear;
 
-/**
- * Retrieve weight unit preference from local storage
- */
-export const getWeightUnit = (): WeightUnit => {
-  try {
-    const unit = localStorage.getItem(WEIGHT_UNIT_KEY);
-    return (unit === 'kg' || unit === 'lbs') ? unit : 'kg';
-  } catch (error) {
-    console.error('Failed to retrieve weight unit from local storage:', error);
-    return 'kg';
-  }
-};
+// Preferences Confirmed
+const preferencesConfirmedStorage = createStorageManager<boolean>({
+  key: 'hevy_analytics_preferences_confirmed',
+  defaultValue: false,
+  serializer: (v) => v ? 'true' : 'false',
+  deserializer: (v) => v === 'true',
+  validator: (v) => v !== null ? v === 'true' : null,
+});
 
-export const clearWeightUnit = (): void => {
-  try {
-    localStorage.removeItem(WEIGHT_UNIT_KEY);
-  } catch (error) {
-    console.error('Failed to clear weight unit from local storage:', error);
-  }
-};
+export const savePreferencesConfirmed = preferencesConfirmedStorage.set;
+export const getPreferencesConfirmed = preferencesConfirmedStorage.get;
+export const clearPreferencesConfirmed = preferencesConfirmedStorage.clear;
 
-export const saveBodyMapGender = (gender: StoredBodyMapGender): void => {
-  try {
-    localStorage.setItem(BODY_MAP_GENDER_KEY, gender);
-  } catch (error) {
-    console.error('Failed to save body map gender to local storage:', error);
-  }
-};
-
-export const getBodyMapGender = (): StoredBodyMapGender => {
-  try {
-    const gender = localStorage.getItem(BODY_MAP_GENDER_KEY);
-    return (gender === 'male' || gender === 'female') ? gender : 'male';
-  } catch (error) {
-    console.error('Failed to retrieve body map gender from local storage:', error);
-    return 'male';
-  }
-};
-
-export const clearBodyMapGender = (): void => {
-  try {
-    localStorage.removeItem(BODY_MAP_GENDER_KEY);
-  } catch (error) {
-    console.error('Failed to clear body map gender from local storage:', error);
-  }
-};
-
-export const savePreferencesConfirmed = (confirmed: boolean): void => {
-  try {
-    localStorage.setItem(PREFERENCES_CONFIRMED_KEY, confirmed ? 'true' : 'false');
-  } catch (error) {
-    console.error('Failed to save preferences confirmed flag to local storage:', error);
-  }
-};
-
-export const getPreferencesConfirmed = (): boolean => {
-  try {
-    return localStorage.getItem(PREFERENCES_CONFIRMED_KEY) === 'true';
-  } catch (error) {
-    console.error('Failed to retrieve preferences confirmed flag from local storage:', error);
-    return false;
-  }
-};
-
-export const clearPreferencesConfirmed = (): void => {
-  try {
-    localStorage.removeItem(PREFERENCES_CONFIRMED_KEY);
-  } catch (error) {
-    console.error('Failed to clear preferences confirmed flag from local storage:', error);
-  }
-};
-
+// Theme Mode
 export type ThemeMode = 'light' | 'medium-dark' | 'midnight-dark' | 'pure-black';
 
-const THEME_MODE_KEY = 'hevy_analytics_theme_mode';
-
-export const saveThemeMode = (mode: ThemeMode): void => {
-  try {
-    localStorage.setItem(THEME_MODE_KEY, mode);
-  } catch (error) {
-    console.error('Failed to save theme mode to local storage:', error);
-  }
-};
-
-export const getThemeMode = (): ThemeMode => {
-  try {
-    const mode = localStorage.getItem(THEME_MODE_KEY);
+const themeModeStorage = createStorageManager<ThemeMode>({
+  key: 'hevy_analytics_theme_mode',
+  defaultValue: 'pure-black',
+  migrator: (stored) => {
     // Back-compat: legacy 'svg' (texture) theme is treated as 'pure-black'.
-    return mode === 'light' || mode === 'medium-dark' || mode === 'midnight-dark' || mode === 'pure-black'
-      ? mode
-      : 'pure-black';
-  } catch (error) {
-    console.error('Failed to retrieve theme mode from local storage:', error);
-    return 'pure-black';
-  }
-};
+    const validModes: ThemeMode[] = ['light', 'medium-dark', 'midnight-dark', 'pure-black'];
+    if (validModes.includes(stored as ThemeMode)) return stored as ThemeMode;
+    if (stored === 'svg') return 'pure-black';
+    return null;
+  },
+});
 
-export const clearThemeMode = (): void => {
-  try {
-    localStorage.removeItem(THEME_MODE_KEY);
-  } catch (error) {
-    console.error('Failed to clear theme mode from local storage:', error);
-  }
-};
+export const saveThemeMode = themeModeStorage.set;
+export const getThemeMode = themeModeStorage.get;
+export const clearThemeMode = themeModeStorage.clear;
 
+// Heatmap Theme
 export type HeatmapTheme = 'red' | 'brown' | 'blue';
 
-const HEATMAP_THEME_KEY = 'hevy_analytics_heatmap_theme';
-
-export const saveHeatmapTheme = (theme: HeatmapTheme): void => {
-  try {
-    localStorage.setItem(HEATMAP_THEME_KEY, theme);
-  } catch (error) {
-    console.error('Failed to save heatmap theme to local storage:', error);
-  }
-};
-
-export const getHeatmapTheme = (): HeatmapTheme => {
-  try {
-    const theme = localStorage.getItem(HEATMAP_THEME_KEY);
-
+const heatmapThemeStorage = createStorageManager<HeatmapTheme>({
+  key: 'hevy_analytics_heatmap_theme',
+  defaultValue: 'red',
+  migrator: (stored) => {
     // Backward compatibility: previously supported themes (cyan/violet/emerald) map to red.
-    // This keeps existing users on a valid palette without breaking localStorage.
-    if (theme === 'blue') return 'blue';
-    if (theme === 'brown') return 'brown';
-    return 'red';
-  } catch (error) {
-    console.error('Failed to retrieve heatmap theme from local storage:', error);
-    return 'red';
-  }
-};
+    if (stored === 'blue') return 'blue';
+    if (stored === 'brown') return 'brown';
+    return null;
+  },
+});
 
-export const clearHeatmapTheme = (): void => {
-  try {
-    localStorage.removeItem(HEATMAP_THEME_KEY);
-  } catch (error) {
-    console.error('Failed to clear heatmap theme from local storage:', error);
-  }
-};
+export const saveHeatmapTheme = heatmapThemeStorage.set;
+export const getHeatmapTheme = heatmapThemeStorage.get;
+export const clearHeatmapTheme = heatmapThemeStorage.clear;
 
-// Date Mode Preference Storage
+// Date Mode
 // 'effective' = use the latest workout date as "now" (default, better for relative time displays)
 // 'actual' = use the real current date as "now"
 export type DateMode = 'effective' | 'actual';
-const DATE_MODE_KEY = 'hevy_analytics_date_mode';
 
-export const saveDateMode = (mode: DateMode): void => {
-  try {
-    localStorage.setItem(DATE_MODE_KEY, mode);
-  } catch (error) {
-    console.error('Failed to save date mode to local storage:', error);
-  }
-};
+const dateModeStorage = createStorageManager<DateMode>({
+  key: 'hevy_analytics_date_mode',
+  defaultValue: 'effective',
+  validator: (v) => (v === 'effective' || v === 'actual') ? v : null,
+});
 
-export const getDateMode = (): DateMode => {
-  try {
-    const mode = localStorage.getItem(DATE_MODE_KEY);
-    return mode === 'effective' || mode === 'actual' ? mode : 'effective';
-  } catch (error) {
-    console.error('Failed to retrieve date mode from local storage:', error);
-    return 'effective';
-  }
-};
+export const saveDateMode = dateModeStorage.set;
+export const getDateMode = dateModeStorage.get;
+export const clearDateMode = dateModeStorage.clear;
 
-export const clearDateMode = (): void => {
-  try {
-    localStorage.removeItem(DATE_MODE_KEY);
-  } catch (error) {
-    console.error('Failed to clear date mode from local storage:', error);
-  }
+// Time Filter Mode - for UI aggregation hints
+export type TimeFilterMode = 'all' | 'weekly' | 'monthly' | 'yearly';
+
+export const getSmartFilterMode = (spanDays: number): TimeFilterMode => {
+  if (spanDays < 35) return 'all';
+  if (spanDays < 150) return 'weekly';
+  return 'monthly';
 };

@@ -1,12 +1,5 @@
+import { createStorageManager } from './createStorageManager';
 import type { DataSourceChoice } from '../dataSources/types';
-
-const DATA_SOURCE_KEY = 'hevy_analytics_data_source';
-const HEVY_AUTH_TOKEN_KEY = 'hevy_auth_token';
-const HEVY_PRO_API_KEY_KEY = 'hevy_pro_api_key';
-const LYFTA_API_KEY_KEY = 'lyfta_api_key';
-const LAST_CSV_PLATFORM_KEY = 'hevy_analytics_last_csv_platform';
-const LAST_LOGIN_METHOD_KEY = 'hevy_analytics_last_login_method_v1';
-const SETUP_COMPLETE_KEY = 'hevy_analytics_setup_complete';
 
 export type LoginMethod = 'csv' | 'credentials' | 'apiKey';
 
@@ -17,95 +10,66 @@ type LastLoginRecord = {
 
 type LastLoginMap = Partial<Record<DataSourceChoice, LastLoginRecord>>;
 
-export const saveDataSourceChoice = (choice: DataSourceChoice): void => {
-  try {
-    localStorage.setItem(DATA_SOURCE_KEY, choice);
-  } catch {
-  }
-};
+const validDataSources: DataSourceChoice[] = ['strong', 'hevy', 'lyfta', 'other'];
+const validLoginMethods: LoginMethod[] = ['csv', 'credentials', 'apiKey'];
 
-export const getDataSourceChoice = (): DataSourceChoice | null => {
-  try {
-    const v = localStorage.getItem(DATA_SOURCE_KEY);
-    return v === 'strong' || v === 'hevy' || v === 'lyfta' || v === 'other' ? v : null;
-  } catch {
-    return null;
-  }
-};
+// Data Source Choice
+const dataSourceStorage = createStorageManager<DataSourceChoice | null>({
+  key: 'hevy_analytics_data_source',
+  defaultValue: null,
+  validator: (v) => validDataSources.includes(v as DataSourceChoice) ? (v as DataSourceChoice) : null,
+});
 
-export const clearDataSourceChoice = (): void => {
-  try {
-    localStorage.removeItem(DATA_SOURCE_KEY);
-  } catch {
-  }
-};
+export const saveDataSourceChoice = (choice: DataSourceChoice): void => dataSourceStorage.set(choice);
+export const getDataSourceChoice = (): DataSourceChoice | null => dataSourceStorage.get();
+export const clearDataSourceChoice = (): void => dataSourceStorage.clear();
 
-export const saveHevyAuthToken = (token: string): void => {
-  try {
-    localStorage.setItem(HEVY_AUTH_TOKEN_KEY, token);
-  } catch {
-  }
-};
+// Hevy Auth Token
+const hevyAuthTokenStorage = createStorageManager<string | null>({
+  key: 'hevy_auth_token',
+  defaultValue: null,
+  validator: (v) => v,
+});
 
-export const getHevyAuthToken = (): string | null => {
-  try {
-    return localStorage.getItem(HEVY_AUTH_TOKEN_KEY);
-  } catch {
-    return null;
-  }
-};
+export const saveHevyAuthToken = (token: string): void => hevyAuthTokenStorage.set(token);
+export const getHevyAuthToken = (): string | null => hevyAuthTokenStorage.get();
+export const clearHevyAuthToken = (): void => hevyAuthTokenStorage.clear();
 
-export const clearHevyAuthToken = (): void => {
-  try {
-    localStorage.removeItem(HEVY_AUTH_TOKEN_KEY);
-  } catch {
-  }
-};
+// Hevy Pro API Key
+const hevyProApiKeyStorage = createStorageManager<string | null>({
+  key: 'hevy_pro_api_key',
+  defaultValue: null,
+  validator: (v) => v,
+});
 
-export const saveHevyProApiKey = (apiKey: string): void => {
-  try {
-    localStorage.setItem(HEVY_PRO_API_KEY_KEY, apiKey);
-  } catch {
-  }
-};
+export const saveHevyProApiKey = (apiKey: string): void => hevyProApiKeyStorage.set(apiKey);
+export const getHevyProApiKey = (): string | null => hevyProApiKeyStorage.get();
+export const clearHevyProApiKey = (): void => hevyProApiKeyStorage.clear();
 
-export const getHevyProApiKey = (): string | null => {
-  try {
-    return localStorage.getItem(HEVY_PRO_API_KEY_KEY);
-  } catch {
-    return null;
-  }
-};
+// Lyfta API Key
+const lyftaApiKeyStorage = createStorageManager<string | null>({
+  key: 'lyfta_api_key',
+  defaultValue: null,
+  validator: (v) => v,
+});
 
-export const clearHevyProApiKey = (): void => {
-  try {
-    localStorage.removeItem(HEVY_PRO_API_KEY_KEY);
-  } catch {
-  }
-};
+export const saveLyfataApiKey = (apiKey: string): void => lyftaApiKeyStorage.set(apiKey);
+export const getLyfataApiKey = (): string | null => lyftaApiKeyStorage.get();
+export const clearLyfataApiKey = (): void => lyftaApiKeyStorage.clear();
 
-export const saveLastCsvPlatform = (platform: DataSourceChoice): void => {
-  try {
-    localStorage.setItem(LAST_CSV_PLATFORM_KEY, platform);
-  } catch {
-  }
-};
+// Last CSV Platform
+const lastCsvPlatformStorage = createStorageManager<DataSourceChoice | null>({
+  key: 'hevy_analytics_last_csv_platform',
+  defaultValue: null,
+  validator: (v) => validDataSources.includes(v as DataSourceChoice) ? (v as DataSourceChoice) : null,
+});
 
-export const getLastCsvPlatform = (): DataSourceChoice | null => {
-  try {
-    const v = localStorage.getItem(LAST_CSV_PLATFORM_KEY);
-    return v === 'strong' || v === 'hevy' || v === 'lyfta' || v === 'other' ? v : null;
-  } catch {
-    return null;
-  }
-};
+export const saveLastCsvPlatform = (platform: DataSourceChoice): void => lastCsvPlatformStorage.set(platform);
+export const getLastCsvPlatform = (): DataSourceChoice | null => lastCsvPlatformStorage.get();
+export const clearLastCsvPlatform = (): void => lastCsvPlatformStorage.clear();
 
-export const clearLastCsvPlatform = (): void => {
-  try {
-    localStorage.removeItem(LAST_CSV_PLATFORM_KEY);
-  } catch {
-  }
-};
+// Last Login Method (complex JSON structure)
+const LAST_LOGIN_METHOD_KEY = 'hevy_analytics_last_login_method_v1';
 
 const readLastLoginMap = (): LastLoginMap => {
   try {
@@ -123,6 +87,7 @@ const writeLastLoginMap = (map: LastLoginMap): void => {
   try {
     localStorage.setItem(LAST_LOGIN_METHOD_KEY, JSON.stringify(map));
   } catch {
+    // Silent fail
   }
 };
 
@@ -143,58 +108,26 @@ export const getLastLoginMethod = (platform: DataSourceChoice, accountKey?: stri
   // If we have an accountKey, prefer an exact match when the stored record includes one.
   if (accountKey?.trim() && record.accountKey && record.accountKey !== accountKey.trim()) return null;
 
-  return record.method === 'csv' || record.method === 'credentials' || record.method === 'apiKey'
-    ? record.method
-    : null;
+  return validLoginMethods.includes(record.method) ? record.method : null;
 };
 
 export const clearLastLoginMethod = (): void => {
   try {
     localStorage.removeItem(LAST_LOGIN_METHOD_KEY);
   } catch {
+    // Silent fail
   }
 };
 
-export const saveSetupComplete = (value: boolean): void => {
-  try {
-    localStorage.setItem(SETUP_COMPLETE_KEY, value ? '1' : '0');
-  } catch {
-  }
-};
+// Setup Complete
+const setupCompleteStorage = createStorageManager<boolean>({
+  key: 'hevy_analytics_setup_complete',
+  defaultValue: false,
+  serializer: (v) => (v ? '1' : '0'),
+  deserializer: (v) => v === '1',
+  validator: (v) => (v !== null ? v === '1' : null),
+});
 
-export const getSetupComplete = (): boolean => {
-  try {
-    return localStorage.getItem(SETUP_COMPLETE_KEY) === '1';
-  } catch {
-    return false;
-  }
-};
-
-export const clearSetupComplete = (): void => {
-  try {
-    localStorage.removeItem(SETUP_COMPLETE_KEY);
-  } catch {
-  }
-};
-
-export const saveLyfataApiKey = (apiKey: string): void => {
-  try {
-    localStorage.setItem(LYFTA_API_KEY_KEY, apiKey);
-  } catch {
-  }
-};
-
-export const getLyfataApiKey = (): string | null => {
-  try {
-    return localStorage.getItem(LYFTA_API_KEY_KEY);
-  } catch {
-    return null;
-  }
-};
-
-export const clearLyfataApiKey = (): void => {
-  try {
-    localStorage.removeItem(LYFTA_API_KEY_KEY);
-  } catch {
-  }
-};
+export const saveSetupComplete = (value: boolean): void => setupCompleteStorage.set(value);
+export const getSetupComplete = (): boolean => setupCompleteStorage.get();
+export const clearSetupComplete = (): void => setupCompleteStorage.clear();
