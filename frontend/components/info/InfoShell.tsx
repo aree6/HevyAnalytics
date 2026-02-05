@@ -3,8 +3,8 @@ import { Navigation } from '../layout/Navigation';
 import { assetPath } from '../../constants';
 import { clientOnly } from 'vike-react/clientOnly';
 
-const LightRays = clientOnly(() => import('../landing/LightRays'));
-const PlatformDock = clientOnly(() => import('../landing/PlatformDock'));
+const LightRays = clientOnly(() => import('../landing/lightRays/LightRays'));
+const PlatformDock = clientOnly(() => import('../landing/ui/PlatformDock'));
 
 type InfoShellProps = {
   activeNav?: 'how-it-works' | 'features' | null;
@@ -17,7 +17,7 @@ export const InfoShell: React.FC<InfoShellProps> = ({ activeNav = null, title, s
   const platformDockItems = [
     {
       name: 'Hevy',
-      image: assetPath('/hevy_small.webp'),
+      image: assetPath('/images/brands/hevy_small.webp'),
       onClick: () => {
         window.location.assign(assetPath(`/?platform=hevy`));
       },
@@ -25,7 +25,7 @@ export const InfoShell: React.FC<InfoShellProps> = ({ activeNav = null, title, s
     },
     {
       name: 'Strong',
-      image: assetPath('/Strong_small.webp'),
+      image: assetPath('/images/brands/Strong_small.webp'),
       onClick: () => {
         window.location.assign(assetPath(`/?platform=strong`));
       },
@@ -33,7 +33,7 @@ export const InfoShell: React.FC<InfoShellProps> = ({ activeNav = null, title, s
     },
     {
       name: 'Lyfta',
-      image: assetPath('/lyfta_small.webp'),
+      image: assetPath('/images/brands/lyfta_small.webp'),
       onClick: () => {
         window.location.assign(assetPath(`/?platform=lyfta`));
       },

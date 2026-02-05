@@ -1,4 +1,4 @@
-import type { DataSourceChoice } from '../../utils/dataSources/types';
+import type { DataSourceChoice } from '../../utils/storage/dataSourceStorage';
 
 export type OnboardingIntent = 'initial' | 'update';
 

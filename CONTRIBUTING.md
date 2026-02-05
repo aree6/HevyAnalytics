@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to LiftShift! We welcome contributions from everyone. This document provides guidelines and instructions for contributing.
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
 - [Getting Started](#getting-started)
@@ -200,120 +200,11 @@ Use Cases:
 
 ## Coding Standards
 
-### TypeScript
-
-- Use strict mode - declare types explicitly
-- Use interfaces for object shapes
-- Avoid `any` type - use generics or union types instead
-- Keep functions small and focused
-
-```typescript
-// Good
-interface WorkoutData {
-  date: Date;
-  volume: number;
-}
-
-function calculateVolume(sets: Set[]): number {
-  return sets.reduce((total, set) => total + set.volume, 0);
-}
-
-// Avoid
-function calculateVolume(sets: any): any {
-  return sets.reduce((total: any, set: any) => total + set.volume, 0);
-}
-```
-
-### React Components
-
-- Use functional components with hooks
-- Keep components focused and reusable
-- Extract complex logic to utilities
-- Use meaningful prop names
-- Add JSDoc comments for complex components
-
-```typescript
-// Good
-interface CardProps {
-  title: string;
-  children: React.ReactNode;
-}
-
-/**
- * Reusable card component for consistent layout
- */
-export function Card({ title, children }: CardProps) {
-  return (
-    <div className="bg-slate-800 rounded-lg p-4">
-      <h3 className="font-bold text-lg">{title}</h3>
-      {children}
-    </div>
-  );
-}
-```
-
-### Styling
-
-- Use Tailwind CSS classes
-- Keep component styles consistent with existing design
-- Use spacing and color system from Tailwind
-- Avoid inline styles
-
-### Naming Conventions
-
-- **Files**: kebab-case for files (`csv-parser.ts`, `Dashboard.tsx`)
-- **Functions**: camelCase (`calculateVolume`, `parseCSV`)
-- **Classes**: PascalCase (`WorkoutParser`, `Analytics`)
-- **Constants**: UPPER_SNAKE_CASE (`DEFAULT_CSV_DATA`, `MAX_FILE_SIZE`)
-- **Types/Interfaces**: PascalCase (`WorkoutSet`, `ExerciseStats`)
+See `docs/CONTRIBUTING-DETAILS.md` for the full coding standards (TypeScript, React, styling, naming).
 
 ## Commit Messages
 
-### Format
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-### Type
-
-- `feat:` New feature
-- `fix:` Bug fix
-- `docs:` Documentation changes
-- `style:` Code style changes (formatting, etc.)
-- `refactor:` Code refactoring
-- `perf:` Performance improvements
-- `test:` Adding or updating tests
-- `chore:` Build, dependencies, tooling
-
-### Examples
-
-```
-feat(dashboard): add volume trend chart
-
-Implement a new chart component that visualizes total training volume
-over time. Users can now easily track their training intensity.
-
-Fixes #42
-```
-
-```
-fix(csv-parser): handle missing weight fields gracefully
-
-- Add validation for missing weight_kg column
-- Default to 0 for cardio exercises
-- Add unit test for edge case
-
-Fixes #38
-```
-
-```
-docs: update deployment instructions for Netlify + Render
-```
+See `docs/CONTRIBUTING-DETAILS.md` for commit message format, types, and examples.
 
 ## Questions?
 

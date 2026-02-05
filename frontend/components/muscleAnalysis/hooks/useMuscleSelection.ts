@@ -5,8 +5,8 @@ import {
   getHeadlessIdForDetailedSvgId,
   HEADLESS_MUSCLE_NAMES,
   type HeadlessMuscleId,
-} from '../../../utils/muscle/muscleMappingConstants';
-import { WeeklySetsWindow } from '../../../utils/muscle/dashboardWeeklySets';
+} from '../../../utils/muscle/mapping';
+import { WeeklySetsWindow } from '../../../utils/muscle/analytics';
 
 export type ViewMode = 'muscle' | 'group' | 'headless';
 

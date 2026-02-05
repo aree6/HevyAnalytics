@@ -2,7 +2,7 @@ export { Page };
 
 import React from 'react';
 import { InfoShell } from '../../components/info/InfoShell';
-import { HowItWorksDoc } from '../../components/howItWorks/HowItWorksDoc';
+import { HowItWorksDoc } from '../../components/howItWorks/ui/HowItWorksDoc';
 
 function Page() {
   return (

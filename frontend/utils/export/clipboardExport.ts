@@ -1,8 +1,8 @@
 import { WorkoutSet, DailySummary, ExerciseStats } from '../../types';
 import { subMonths, format, differenceInMonths, min } from 'date-fns';
-import { getDailySummaries, getExerciseStats, getIntensityEvolution, getTopExercisesOverTime, getPrsOverTime, HeatmapEntry } from '../analysis/analytics';
+import { getDailySummaries, getExerciseStats, getIntensityEvolution, getTopExercisesOverTime, getPrsOverTime, HeatmapEntry } from '../analysis/core';
 import { getEffectiveNowFromWorkoutData, getSessionKey, isPlausibleDate } from '../date/dateUtils';
-import { isWarmupSet } from '../analysis/setClassification';
+import { isWarmupSet } from '../analysis/classification';
 import { getWeightUnit, WeightUnit } from '../storage/localStorage';
 import { convertWeight } from '../format/units';
 

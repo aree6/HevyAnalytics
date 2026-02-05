@@ -1,6 +1,6 @@
 import React from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import { CsvLoadingAnimation } from '../modals/CsvLoadingAnimation';
+import { CsvLoadingAnimation } from '../modals/csvImport/CsvLoadingAnimation';
 
 type LoadingKind = 'hevy' | 'lyfta' | 'csv' | null;
 

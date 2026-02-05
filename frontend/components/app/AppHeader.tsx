@@ -1,7 +1,7 @@
 import React from 'react';
 import { Calendar, LayoutDashboard, Pencil, RefreshCw, Settings, X } from 'lucide-react';
 import { assetPath } from '../../constants';
-import { Tab } from '../../app/tabs';
+import { Tab } from '../../app/navigation';
 import { SupportLinks } from '../layout/SupportLinks';
 import { ThemeToggleButton } from '../theme/ThemeToggleButton';
 

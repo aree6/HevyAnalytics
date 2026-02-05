@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import type { Session } from '../historySessions';
+import type { Session } from '../utils/historySessions';
 
 const ITEMS_PER_PAGE = 3;
 

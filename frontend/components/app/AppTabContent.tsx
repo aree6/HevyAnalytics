@@ -2,14 +2,14 @@ import React, { Suspense } from 'react';
 import type { DailySummary, ExerciseStats, WorkoutSet } from '../../types';
 import type { BodyMapGender } from '../bodyMap/BodyMap';
 import type { ExerciseTrendMode, WeightUnit } from '../../utils/storage/localStorage';
-import { Tab } from '../../app/tabs';
+import { Tab } from '../../app/navigation';
 import { SupportLinks } from '../layout/SupportLinks';
 
-const Dashboard = React.lazy(() => import('../dashboard/Dashboard').then((m) => ({ default: m.Dashboard })));
-const ExerciseView = React.lazy(() => import('../exerciseView/ExerciseView').then((m) => ({ default: m.ExerciseView })));
-const HistoryView = React.lazy(() => import('../historyView/HistoryView').then((m) => ({ default: m.HistoryView })));
-const MuscleAnalysis = React.lazy(() => import('../muscleAnalysis/MuscleAnalysis').then((m) => ({ default: m.MuscleAnalysis })));
-const FlexView = React.lazy(() => import('../flexView/FlexView').then((m) => ({ default: m.FlexView })));
+const Dashboard = React.lazy(() => import('../dashboard/ui/Dashboard').then((m) => ({ default: m.Dashboard })));
+const ExerciseView = React.lazy(() => import('../exerciseView/ui/ExerciseView').then((m) => ({ default: m.ExerciseView })));
+const HistoryView = React.lazy(() => import('../historyView/ui/HistoryView').then((m) => ({ default: m.HistoryView })));
+const MuscleAnalysis = React.lazy(() => import('../muscleAnalysis/ui/MuscleAnalysis').then((m) => ({ default: m.MuscleAnalysis })));
+const FlexView = React.lazy(() => import('../flexView/ui/FlexView').then((m) => ({ default: m.FlexView })));
 
 type InitialMuscleForAnalysis = { muscleId: string; viewMode: 'muscle' | 'group' | 'headless' } | null;
 

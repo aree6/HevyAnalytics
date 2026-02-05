@@ -1,5 +1,7 @@
 import { createStorageManager } from './createStorageManager';
-import type { DataSourceChoice } from '../dataSources/types';
+
+// Type moved from dataSources/types.ts
+export type DataSourceChoice = 'strong' | 'hevy' | 'lyfta' | 'other';
 
 export type LoginMethod = 'csv' | 'credentials' | 'apiKey';
 

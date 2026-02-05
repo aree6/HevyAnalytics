@@ -1,0 +1,205 @@
+import type { ComparisonItem } from './comparisonTypes';
+
+export const COMPARISON_FILES: string[] = [
+  'Automatic__aussault_gun.svg',
+  'Chicken_whole_skinned.svg',
+  'Decorated-Elephant.svg',
+  'Donald-Trump.svg',
+  'Egyptian-pyramids.svg',
+  'Egyptian-sphinx.svg',
+  'F15jet.svg',
+  'Female-Bodybuilder-flexing-sillhuite.svg',
+  'Ford-Falcon.svg',
+  'Gorilla.svg',
+  'Muscular-Putin.svg',
+  'Statue-Of-Liberty.svg',
+  'Taj-Mahal-Illustration.svg',
+  'Titanic.svg',
+  'U.S.-American-Bomb.svg',
+  'electric_train.svg',
+  'fighter-Jet.svg',
+  'hercules-statue.svg',
+  'horse.svg',
+  'loaded-artillery-truck.svg',
+  'male -Posing-Bodybuilder.svg',
+  'male-Bodybuilder-flexing-sillhuite.svg',
+  'mustang.svg',
+  'napolean-on-horse-with-his-army-on-feet-climbing-mountain..svg',
+  'oil-tanker.svg',
+  'passenger_Plane.svg',
+  'refrigerator.svg',
+  'sad-alexander-the-great.svg',
+  'three-nerd-personas-scalar.svg',
+  'war-Tank.svg',
+  'whole_chicken_Egg.svg',
+  'yellow-banana.svg',
+  'yeti.svg',
+];
+
+export const COMPARISON_ITEMS: Record<string, ComparisonItem> = {
+  'Automatic__aussault_gun.svg': {
+    weight: 3.6,
+    label: 'Assault Rifles',
+    description: 'Make sure to not Assault your rotater cuff.',
+  },
+  'Chicken_whole_skinned.svg': {
+    weight: 1.8,
+    label: 'Chickens',
+    description: 'Meal prep meets big volume—don’t drop your protein.',
+  },
+  'Decorated-Elephant.svg': {
+    weight: 5400.0,
+    label: 'Elephants',
+    description: 'Gravity negotiator: one rep, instant legend status.',
+  },
+  'Donald-Trump.svg': {
+    weight: 102.0,
+    label: 'Loud Guys in Suits',
+    description: 'Tremendous lift. Really tremendous. Believe me.\nGreat guy, great compression tee , very strong, the best fit.',
+  },
+  'Egyptian-pyramids.svg': {
+    weight: 6000000.0,
+    label: 'Pyramids',
+    description: 'Civilization-level volume—ancient engineers approve.',
+  },
+  'Egyptian-sphinx.svg': {
+    weight: 2000000.0,
+    label: 'Sphinxes',
+    description: 'One rep unlocks Pharaoh mode, chalk becomes an offering.',
+  },
+  'F15jet.svg': {
+    weight: 12700.0,
+    label: 'F-15 Fighter Jets',
+    description: 'Not a lift, a launch—air superiority achieved.',
+  },
+  'Female-Bodybuilder-flexing-sillhuite.svg': {
+    weight: 72.0,
+    label: 'Pro Bodybuilders',
+    description: 'You lifted the aura and still got mogged.',
+  },
+  'Ford-Falcon.svg': {
+    weight: 1450.0,
+    label: 'Ford Falcons',
+    description: "Don't forget to re-rack it in the driveway.",
+  },
+  'Gorilla.svg': {
+    weight: 160.0,
+    label: 'Gorillas',
+    description: 'Silverback strength borrowed—avoid eye contact mid-rep.',
+  },
+  'Muscular-Putin.svg': {
+    weight: 98.0,
+    label: 'Bodybuilder Putins',
+    description: 'Heavy stare, heavier weight—soundtrack required.',
+  },
+  'Statue-Of-Liberty.svg': {
+    weight: 204000.0,
+    label: 'Statues of Liberty',
+    description: 'Torch up, core tight—liberty for your stabilizers.',
+  },
+  'Taj-Mahal-Illustration.svg': {
+    weight: 200000.0,
+    label: 'Taj Mahals',
+    description: 'Romance and rep range both go up.',
+  },
+  'Titanic.svg': {
+    weight: 52310000.0,
+    label: 'Titanics',
+    description: 'You lifted it… just keep it away from icebergs.',
+  },
+  'U.S.-American-Bomb.svg': {
+    weight: 4400.0,
+    label: 'Bunker Busters',
+    description: 'Explosive power without the war crimes.',
+  },
+  'electric_train.svg': {
+    weight: 147000.0,
+    label: 'Electric Trains',
+    description: 'You could commute on that.',
+  },
+  'fighter-Jet.svg': {
+    weight: 12700.0,
+    label: 'Fighter Jets',
+    description: 'Supersonic strength unlocked.',
+  },
+  'hercules-statue.svg': {
+    weight: 1100.0,
+    label: 'Hercules Statues',
+    description: 'Demigod flex in progress.',
+  },
+  'horse.svg': {
+    weight: 500.0,
+    label: 'Horses',
+    description: 'Neigh-sayers left in the dust.',
+  },
+  'loaded-artillery-truck.svg': {
+    weight: 15000.0,
+    label: 'Artillery Trucks',
+    description: 'Heavy metal with wheels.',
+  },
+  'male -Posing-Bodybuilder.svg': {
+    weight: 85.0,
+    label: 'Posing Bodybuilders',
+    description: 'You curled the ego too.',
+  },
+  'male-Bodybuilder-flexing-sillhuite.svg': {
+    weight: 85.0,
+    label: 'Bodybuilders',
+    description: 'Good lift. Now hit the rear double biceps.',
+  },
+  'mustang.svg': {
+    weight: 1650.0,
+    label: 'Mustangs',
+    description: 'Muscle car meets muscle fibers.',
+  },
+  'napolean-on-horse-with-his-army-on-feet-climbing-mountain..svg': {
+    weight: 950.0,
+    label: 'Napoleon on a Horse',
+    description: 'Tactics and traps both firing.',
+  },
+  'oil-tanker.svg': {
+    weight: 200000000.0,
+    label: 'Oil Tankers',
+    description: 'Enough weight to bend the planet.',
+  },
+  'passenger_Plane.svg': {
+    weight: 41000.0,
+    label: 'Passenger Planes',
+    description: 'Wings optional.',
+  },
+  'refrigerator.svg': {
+    weight: 100.0,
+    label: 'Refrigerators',
+    description: 'Open it for your post-workout shake.',
+  },
+  'sad-alexander-the-great.svg': {
+    weight: 80.0,
+    label: 'Sad Alexanders',
+    description: 'Conquered the set, still not happy.',
+  },
+  'three-nerd-personas-scalar.svg': {
+    weight: 210.0,
+    label: 'Three Nerd Personas',
+    description: 'Calculus approved.',
+  },
+  'war-Tank.svg': {
+    weight: 60000.0,
+    label: 'War Tanks',
+    description: 'Moving plates like armored plates.',
+  },
+  'whole_chicken_Egg.svg': {
+    weight: 0.08,
+    label: 'Eggs',
+    description: 'Soft-boiled strength.',
+  },
+  'yellow-banana.svg': {
+    weight: 0.12,
+    label: 'Bananas',
+    description: 'Potassium-powered gains.',
+  },
+  'yeti.svg': {
+    weight: 300.0,
+    label: 'Yetis',
+    description: 'Fuzzy. Heavy. Mythically strong.',
+  },
+};

@@ -1,6 +1,6 @@
 import React from 'react';
 import { startOfDay, endOfDay } from 'date-fns';
-import { CalendarSelector } from '../modals/CalendarSelector';
+import { CalendarSelector } from '../modals/calendar/CalendarSelector';
 
 type DateRange = { start: Date; end: Date };
 

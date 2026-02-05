@@ -9,11 +9,11 @@ import {
   getVolumeColor,
   lookupExerciseMuscleData,
   toHeadlessVolumeMap,
-} from '../../../utils/muscle/muscleMapping';
+} from '../../../utils/muscle/mapping';
 import { getExerciseAssets, ExerciseAsset } from '../../../utils/data/exerciseAssets';
 import { getEffectiveNowFromWorkoutData } from '../../../utils/date/dateUtils';
 import { subDays } from 'date-fns';
-import { WeeklySetsWindow } from '../../../utils/muscle/dashboardWeeklySets';
+import { WeeklySetsWindow } from '../../../utils/muscle/analytics';
 
 export interface UseMuscleVolumeDataProps {
   data: WorkoutSet[];

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { ExerciseStats } from '../../../types';
 import { analyzeExerciseTrendCore, ExerciseTrendStatus, MIN_SESSIONS_FOR_TREND, summarizeExerciseHistory } from '../../../utils/analysis/exerciseTrend';
 import type { ExerciseTrendMode } from '../../../utils/storage/localStorage';
-import { analyzeExerciseTrend, type StatusResult } from '../exerciseTrendUi';
+import { analyzeExerciseTrend, type StatusResult } from '../trend/exerciseTrendUi';
 
 export type ExerciseListSortMode = 'recent' | 'trend';
 
