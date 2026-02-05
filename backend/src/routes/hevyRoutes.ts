@@ -58,10 +58,15 @@ export const createHevyRouter = (opts: {
   });
 
   router.get('/workouts', async (req, res) => {
+    const username = String(req.query.username ?? '').trim();
+    const offset = Number(req.query.offset ?? 0);
+
+    if (!username) return res.status(400).json({ error: 'Missing username' });
+    if (!Number.isFinite(offset) || offset < 0) return res.status(400).json({ error: 'Invalid offset' });
+
     try {
       const token = requireAuthTokenHeader(req);
-      const page = Number(req.query?.page ?? 1) || 1;
-      const data = await hevyGetWorkoutsPaged(token, page);
+      const data = await hevyGetWorkoutsPaged(token, { username, offset });
       res.json(data);
     } catch (err) {
       const status = (err as any).statusCode ?? 500;
@@ -70,13 +75,36 @@ export const createHevyRouter = (opts: {
   });
 
   router.get('/sets', async (req, res) => {
+    const username = String(req.query.username ?? '').trim();
+    const maxPages = req.query.maxPages != null ? Number(req.query.maxPages) : undefined;
+
+    if (!username) return res.status(400).json({ error: 'Missing username' });
+    if (maxPages != null && (!Number.isFinite(maxPages) || maxPages <= 0)) {
+      return res.status(400).json({ error: 'Invalid maxPages' });
+    }
+
     try {
       const token = requireAuthTokenHeader(req);
-      const cacheKey = `hevySets:${token}`;
+      const cacheKey = `hevySets:${token}:${username}:${maxPages ?? 'all'}`;
       const { workouts, sets } = await getCachedResponse(cacheKey, async () => {
-        const workouts = await hevyGetWorkoutsPaged(token, 1, true);
-        const sets = mapHevyWorkoutsToWorkoutSets(workouts);
-        return { workouts, sets };
+        const allWorkouts = [] as any[];
+        let offset = 0;
+        let page = 0;
+
+        while (true) {
+          if (maxPages != null && page >= maxPages) break;
+
+          const data = await hevyGetWorkoutsPaged(token, { username, offset });
+          const workouts = data.workouts ?? [];
+          if (workouts.length === 0) break;
+
+          allWorkouts.push(...workouts);
+          offset += 5;
+          page += 1;
+        }
+
+        const sets = mapHevyWorkoutsToWorkoutSets(allWorkouts);
+        return { workouts: allWorkouts, sets };
       });
       res.json({ sets, meta: { workouts: workouts.length } });
     } catch (err) {
