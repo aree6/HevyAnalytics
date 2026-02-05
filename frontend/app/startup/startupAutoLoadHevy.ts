@@ -30,6 +30,13 @@ export const loadHevyFromProKey = (deps: StartupAutoLoadParams, apiKey: string):
     .then((resp) => {
       deps.setLoadingStep(2);
       const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
+      if (hydrated.length === 0 || hydrated.every((s) => !s.parsedDate)) {
+        clearHevyProApiKey();
+        saveSetupComplete(false);
+        deps.setHevyLoginError('Hevy data could not be parsed. Please try syncing again.');
+        deps.setOnboarding({ intent: 'initial', step: 'platform' });
+        return;
+      }
       const enriched = identifyPersonalRecords(hydrated);
       deps.setParsedData(enriched);
       deps.setHevyLoginError(null);
@@ -68,6 +75,13 @@ export const loadHevyFromToken = (
         trackEvent('hevy_sync_success', { method: trackConfig.successMethod, workouts: resp.meta?.workouts });
       }
       const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
+      if (hydrated.length === 0 || hydrated.every((s) => !s.parsedDate)) {
+        clearHevyAuthToken();
+        saveSetupComplete(false);
+        deps.setHevyLoginError('Hevy data could not be parsed. Please try syncing again.');
+        deps.setOnboarding({ intent: 'initial', step: 'platform' });
+        return;
+      }
       const enriched = identifyPersonalRecords(hydrated);
       deps.setParsedData(enriched);
       deps.setHevyLoginError(null);

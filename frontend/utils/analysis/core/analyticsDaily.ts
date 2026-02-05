@@ -25,7 +25,25 @@ const parseSessionDuration = (startDate: Date | undefined, endTimeStr: string): 
   }
 };
 
+// Estimate workout duration when not provided (e.g., Strong app exports)
+// Assumes ~2.5 minutes per set including rest periods
+const ESTIMATED_MINUTES_PER_SET = 2.5;
+
+const estimateSessionDuration = (setCount: number): number => {
+  return Math.round(setCount * ESTIMATED_MINUTES_PER_SET);
+};
+
 export const getDailySummaries = (data: WorkoutSet[]): DailySummary[] => {
+  // First pass: count sets per session for duration estimation
+  const setsPerSession = new Map<string, number>();
+  for (const set of data) {
+    if (!set.parsedDate || isWarmupSet(set)) continue;
+    const sessionKey = getSessionKey(set);
+    if (sessionKey) {
+      setsPerSession.set(sessionKey, (setsPerSession.get(sessionKey) || 0) + 1);
+    }
+  }
+
   const metaByDate = new Map<string, {
     timestamp: number;
     workoutTitle: string;
@@ -58,7 +76,14 @@ export const getDailySummaries = (data: WorkoutSet[]): DailySummary[] => {
     const sessionKey = getSessionKey(set);
     if (sessionKey && !meta.sessions.has(sessionKey)) {
       meta.sessions.add(sessionKey);
-      meta.durationMinutes += parseSessionDuration(set.parsedDate, set.end_time);
+      const actualDuration = parseSessionDuration(set.parsedDate, set.end_time);
+      if (actualDuration > 0) {
+        meta.durationMinutes += actualDuration;
+      } else {
+        // Estimate duration based on set count (for apps like Strong that don't provide end time)
+        const sessionSetCount = setsPerSession.get(sessionKey) || 0;
+        meta.durationMinutes += estimateSessionDuration(sessionSetCount);
+      }
     }
 
     if (isWarmupSet(set)) continue;

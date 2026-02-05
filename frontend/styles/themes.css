@@ -17,7 +17,7 @@
   --mw-calendar-end-rgb: 253 164 175;
 
   --bodymap-empty-rgb: 255 255 255;
-  --bodymap-empty-alpha: 0.12;
+  --bodymap-empty-alpha: 0.25;
 
   --panel-rgb: 0 0 0;
   --border-rgb: 71 85 105;
@@ -127,8 +127,8 @@ html[data-theme='light'] {
   --mw-calendar-start-rgb: 4 120 87;
   --mw-calendar-end-rgb: 190 18 60;
 
-  --bodymap-empty-rgb: 255 255 255;
-  --bodymap-empty-alpha: 0;
+  --bodymap-empty-rgb: 0 0 0;
+  --bodymap-empty-alpha: 0.15;
 
   --panel-rgb: 255 255 255;
   --border-rgb: 203 213 225;

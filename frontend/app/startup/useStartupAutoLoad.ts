@@ -50,14 +50,14 @@ export const useStartupAutoLoad = (params: StartupAutoLoadParams): void => {
       params.setOnboarding({ intent: 'initial', step: 'platform' });
     };
 
-    if (storedChoice === 'strong') {
-      if (!storedCSV || lastCsvPlatform !== 'strong') {
+    if (storedChoice === 'strong' || storedChoice === 'other') {
+      if (!storedCSV || lastCsvPlatform !== storedChoice) {
         resetToPlatform();
         return;
       }
 
       loadCsvAuto(params, {
-        platform: 'strong',
+        platform: storedChoice,
         storedCSV,
         weightUnit,
         clearLoginErrors: () => params.setHevyLoginError(null),

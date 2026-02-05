@@ -49,6 +49,7 @@ export const mapLyfataWorkoutsToWorkoutSets = (
   const durationMap = new Map<number, number>();
   for (const summary of summaries) {
     const workoutId = parseInt(summary.id, 10);
+    if (isNaN(workoutId)) continue;
     const duration = parseDurationToMinutes(summary.workout_duration);
     durationMap.set(workoutId, duration);
   }
@@ -59,9 +60,14 @@ export const mapLyfataWorkoutsToWorkoutSets = (
     
     // Calculate end_time based on duration from summary data
     const durationMinutes = durationMap.get(w.id) ?? 0;
-    const end_time = durationMinutes > 0 
-      ? format(new Date(new Date(w.workout_perform_date).getTime() + durationMinutes * 60 * 1000), DATE_FORMAT_LYFTA)
-      : start_time; // Fallback to start_time if no duration available
+    let end_time = start_time;
+    
+    if (durationMinutes > 0 && w.workout_perform_date) {
+      const startDate = new Date(w.workout_perform_date);
+      if (!isNaN(startDate.getTime())) {
+        end_time = format(new Date(startDate.getTime() + durationMinutes * 60 * 1000), DATE_FORMAT_LYFTA);
+      }
+    }
     
     const description = '';
 

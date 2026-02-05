@@ -15,8 +15,12 @@ export const analyzeProgression = (
   const exerciseName = workingSets[0]?.exercise_title || 'unknown';
   const seedBase = `progression|${exerciseName}|${workingSets.length}`;
 
-  const reps = workingSets.map(s => s.reps);
-  const weights = workingSets.map(s => s.weight_kg);
+  const reps = workingSets.map(s => s.reps).filter(r => Number.isFinite(r));
+  const weights = workingSets.map(s => s.weight_kg).filter(w => Number.isFinite(w));
+  
+  // Guard against empty arrays after filtering
+  if (reps.length === 0 || weights.length === 0) return null;
+  
   const minReps = Math.min(...reps);
   const maxReps = Math.max(...reps);
   const avgReps = Math.round(reps.reduce((a, b) => a + b, 0) / reps.length);

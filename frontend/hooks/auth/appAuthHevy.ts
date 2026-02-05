@@ -39,8 +39,21 @@ export const runHevySyncSaved = (deps: AppAuthHandlersDeps): void => {
       })
       .then((resp) => {
         deps.setLoadingStep(2);
-        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
+        const sets = resp.sets ?? [];
+        
+        // Debug logging for empty dashboard issue
+        if (sets.length === 0) {
+          console.warn('[runHevySyncSaved Pro API] No sets received from backend');
+        }
+        
+        const hydrated = hydrateBackendWorkoutSets(sets);
         const enriched = identifyPersonalRecords(hydrated);
+        
+        // Debug logging for empty dashboard issue
+        if (enriched.length > 0 && enriched.every(s => !s.parsedDate)) {
+          console.warn('[runHevySyncSaved Pro API] All hydrated sets have invalid parsedDate');
+        }
+        
         deps.setParsedData(enriched);
         saveLastLoginMethod('hevy', 'apiKey', getHevyUsernameOrEmail() ?? undefined);
         deps.setDataSource('hevy');
@@ -73,8 +86,21 @@ export const runHevySyncSaved = (deps: AppAuthHandlersDeps): void => {
     })
     .then((resp) => {
       deps.setLoadingStep(2);
-      const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
+      const sets = resp.sets ?? [];
+      
+      // Debug logging for empty dashboard issue
+      if (sets.length === 0) {
+        console.warn('[runHevySyncSaved] No sets received from backend');
+      }
+      
+      const hydrated = hydrateBackendWorkoutSets(sets);
       const enriched = identifyPersonalRecords(hydrated);
+      
+      // Debug logging for empty dashboard issue
+      if (enriched.length > 0 && enriched.every(s => !s.parsedDate)) {
+        console.warn('[runHevySyncSaved] All hydrated sets have invalid parsedDate');
+      }
+      
       deps.setParsedData(enriched);
       saveLastLoginMethod('hevy', 'credentials', getHevyUsernameOrEmail() ?? undefined);
       deps.setDataSource('hevy');
@@ -116,8 +142,21 @@ export const runHevyApiKeyLogin = (deps: AppAuthHandlersDeps, apiKey: string): v
     })
     .then((resp) => {
       deps.setLoadingStep(2);
-      const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
+      const sets = resp.sets ?? [];
+      
+      // Debug logging for empty dashboard issue
+      if (sets.length === 0) {
+        console.warn('[runHevyApiKeyLogin] No sets received from backend');
+      }
+      
+      const hydrated = hydrateBackendWorkoutSets(sets);
       const enriched = identifyPersonalRecords(hydrated);
+      
+      // Debug logging for empty dashboard issue
+      if (enriched.length > 0 && enriched.every(s => !s.parsedDate)) {
+        console.warn('[runHevyApiKeyLogin] All hydrated sets have invalid parsedDate');
+      }
+      
       deps.setParsedData(enriched);
       deps.setDataSource('hevy');
       saveSetupComplete(true);
@@ -159,8 +198,21 @@ export const runHevyLogin = (deps: AppAuthHandlersDeps, emailOrUsername: string,
     })
     .then((resp) => {
       deps.setLoadingStep(2);
-      const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
+      const sets = resp.sets ?? [];
+      
+      // Debug logging for empty dashboard issue
+      if (sets.length === 0) {
+        console.warn('[runHevyLogin] No sets received from backend');
+      }
+      
+      const hydrated = hydrateBackendWorkoutSets(sets);
       const enriched = identifyPersonalRecords(hydrated);
+      
+      // Debug logging for empty dashboard issue
+      if (enriched.length > 0 && enriched.every(s => !s.parsedDate)) {
+        console.warn('[runHevyLogin] All hydrated sets have invalid parsedDate');
+      }
+      
       deps.setParsedData(enriched);
       deps.setDataSource('hevy');
       saveSetupComplete(true);

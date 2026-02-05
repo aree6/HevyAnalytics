@@ -17,14 +17,20 @@ export const loadLyftaFromApiKey = (deps: StartupAutoLoadParams, apiKey: string)
       deps.setLoadingStep(1);
       return lyfatBackendGetSets<WorkoutSet>(apiKey);
     })
-    .then((resp) => {
-      deps.setLoadingStep(2);
-      const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
-      const enriched = identifyPersonalRecords(hydrated);
-      deps.setParsedData(enriched);
-      deps.setLyfatLoginError(null);
-      deps.setCsvImportError(null);
-    })
+      .then((resp) => {
+        deps.setLoadingStep(2);
+        const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
+        if (hydrated.length === 0 || hydrated.every((s) => !s.parsedDate)) {
+          saveSetupComplete(false);
+          deps.setLyfatLoginError('Lyfta data could not be parsed. Please try syncing again.');
+          deps.setOnboarding({ intent: 'initial', step: 'platform' });
+          return;
+        }
+        const enriched = identifyPersonalRecords(hydrated);
+        deps.setParsedData(enriched);
+        deps.setLyfatLoginError(null);
+        deps.setCsvImportError(null);
+      })
     .catch((err) => {
       clearLyfataApiKey();
       saveSetupComplete(false);

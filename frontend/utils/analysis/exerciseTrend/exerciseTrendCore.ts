@@ -126,8 +126,21 @@ export const analyzeExerciseTrendCore = (
   }
 
   const repsMetric = isBodyweightLike
-    ? recent.map((h) => h.maxReps)
-    : recent.map((h) => h.reps || (h.weight > 0 ? h.volume / h.weight : 0));
+    ? recent.map((h) => h.maxReps).filter(r => Number.isFinite(r))
+    : recent.map((h) => h.reps || (h.weight > 0 ? h.volume / h.weight : 0)).filter(r => Number.isFinite(r));
+  
+  // Guard against empty arrays
+  if (repsMetric.length === 0) {
+    return {
+      status: 'new',
+      isBodyweightLike,
+      confidence: 'low',
+      evidence: keepDynamicEvidence(clampEvidence([
+        'No valid rep data available for analysis.',
+      ])),
+    };
+  }
+  
   const maxRepsMetric = Math.max(...repsMetric);
   const minRepsMetric = Math.min(...repsMetric);
 

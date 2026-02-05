@@ -27,12 +27,34 @@ export const useFlexStats = ({
   effectiveNow,
 }: UseFlexStatsArgs): FlexStats =>
   useMemo(() => {
+    if (data.length === 0) {
+      return {
+        totalVolume: 0,
+        totalVolumeKg: 0,
+        totalSets: 0,
+        totalReps: 0,
+        totalDuration: 0,
+        totalWorkouts: 0,
+        topExercises: [],
+        monthlyData: Array.from({ length: 12 }, (_, idx) => ({ month: idx, workouts: 0 })),
+        muscleData: [],
+      };
+    }
     let totalVolumeKg = 0;
     let totalReps = 0;
     let totalDuration = 0;
     const sessions = new Set<string>();
     const exerciseCounts = new Map<string, number>();
     const muscleGroups = new Map<NormalizedMuscleGroup, number>();
+    const assetCache = new Map<string, ReturnType<ExerciseAssetLookup['getAsset']>>();
+
+    const getAssetForExercise = (name: string): ReturnType<ExerciseAssetLookup['getAsset']> | undefined => {
+      if (!name) return undefined;
+      if (assetCache.has(name)) return assetCache.get(name);
+      const asset = assetLookup.getAsset(name);
+      assetCache.set(name, asset);
+      return asset;
+    };
 
     for (const set of data) {
       if (isWarmupSet(set)) continue;
@@ -48,7 +70,7 @@ export const useFlexStats = ({
       }
 
       if (set.parsedDate) {
-        const asset = assetLookup.getAsset(exerciseName);
+        const asset = getAssetForExercise(exerciseName);
         if (asset) {
           const primaryMuscle = normalizeMuscleGroup(asset.primary_muscle);
           if (primaryMuscle !== 'Cardio') {
@@ -81,7 +103,7 @@ export const useFlexStats = ({
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([name, count]) => {
-        const asset = assetLookup.getAsset(name);
+        const asset = getAssetForExercise(name);
         return {
           name,
           count,

@@ -97,14 +97,15 @@ export const YearlyHeatmapCard: React.FC<{
 
   const monthsCount = months.length;
   const isUltraDense = monthsCount >= 10;
-  const monthColsForDensity = isUltraDense ? 4 : 3;
+  const isCompact = monthsCount >= 7;
+  const monthColsForDensity = isCompact ? 4 : 3;
   const monthRows = Math.max(1, Math.ceil(monthsCount / monthColsForDensity));
-  const isDense = monthRows >= 4;
-  const isVeryDense = monthRows >= 5;
+  const isDense = monthRows >= 3;
+  const isVeryDense = monthRows >= 4;
 
-  const monthGridColsClass = isUltraDense ? 'grid-cols-4 md:grid-cols-6 lg:grid-cols-4' : 'grid-cols-3';
+  const monthGridColsClass = isCompact ? 'grid-cols-4 md:grid-cols-5 lg:grid-cols-4' : 'grid-cols-3';
   const monthGridGapX = isUltraDense ? 'gap-x-2' : isVeryDense ? 'gap-x-2' : isDense ? 'gap-x-3' : 'gap-x-6';
-  const monthGridGapY = isUltraDense ? 'gap-y-3' : isVeryDense ? 'gap-y-2' : isDense ? 'gap-y-3' : 'gap-y-6';
+  const monthGridGapY = isUltraDense ? 'gap-y-2' : isVeryDense ? 'gap-y-2' : isDense ? 'gap-y-3' : 'gap-y-6';
   const monthLabelClass = isUltraDense
     ? 'text-[10px] mb-0.5'
     : isVeryDense
@@ -115,7 +116,13 @@ export const YearlyHeatmapCard: React.FC<{
   const cellGapClass = isUltraDense ? 'gap-0.5' : isVeryDense ? 'gap-0.5' : isDense ? 'gap-0.5' : 'gap-1';
   const headerGapClass = isDense ? 'mb-4' : 'mb-6';
   const contentPadClass = isDense ? 'pt-5 pb-12' : 'pt-6 pb-14';
-  const monthGridMaxWClass = isUltraDense ? 'max-w-[80px] lg:max-w-[120px]' : isVeryDense ? 'max-w-[84px]' : isDense ? 'max-w-[96px]' : 'max-w-[120px]';
+  const monthGridMaxWClass = isUltraDense
+    ? 'max-w-[80px] lg:max-w-[120px]'
+    : isVeryDense
+      ? 'max-w-[84px]'
+      : isDense
+        ? 'max-w-[96px]'
+        : 'max-w-[120px]';
   const headlineCountClass = isUltraDense
     ? 'text-4xl sm:text-5xl'
     : isVeryDense

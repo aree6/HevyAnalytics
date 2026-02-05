@@ -25,6 +25,14 @@ export const loadCsvAuto = (deps: StartupAutoLoadParams, options: CsvLoadOptions
     parseWorkoutCSVAsyncWithUnit(options.storedCSV, { unit: options.weightUnit })
       .then((result: ParseWorkoutCsvResult) => {
         deps.setLoadingStep(2);
+        if (result.sets.length === 0 || result.sets.every((s) => !s.parsedDate)) {
+          clearCSVData();
+          saveSetupComplete(false);
+          deps.setCsvImportError('No workouts found in your CSV.');
+          deps.setOnboarding({ intent: 'initial', step: 'platform' });
+          return;
+        }
+
         const enriched = identifyPersonalRecords(result.sets);
         deps.setParsedData(enriched);
         options.clearLoginErrors();
