@@ -1,6 +1,6 @@
 import React from 'react';
-import { AlertTriangle, Info, TrendingDown, TrendingUp, Trophy } from 'lucide-react';
-import type { AnalysisResult, WorkoutSet } from '../../../types';
+import { AlertTriangle, Award, BarChart3, Info, TrendingDown, TrendingUp, Trophy } from 'lucide-react';
+import type { AnalysisResult, WorkoutSet, PrType } from '../../../types';
 import { getSetTypeConfig } from '../../../utils/analysis/classification';
 import { convertWeight } from '../../../utils/format/units';
 import { formatSignedNumber } from '../../../utils/format/formatters';
@@ -106,26 +106,35 @@ export const HistorySetRow: React.FC<HistorySetRowProps> = ({
         <div className="flex items-center gap-1 sm:gap-2 flex-none pl-2">
           {(set.isPr || (volPrEvent && setIndex === volPrAnchorIndex)) && (
             <span className="flex items-center gap-1 px-1 py-0.5 bg-amber-200/70 text-yellow-300 dark:bg-yellow-500/10 dark:text-yellow-400 rounded text-[7px] sm:text-[9px] font-bold uppercase tracking-wider border border-amber-300/80 dark:border-yellow-500/20 animate-pulse whitespace-nowrap leading-none">
-              <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-none" />
+              {/* Show badge for each PR type */}
+              {set.prTypes?.map((prType: PrType, idx: number) => {
+                const isLast = idx === (set.prTypes?.length || 0) - 1;
+                const Icon = prType === 'weight' ? Trophy : prType === 'oneRm' ? Award : BarChart3;
+                const label = prType === 'weight' ? 'PR' : prType === 'oneRm' ? '1RM PR' : 'Vol PR';
 
-              {set.isPr && (
-                <span className="inline-flex items-center leading-none">
-                  <span>PR</span>
-                  {prDelta > 0 && (
-                    <span className="ml-0.5 text-[5px] sm:text-[8px] font-extrabold text-yellow-500 leading-none">
-                      {formatSignedNumber(convertWeight(prDelta, weightUnit), { maxDecimals: 2 })}{weightUnit}
-                    </span>
-                  )}
-                </span>
-              )}
+                return (
+                  <span key={prType} className="inline-flex items-center leading-none">
+                    {idx > 0 && <span className="hidden sm:inline text-slate-600 dark:text-slate-300 mx-0.5">·</span>}
+                    <Icon className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-none mr-0.5" />
+                    <span>{label}</span>
+                    {prType === 'weight' && prDelta > 0 && (
+                      <span className="ml-0.5 text-[5px] sm:text-[8px] font-extrabold text-yellow-500 leading-none">
+                        {formatSignedNumber(convertWeight(prDelta, weightUnit), { maxDecimals: 2 })}{weightUnit}
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
 
-              {volPrEvent && setIndex === volPrAnchorIndex && (
+              {/* Show legacy vol PR if not already in prTypes */}
+              {volPrEvent && setIndex === volPrAnchorIndex && !set.prTypes?.includes('volume') && (
                 <span
                   className="inline-flex items-center leading-none"
                   title="Volume PR (best-ever single-set volume)"
                   aria-label="Volume PR (best-ever single-set volume)"
                 >
-                  {set.isPr && <span className="hidden sm:inline text-slate-600 dark:text-slate-300 mx-1">·</span>}
+                  {(set.prTypes?.length || 0) > 0 && <span className="hidden sm:inline text-slate-600 dark:text-slate-300 mx-0.5">·</span>}
+                  <BarChart3 className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-none mr-0.5" />
                   <span>Vol PR</span>
                   {volPrEvent.previousBest > 0 && (
                     <span className="ml-0.5 text-[5px] sm:text-[8px] font-extrabold text-yellow-500 dark:text-yellow-300 leading-none">

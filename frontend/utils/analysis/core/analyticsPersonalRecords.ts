@@ -1,5 +1,6 @@
-import type { WorkoutSet } from '../../../types';
+import type { PrType, WorkoutSet } from '../../../types';
 import { getDateKey, type TimePeriod, sortByTimestamp } from '../../date/dateUtils';
+import { roundTo } from '../../format/formatters';
 import { isWarmupSet } from '../classification/setClassification';
 
 const sortByParsedDate = (sets: WorkoutSet[], ascending: boolean): WorkoutSet[] => {
@@ -22,31 +23,78 @@ const sortByParsedDate = (sets: WorkoutSet[], ascending: boolean): WorkoutSet[] 
     .map((x) => x.s);
 };
 
+const calculateOneRepMax = (weight: number, reps: number): number => {
+  if (reps <= 0 || weight <= 0) return 0;
+  return roundTo(weight * (1 + reps / 30), 2);
+};
+
+export interface PRTypeFlags {
+  isWeightPr: boolean;
+  isOneRmPr: boolean;
+  isVolumePr: boolean;
+}
+
 export const identifyPersonalRecords = (data: WorkoutSet[]): WorkoutSet[] => {
   const sorted = sortByParsedDate(data, true);
   const maxWeightMap = new Map<string, number>();
-  const isPrFlags = new Map<WorkoutSet, boolean>();
+  const maxOneRmMap = new Map<string, number>();
+  const maxVolumeMap = new Map<string, number>();
+  const prTypesMap = new Map<WorkoutSet, PrType[]>();
 
   for (const set of sorted) {
     if (isWarmupSet(set)) {
-      isPrFlags.set(set, false);
+      prTypesMap.set(set, []);
       continue;
     }
     const exercise = set.exercise_title;
     const currentWeight = set.weight_kg || 0;
-    const previousMax = maxWeightMap.get(exercise) ?? 0;
+    const currentReps = set.reps || 0;
+    const currentOneRm = calculateOneRepMax(currentWeight, currentReps);
+    const currentVolume = currentWeight * currentReps;
 
-    const isPr = currentWeight > 0 && currentWeight > previousMax;
-    if (isPr) {
+    const previousMaxWeight = maxWeightMap.get(exercise) ?? 0;
+    const previousMaxOneRm = maxOneRmMap.get(exercise) ?? 0;
+    const previousMaxVolume = maxVolumeMap.get(exercise) ?? 0;
+
+    const prTypes: PrType[] = [];
+
+    // Weight PR
+    if (currentWeight > 0 && currentWeight > previousMaxWeight) {
+      prTypes.push('weight');
       maxWeightMap.set(exercise, currentWeight);
     }
-    isPrFlags.set(set, isPr);
+
+    // 1RM PR
+    if (currentOneRm > 0 && currentOneRm > previousMaxOneRm) {
+      prTypes.push('oneRm');
+      maxOneRmMap.set(exercise, currentOneRm);
+    }
+
+    // Volume PR
+    if (currentVolume > 0 && currentVolume > previousMaxVolume) {
+      prTypes.push('volume');
+      maxVolumeMap.set(exercise, currentVolume);
+    }
+
+    prTypesMap.set(set, prTypes);
   }
 
-  return sortByParsedDate(sorted, false).map((set) => ({
-    ...set,
-    isPr: isPrFlags.get(set) ?? false,
-  }));
+  return sortByParsedDate(sorted, false).map((set) => {
+    const prTypes = prTypesMap.get(set) ?? [];
+    return {
+      ...set,
+      isPr: prTypes.length > 0,
+      prTypes,
+    };
+  });
+};
+
+export const getPrTypeFlags = (prTypes?: PrType[]): PRTypeFlags => {
+  return {
+    isWeightPr: prTypes?.includes('weight') ?? false,
+    isOneRmPr: prTypes?.includes('oneRm') ?? false,
+    isVolumePr: prTypes?.includes('volume') ?? false,
+  };
 };
 
 export interface PRTimeEntry {

@@ -58,6 +58,7 @@ export const getExerciseStats = (data: WorkoutSet[]): ExerciseStats[] => {
       oneRepMax,
       volume,
       isPr: set.isPr ?? false,
+      prTypes: set.prTypes,
       side,
     });
 

@@ -1,4 +1,4 @@
-import { ExerciseStats } from '../../../types';
+import { ExerciseStats, PrType } from '../../../types';
 import {
   formatDayContraction,
   getDateKey,
@@ -20,6 +20,7 @@ export interface ExerciseChartDataPoint {
   sets?: number;
   volume?: number;
   isPr?: boolean;
+  prTypes?: PrType[];
   // For unilateral exercises - separate L/R values
   leftOneRepMax?: number;
   leftWeight?: number;
@@ -60,9 +61,13 @@ export const buildExerciseChartData = (args: {
 
   let globalMaxWeight = -Infinity;
   let globalMaxReps = -Infinity;
+  let globalMaxOneRm = -Infinity;
+  let globalMaxVolume = -Infinity;
   for (const h of history) {
     if (Number.isFinite(h.weight)) globalMaxWeight = Math.max(globalMaxWeight, h.weight);
     if (Number.isFinite(h.maxReps)) globalMaxReps = Math.max(globalMaxReps, h.maxReps);
+    if (Number.isFinite(h.oneRepMax)) globalMaxOneRm = Math.max(globalMaxOneRm, h.oneRepMax);
+    if (Number.isFinite(h.volume)) globalMaxVolume = Math.max(globalMaxVolume, h.volume);
   }
   const eps = 1e-9;
 
@@ -104,6 +109,7 @@ export const buildExerciseChartData = (args: {
           weightMax: number;
           repsMax: number;
           sets: number;
+          prTypes: Set<PrType>;
         }
       >();
 
@@ -124,6 +130,7 @@ export const buildExerciseChartData = (args: {
             weightMax: 0,
             repsMax: 0,
             sets: 0,
+            prTypes: new Set(),
           };
           buckets.set(key, b);
         }
@@ -142,20 +149,25 @@ export const buildExerciseChartData = (args: {
           b.repsMax = Math.max(b.repsMax, h.maxReps);
         }
         b.sets += h.sets;
+
+        // Aggregate PR types
+        if (h.prTypes) {
+          h.prTypes.forEach((type) => b!.prTypes.add(type));
+        }
       });
 
       return Array.from(buckets.values())
         .sort((a, b) => a.ts - b.ts)
         .map((b) => {
-          const isPr = isBodyweightLike
-            ? Number.isFinite(globalMaxReps) && Math.max(b.leftRepsMax, b.rightRepsMax, b.repsMax) >= globalMaxReps - eps
-            : Number.isFinite(globalMaxWeight) && Math.max(b.leftWeightMax, b.rightWeightMax, b.weightMax) >= globalMaxWeight - eps;
+          const prTypes = Array.from(b.prTypes);
+          const isPr = prTypes.length > 0;
 
           const point: ExerciseChartDataPoint = {
             timestamp: b.ts,
             date: b.label,
             sets: b.sets,
             isPr,
+            prTypes,
           };
 
           if (b.leftOneRmMax > 0) {
@@ -188,6 +200,9 @@ export const buildExerciseChartData = (args: {
         weightMax: number;
         repsMax: number;
         sets: number;
+        // Track which PR types correspond to the max values
+        weightPrTypes: Set<PrType>;
+        oneRmPrTypes: Set<PrType>;
       }
     >();
 
@@ -195,21 +210,54 @@ export const buildExerciseChartData = (args: {
       const { key, timestamp, label } = getDateKey(h.date, period);
       let b = buckets.get(key);
       if (!b) {
-        b = { ts: timestamp, label, oneRmMax: 0, weightMax: 0, repsMax: 0, sets: 0 };
+        b = { 
+          ts: timestamp, 
+          label, 
+          oneRmMax: 0, 
+          weightMax: 0, 
+          repsMax: 0, 
+          sets: 0, 
+          weightPrTypes: new Set(),
+          oneRmPrTypes: new Set(),
+        };
         buckets.set(key, b);
       }
+      
+      // Check BEFORE updating max values
+      const isNewWeightMax = h.weight > b.weightMax;
+      const isNewOneRmMax = h.oneRepMax > b.oneRmMax;
+      
+      // Update max values
       b.oneRmMax = Math.max(b.oneRmMax, h.oneRepMax);
       b.weightMax = Math.max(b.weightMax, h.weight);
       b.repsMax = Math.max(b.repsMax, h.maxReps);
       b.sets += h.sets;
+
+      // Only add PR types if they correspond to the max value in this bucket
+      if (h.prTypes) {
+        // Weight PR: only if this session achieved the new max weight
+        if (isNewWeightMax) {
+          h.prTypes.forEach((type) => {
+            if (type === 'weight' || type === 'volume') {
+              b!.weightPrTypes.add(type);
+            }
+          });
+        }
+        
+        // 1RM PR: only if this session achieved the new max 1RM
+        if (isNewOneRmMax && h.prTypes.includes('oneRm')) {
+          b!.oneRmPrTypes.add('oneRm');
+        }
+      }
     });
 
     return Array.from(buckets.values())
       .sort((a, b) => a.ts - b.ts)
       .map((b) => {
-        const isPr = isBodyweightLike
-          ? Number.isFinite(globalMaxReps) && b.repsMax >= globalMaxReps - eps
-          : Number.isFinite(globalMaxWeight) && b.weightMax >= globalMaxWeight - eps;
+        // Combine PR types from both weight and 1RM
+        const allPrTypes = new Set([...b.weightPrTypes, ...b.oneRmPrTypes]);
+        const prTypes = Array.from(allPrTypes);
+        const isPr = prTypes.length > 0;
 
         return {
           timestamp: b.ts,
@@ -219,6 +267,10 @@ export const buildExerciseChartData = (args: {
           reps: b.repsMax,
           sets: b.sets,
           isPr,
+          prTypes,
+          // Also store separately for accurate filtering
+          weightPrTypes: Array.from(b.weightPrTypes),
+          oneRmPrTypes: Array.from(b.oneRmPrTypes),
         };
       });
   };

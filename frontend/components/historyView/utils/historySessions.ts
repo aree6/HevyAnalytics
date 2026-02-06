@@ -45,7 +45,13 @@ export const buildHistorySessions = (data: WorkoutSet[]): Session[] => {
 
         if (!isWarmupSet(set)) {
           totalVolume += (set.weight_kg || 0) * (set.reps || 0);
-          if (set.isPr) totalPRs += 1;
+          // Count each PR type as a separate PR
+          if (set.prTypes && set.prTypes.length > 0) {
+            totalPRs += set.prTypes.length;
+          } else if (set.isPr) {
+            // Fallback for backward compatibility
+            totalPRs += 1;
+          }
         }
       });
 

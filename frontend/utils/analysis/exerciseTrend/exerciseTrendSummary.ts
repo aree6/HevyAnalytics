@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import type { ExerciseHistoryEntry } from '../../../types';
+import type { ExerciseHistoryEntry, PrType } from '../../../types';
 import type { ExerciseSessionEntry } from '../exerciseTrend/exerciseTrendCore';
 
 export const summarizeExerciseHistory = (
@@ -29,6 +29,7 @@ export const summarizeExerciseHistory = (
         sets: 0,
         totalReps: 0,
         maxReps: 0,
+        prTypes: [],
         side: separateSides ? h.side : undefined,
       };
       bySession.set(key, entry);
@@ -38,6 +39,13 @@ export const summarizeExerciseHistory = (
     entry.volume += h.volume || 0;
     entry.totalReps += h.reps || 0;
     entry.maxReps = Math.max(entry.maxReps, h.reps || 0);
+
+    // Aggregate PR types from all sets in this session
+    if (h.prTypes && h.prTypes.length > 0) {
+      const currentTypes = new Set(entry.prTypes || []);
+      h.prTypes.forEach((type) => currentTypes.add(type));
+      entry.prTypes = Array.from(currentTypes);
+    }
 
     if ((h.oneRepMax || 0) >= (entry.oneRepMax || 0)) {
       entry.oneRepMax = h.oneRepMax || 0;

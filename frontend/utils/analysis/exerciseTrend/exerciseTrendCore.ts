@@ -1,5 +1,5 @@
 import type { ExerciseTrendMode } from '../../storage/localStorage';
-import type { ExerciseStats } from '../../../types';
+import type { ExerciseStats, PrType } from '../../../types';
 import { avg, clampEvidence, fmtSignedPct, getConfidence, keepDynamicEvidence } from '../exerciseTrend/exerciseTrendUtils';
 import { summarizeExerciseHistory } from '../exerciseTrend/exerciseTrendSummary';
 import { buildRecentEvidence } from '../exerciseTrend/exerciseTrendRecentEvidence';
@@ -38,6 +38,8 @@ export interface ExerciseSessionEntry {
   sets: number;
   totalReps: number;
   maxReps: number;
+  /** PR types achieved in this session */
+  prTypes?: PrType[];
   /** For unilateral exercises: 'left', 'right', or undefined for bilateral/combined */
   side?: 'left' | 'right';
 }

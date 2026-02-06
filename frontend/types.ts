@@ -1,3 +1,5 @@
+export type PrType = 'weight' | 'oneRm' | 'volume';
+
 export interface WorkoutSet {
   title: string;
   start_time: string;
@@ -15,6 +17,7 @@ export interface WorkoutSet {
   rpe: number | null;
   parsedDate?: Date;
   isPr?: boolean;
+  prTypes?: PrType[];
 }
 
 export interface ExerciseHistoryEntry {
@@ -24,6 +27,7 @@ export interface ExerciseHistoryEntry {
   oneRepMax: number;
   volume: number;
   isPr: boolean;
+  prTypes?: PrType[];
   /** For unilateral exercises: 'left', 'right', or undefined for bilateral */
   side?: 'left' | 'right';
 }
