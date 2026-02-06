@@ -1,7 +1,7 @@
 export { Page };
 
 import React, { useEffect } from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import App from '../../App';
 import { initGA } from '../../utils/integrations/ga';
 

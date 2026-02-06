@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { WorkoutSet } from './types';
 import { Tab } from './app/navigation';
 import { AppOnboardingLayer } from './components/app/AppOnboardingLayer';

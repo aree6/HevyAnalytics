@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useEffect } from 'react';
-import type { NavigateFunction } from 'react-router-dom';
+import type { NavigateFunction } from 'react-router';
 
 import type { OnboardingFlow } from './onboarding/types';
 import { trackEvent } from '../../utils/integrations/analytics';

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useLayoutEffect, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { Tab, getPathForTab, getTabFromPathname, parseLocalDateFromYyyyMmDd } from '../../app/navigation';
 import { trackEvent } from '../../utils/integrations/analytics';
 

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Location } from 'react-router-dom';
+import type { Location } from 'react-router';
 import { setContext, trackEvent } from '../../utils/integrations/analytics';
 import { trackPageView } from '../../utils/integrations/ga';
 import { saveDataSourceChoice } from '../../utils/storage/dataSourceStorage';
