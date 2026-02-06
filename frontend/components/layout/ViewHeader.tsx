@@ -33,7 +33,7 @@ export const ViewHeader: React.FC<ViewHeaderProps> = ({
 
   return (
     <div className={`${sticky ? 'sticky top-0 z-30' : ''} bg-black/70 p-2 sm:p-3 rounded-xl`}>
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr),auto,minmax(0,1fr)] items-center gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
         {/* Left: Stats */}
         <div className="hidden sm:flex items-center gap-2 justify-start min-w-0">
           {leftItems.map((stat, i) => (
