@@ -8,6 +8,7 @@ import type { NormalizedMuscleGroup } from '../../../utils/muscle/analytics';
 import { resolveSelectedSubjectKeys } from '../utils/selectedSubjectKeys';
 import type { ExerciseAsset } from '../../../utils/data/exerciseAssets';
 import type { QuickFilterCategory } from './useMuscleSelection';
+import { muscleCacheKeys } from '../../../utils/storage/cacheKeys';
 
 interface UseMuscleHeatmapDataParams {
   data: WorkoutSet[];
@@ -18,6 +19,7 @@ interface UseMuscleHeatmapDataParams {
   viewMode: 'muscle' | 'group' | 'headless';
   selectedMuscle: string | null;
   activeQuickFilter: QuickFilterCategory | null;
+  filterCacheKey: string;
 }
 
 export const useMuscleHeatmapData = ({
@@ -29,32 +31,33 @@ export const useMuscleHeatmapData = ({
   viewMode,
   selectedMuscle,
   activeQuickFilter,
+  filterCacheKey,
 }: UseMuscleHeatmapDataParams) => {
   const weeklySetsDashboardMuscles = useMemo(() => {
     if (!assetsMap) return null;
 
     const window: WeeklySetsWindow = weeklySetsWindow === 'all' ? 'all' : weeklySetsWindow;
-    const cacheKey = `weeklySetsDashboard:v2:${window}:muscles`;
+    const cacheKey = muscleCacheKeys.weeklySets(filterCacheKey, window, 'muscles');
     return computationCache.getOrCompute(
       cacheKey,
       data,
       () => computeWeeklySetsDashboardData(data, assetsMap, effectiveNow, window, 'muscles'),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [assetsMap, data, effectiveNow, weeklySetsWindow]);
+  }, [assetsMap, data, effectiveNow, weeklySetsWindow, filterCacheKey]);
 
   const weeklySetsDashboardGroups = useMemo(() => {
     if (!assetsMap) return null;
 
     const window: WeeklySetsWindow = weeklySetsWindow === 'all' ? 'all' : weeklySetsWindow;
-    const cacheKey = `weeklySetsDashboard:v2:${window}:groups`;
+    const cacheKey = muscleCacheKeys.weeklySets(filterCacheKey, window, 'groups');
     return computationCache.getOrCompute(
       cacheKey,
       data,
       () => computeWeeklySetsDashboardData(data, assetsMap, effectiveNow, window, 'groups'),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [assetsMap, data, effectiveNow, weeklySetsWindow]);
+  }, [assetsMap, data, effectiveNow, weeklySetsWindow, filterCacheKey]);
 
   const windowedHeatmapData = useMemo(() => {
     if (!assetsMap || !windowStart) return { volumes: new Map<string, number>(), maxVolume: 1 };

@@ -15,6 +15,7 @@ import { TooltipData } from '../../ui/Tooltip';
 
 interface MuscleAnalysisProps {
   data: WorkoutSet[];
+  filterCacheKey: string;
   filtersSlot?: React.ReactNode;
   onExerciseClick?: (exerciseName: string) => void;
   initialMuscle?: { muscleId: string; viewMode: 'muscle' | 'group' | 'headless' } | null;
@@ -27,6 +28,7 @@ interface MuscleAnalysisProps {
 
 export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
   data,
+  filterCacheKey,
   filtersSlot,
   onExerciseClick,
   initialMuscle,
@@ -92,6 +94,7 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
     viewMode,
     selectedMuscle,
     activeQuickFilter,
+    filterCacheKey,
   });
 
   const {

@@ -35,6 +35,7 @@ interface AppShellProps {
   dailySummaries: DailySummary[];
   exerciseStats: ExerciseStats[];
   filteredData: WorkoutSet[];
+  filterCacheKey: string;
   filtersSlot: React.ReactNode;
   highlightedExercise: string | null;
   onHighlightApplied: () => void;
@@ -83,6 +84,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   dailySummaries,
   exerciseStats,
   filteredData,
+  filterCacheKey,
   filtersSlot,
   highlightedExercise,
   onHighlightApplied,
@@ -143,6 +145,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         dailySummaries={dailySummaries}
         exerciseStats={exerciseStats}
         filteredData={filteredData}
+        filterCacheKey={filterCacheKey}
         filtersSlot={filtersSlot}
         highlightedExercise={highlightedExercise}
         onHighlightApplied={onHighlightApplied}

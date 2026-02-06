@@ -10,6 +10,7 @@ import {
   pickChartAggregation,
 } from '../../../utils/date/dateUtils';
 import { computationCache } from '../../../utils/storage/computationCache';
+import { dashboardCacheKeys } from '../../../utils/storage/cacheKeys';
 import type { TimeFilterMode } from '../../../utils/storage/localStorage';
 import { getWindowedWorkoutSets } from '../../../utils/analysis/classification';
 
@@ -26,12 +27,13 @@ export const useDashboardPrTrend = (args: {
   allAggregationMode: 'daily' | 'weekly' | 'monthly';
   effectiveNow: Date;
   dashboardInsights: any;
+  filterCacheKey: string;
 }): {
   prsData: PrsOverTimePoint[];
   prTrendDelta: any;
   prTrendDelta7d: any;
 } => {
-  const { fullData, rangeMode, allAggregationMode, effectiveNow, dashboardInsights } = args;
+  const { fullData, rangeMode, allAggregationMode, effectiveNow, dashboardInsights, filterCacheKey } = args;
 
   const prsData = useMemo<PrsOverTimePoint[]>(() => {
     const { filtered, minTs, maxTs } = getWindowedWorkoutSets(fullData, rangeMode, effectiveNow);
@@ -44,8 +46,9 @@ export const useDashboardPrTrend = (args: {
         ? pickChartAggregation({ minTs, maxTs, preferred, maxPoints: DEFAULT_CHART_MAX_POINTS })
         : preferred;
 
+    const cacheKey = dashboardCacheKeys.prTrend(filterCacheKey, rangeMode, mode);
     return computationCache.getOrCompute(
-      `prsOverTime:${rangeMode}:${mode}:${effectiveNow.getTime()}`,
+      cacheKey,
       fullData,
       () => {
         const data = getPrsOverTime(filtered, mode as any) as PrsOverTimePoint[];
@@ -77,7 +80,7 @@ export const useDashboardPrTrend = (args: {
       },
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, rangeMode, allAggregationMode, effectiveNow]);
+  }, [fullData, rangeMode, allAggregationMode, effectiveNow, filterCacheKey]);
 
   const prTrendDelta = useMemo(() => {
     const days = getRollingWindowDaysForMode(rangeMode) ?? 30;

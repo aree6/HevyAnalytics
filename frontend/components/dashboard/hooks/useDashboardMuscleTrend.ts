@@ -9,6 +9,7 @@ import { getMuscleVolumeTimeSeries, getMuscleVolumeTimeSeriesDetailed } from '..
 import { getMuscleContributionsFromAsset } from '../../../utils/muscle/analytics';
 import { bucketRollingWeeklySeriesToMonths, bucketRollingWeeklySeriesToWeeks } from '../../../utils/muscle/analytics';
 import { computationCache } from '../../../utils/storage/computationCache';
+import { dashboardCacheKeys } from '../../../utils/storage/cacheKeys';
 
 export type DashboardMuscleGrouping = 'groups' | 'muscles';
 export type DashboardMusclePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all';
@@ -26,18 +27,20 @@ export const useDashboardMuscleTrend = (args: {
   muscleGrouping: DashboardMuscleGrouping;
   musclePeriod: DashboardMusclePeriod;
   effectiveNow: Date;
+  filterCacheKey: string;
 }): {
   trendData: any[];
   trendKeys: string[];
   muscleTrendInsight: MuscleTrendInsight | null;
   muscleVsLabel: string;
 } => {
-  const { fullData, assetsMap, assetsLowerMap, muscleGrouping, musclePeriod, effectiveNow } = args;
+  const { fullData, assetsMap, assetsLowerMap, muscleGrouping, musclePeriod, effectiveNow, filterCacheKey } = args;
 
   const muscleSeriesGroups = useMemo(() => {
     if (!assetsMap) return { data: [], keys: [] as string[] } as { data: any[]; keys: string[] };
+    const cacheKey = dashboardCacheKeys.muscleSeries(filterCacheKey, 'groups');
     const base = computationCache.getOrCompute(
-      `muscleSeriesGroups:rollingWeekly:${assetsMap.size}`,
+      cacheKey,
       fullData,
       () => getMuscleVolumeTimeSeries(fullData, assetsMap, 'weekly'),
       { ttl: 10 * 60 * 1000 }
@@ -62,12 +65,13 @@ export const useDashboardMuscleTrend = (args: {
     const maxPoints = DEFAULT_CHART_MAX_POINTS;
     if (windowed.data.length <= maxPoints) return windowed as any;
     return windowed.data.length > 140 ? bucketRollingWeeklySeriesToMonths(windowed as any) : bucketRollingWeeklySeriesToWeeks(windowed as any);
-  }, [fullData, assetsMap, musclePeriod, effectiveNow]);
+  }, [fullData, assetsMap, musclePeriod, effectiveNow, filterCacheKey]);
 
   const muscleSeriesMuscles = useMemo(() => {
     if (!assetsMap) return { data: [], keys: [] as string[] } as { data: any[]; keys: string[] };
+    const cacheKey = dashboardCacheKeys.muscleSeries(filterCacheKey, 'muscles');
     const base = computationCache.getOrCompute(
-      `muscleSeriesMuscles:rollingWeekly:${assetsMap.size}`,
+      cacheKey,
       fullData,
       () => getMuscleVolumeTimeSeriesDetailed(fullData, assetsMap, 'weekly'),
       { ttl: 10 * 60 * 1000 }
@@ -91,7 +95,7 @@ export const useDashboardMuscleTrend = (args: {
     const maxPoints = DEFAULT_CHART_MAX_POINTS;
     if (windowed.data.length <= maxPoints) return windowed as any;
     return windowed.data.length > 140 ? bucketRollingWeeklySeriesToMonths(windowed as any) : bucketRollingWeeklySeriesToWeeks(windowed as any);
-  }, [fullData, assetsMap, musclePeriod, effectiveNow]);
+  }, [fullData, assetsMap, musclePeriod, effectiveNow, filterCacheKey]);
 
   const trendData = muscleGrouping === 'groups' ? muscleSeriesGroups.data : muscleSeriesMuscles.data;
 
@@ -110,7 +114,7 @@ export const useDashboardMuscleTrend = (args: {
     if (!assetsMap || !assetsLowerMap) return null;
     if (!trendKeys || trendKeys.length === 0) return null;
 
-    const cacheKey = `muscleTrendInsight:${muscleGrouping}:${musclePeriod}:${trendKeys.join('|')}:${effectiveNow.getTime()}:${assetsMap.size}`;
+    const cacheKey = dashboardCacheKeys.muscleTrendInsight(filterCacheKey, muscleGrouping, musclePeriod);
     return computationCache.getOrCompute(
       cacheKey,
       fullData,
@@ -183,7 +187,7 @@ export const useDashboardMuscleTrend = (args: {
       },
       { ttl: 10 * 60 * 1000 }
     );
-  }, [assetsMap, assetsLowerMap, fullData, effectiveNow, trendKeys, muscleGrouping, musclePeriod]);
+  }, [assetsMap, assetsLowerMap, fullData, effectiveNow, trendKeys, muscleGrouping, musclePeriod, filterCacheKey]);
 
   const muscleVsLabel =
     musclePeriod === 'weekly' ? 'vs prev wk' : musclePeriod === 'yearly' ? 'vs prev yr' : 'vs prev mo';

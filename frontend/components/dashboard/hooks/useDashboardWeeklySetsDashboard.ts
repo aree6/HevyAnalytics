@@ -7,6 +7,7 @@ import {
   type WeeklySetsWindow,
 } from '../../../utils/muscle/analytics';
 import { computationCache } from '../../../utils/storage/computationCache';
+import { dashboardCacheKeys } from '../../../utils/storage/cacheKeys';
 
 export const useDashboardWeeklySetsDashboard = (args: {
   assetsMap: Map<string, ExerciseAsset> | null;
@@ -14,13 +15,14 @@ export const useDashboardWeeklySetsDashboard = (args: {
   effectiveNow: Date;
   muscleCompQuick: WeeklySetsWindow;
   compositionGrouping: WeeklySetsGrouping;
+  filterCacheKey: string;
 }): {
   weeklySetsDashboard: {
     heatmap: { volumes: Map<string, number>; maxVolume: number };
     windowStart: Date | null;
   };
 } => {
-  const { assetsMap, fullData, effectiveNow, muscleCompQuick, compositionGrouping } = args;
+  const { assetsMap, fullData, effectiveNow, muscleCompQuick, compositionGrouping, filterCacheKey } = args;
 
   const weeklySetsDashboard = useMemo(() => {
     if (!assetsMap) {
@@ -30,7 +32,7 @@ export const useDashboardWeeklySetsDashboard = (args: {
       };
     }
 
-    const cacheKey = `weeklySetsDashboard:v2:${muscleCompQuick}:${compositionGrouping}`;
+    const cacheKey = dashboardCacheKeys.weeklySets(filterCacheKey, muscleCompQuick, compositionGrouping);
     return computationCache.getOrCompute(
       cacheKey,
       fullData,
@@ -49,7 +51,7 @@ export const useDashboardWeeklySetsDashboard = (args: {
       },
       { ttl: 10 * 60 * 1000 }
     );
-  }, [assetsMap, fullData, effectiveNow, muscleCompQuick, compositionGrouping]);
+  }, [assetsMap, fullData, effectiveNow, muscleCompQuick, compositionGrouping, filterCacheKey]);
 
   return { weeklySetsDashboard };
 };

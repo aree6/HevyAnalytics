@@ -7,6 +7,7 @@ import { getEffectiveNowFromWorkoutData, getSessionKey } from '../../../utils/da
 import { getExerciseAssets, ExerciseAsset } from '../../../utils/data/exerciseAssets';
 import { calculateDashboardInsights } from '../../../utils/analysis/insights';
 import { computationCache } from '../../../utils/storage/computationCache';
+import { dashboardCacheKeys } from '../../../utils/storage/cacheKeys';
 import { isWarmupSet } from '../../../utils/analysis/classification';
 import { useDashboardIntensityEvolution } from '../hooks/useDashboardIntensityEvolution';
 import { useDashboardMuscleTrend } from '../hooks/useDashboardMuscleTrend';
@@ -23,6 +24,7 @@ interface DashboardProps {
   dailyData: DailySummary[];
   exerciseStats: ExerciseStats[];
   fullData: WorkoutSet[];
+  filterCacheKey: string;
   onDayClick?: (date: Date) => void;
   onMuscleClick?: (
     muscleId: string,
@@ -41,6 +43,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   dailyData,
   exerciseStats,
   fullData,
+  filterCacheKey,
   onDayClick,
   onMuscleClick,
   onExerciseClick,
@@ -147,19 +150,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [fullData]);
 
   const dashboardInsights = useMemo(() => {
+    const cacheKey = dashboardCacheKeys.dashboardInsights(filterCacheKey);
     return computationCache.getOrCompute(
-      'dashboardInsights',
+      cacheKey,
       fullData,
       () => calculateDashboardInsights(fullData, dailyData, effectiveNow),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, dailyData, effectiveNow]);
+  }, [fullData, dailyData, effectiveNow, filterCacheKey]);
 
   const { activePlateauExercises } = useDashboardPlateaus({
     fullData,
     exerciseStats,
     weightUnit,
     effectiveNow,
+    filterCacheKey,
   });
 
   const { prsData, prTrendDelta, prTrendDelta7d } = useDashboardPrTrend({
@@ -168,6 +173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     allAggregationMode,
     effectiveNow,
     dashboardInsights,
+    filterCacheKey,
   });
 
   const { intensityData, intensityInsight } = useDashboardIntensityEvolution({
@@ -175,6 +181,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     rangeMode: chartModes.intensityEvo,
     allAggregationMode,
     effectiveNow,
+    filterCacheKey,
   });
 
   const { volumeDurationData, volumeDensityTrend } = useDashboardVolumeDensity({
@@ -184,6 +191,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     weightUnit,
     effectiveNow,
     dashboardInsights,
+    filterCacheKey,
   });
 
   const { weekShapeData, weeklyRhythmInsight } = useWeeklyRhythm(dailyData);
@@ -194,6 +202,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     topExerciseMode,
     allAggregationMode,
     effectiveNow,
+    filterCacheKey,
   });
 
   const { trendData, trendKeys, muscleTrendInsight, muscleVsLabel } = useDashboardMuscleTrend({
@@ -203,6 +212,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     muscleGrouping,
     musclePeriod,
     effectiveNow,
+    filterCacheKey,
   });
 
   const { weeklySetsDashboard } = useDashboardWeeklySetsDashboard({
@@ -211,6 +221,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     effectiveNow,
     muscleCompQuick,
     compositionGrouping,
+    filterCacheKey,
   });
 
   const TooltipStyle = CHART_TOOLTIP_STYLE;

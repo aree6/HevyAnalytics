@@ -222,6 +222,7 @@ const App: React.FC = () => {
         dailySummaries={dailySummaries}
         exerciseStats={exerciseStats}
         filteredData={filteredData}
+        filterCacheKey={filterCacheKey}
         filtersSlot={desktopFilterControls}
         highlightedExercise={highlightedExercise}
         onHighlightApplied={clearHighlightedExercise}

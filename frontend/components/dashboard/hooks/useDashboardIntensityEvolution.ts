@@ -11,6 +11,7 @@ import {
   pickChartAggregation,
 } from '../../../utils/date/dateUtils';
 import { computationCache } from '../../../utils/storage/computationCache';
+import { dashboardCacheKeys } from '../../../utils/storage/cacheKeys';
 import type { TimeFilterMode } from '../../../utils/storage/localStorage';
 import { getWindowedWorkoutSets } from '../../../utils/analysis/classification';
 
@@ -21,11 +22,12 @@ export const useDashboardIntensityEvolution = (args: {
   rangeMode: TimeFilterMode;
   allAggregationMode: 'daily' | 'weekly' | 'monthly';
   effectiveNow: Date;
+  filterCacheKey: string;
 }): {
   intensityData: any;
   intensityInsight: any;
 } => {
-  const { fullData, rangeMode, allAggregationMode, effectiveNow } = args;
+  const { fullData, rangeMode, allAggregationMode, effectiveNow, filterCacheKey } = args;
 
   const intensityData = useMemo(() => {
     const { filtered, minTs, maxTs } = getWindowedWorkoutSets(fullData, rangeMode, effectiveNow);
@@ -38,17 +40,19 @@ export const useDashboardIntensityEvolution = (args: {
         ? pickChartAggregation({ minTs, maxTs, preferred, maxPoints: DEFAULT_CHART_MAX_POINTS })
         : preferred;
 
+    const cacheKey = dashboardCacheKeys.intensityEvolution(filterCacheKey, rangeMode, mode);
     return computationCache.getOrCompute(
-      `intensityEvolution:${rangeMode}:${mode}:${effectiveNow.getTime()}`,
+      cacheKey,
       fullData,
       () => getIntensityEvolution(filtered, mode as any),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, rangeMode, allAggregationMode, effectiveNow]);
+  }, [fullData, rangeMode, allAggregationMode, effectiveNow, filterCacheKey]);
 
   const intensityInsight = useMemo(() => {
+    const cacheKey = dashboardCacheKeys.intensityInsight(filterCacheKey, rangeMode);
     return computationCache.getOrCompute(
-      `intensityInsight:${rangeMode}:${effectiveNow.getTime()}`,
+      cacheKey,
       fullData,
       () => {
         const now = effectiveNow;
@@ -117,7 +121,7 @@ export const useDashboardIntensityEvolution = (args: {
       },
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, effectiveNow, rangeMode]);
+  }, [fullData, effectiveNow, rangeMode, filterCacheKey]);
 
   return { intensityData, intensityInsight };
 };

@@ -6,6 +6,7 @@ import { calculateDelta } from '../../../utils/analysis/insights';
 import { isWarmupSet } from '../../../utils/analysis/classification';
 import { DEFAULT_CHART_MAX_POINTS, getSessionKey, pickChartAggregation } from '../../../utils/date/dateUtils';
 import { computationCache } from '../../../utils/storage/computationCache';
+import { dashboardCacheKeys } from '../../../utils/storage/cacheKeys';
 import { getWindowedWorkoutSets } from '../../../utils/analysis/classification';
 
 const safePct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
@@ -31,19 +32,21 @@ export const useDashboardTopExercises = (args: {
   topExerciseMode: DashboardTopExerciseMode;
   allAggregationMode: 'daily' | 'weekly' | 'monthly';
   effectiveNow: Date;
+  filterCacheKey: string;
 }): {
   topExercisesBarData: TopExerciseCount[];
   topExercisesOverTimeData: any;
   topExerciseNames: string[];
   topExercisesInsight: TopExercisesInsight;
 } => {
-  const { fullData, exerciseStats, topExerciseMode, allAggregationMode, effectiveNow } = args;
+  const { fullData, exerciseStats, topExerciseMode, allAggregationMode, effectiveNow, filterCacheKey } = args;
 
   const topExercisesData = useMemo(() => getTopExercisesRadial(exerciseStats).slice(0, 4), [exerciseStats]);
 
   const topExercisesBarData = useMemo(() => {
+    const cacheKey = dashboardCacheKeys.topExercisesBar(filterCacheKey, topExerciseMode);
     return computationCache.getOrCompute(
-      `topExercisesBarData:${topExerciseMode}:${effectiveNow.getTime()}`,
+      cacheKey,
       fullData,
       () => {
         const now = effectiveNow;
@@ -68,12 +71,13 @@ export const useDashboardTopExercises = (args: {
       },
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, topExerciseMode, effectiveNow]);
+  }, [fullData, topExerciseMode, effectiveNow, filterCacheKey]);
 
   const topExercisesInsight = useMemo(() => {
     const barKey = topExercisesBarData.map((x) => `${x.name}:${x.count}`).join('|');
+    const cacheKey = dashboardCacheKeys.topExercisesInsight(filterCacheKey, topExerciseMode, barKey);
     return computationCache.getOrCompute(
-      `topExercisesInsight:${topExerciseMode}:${effectiveNow.getTime()}:${barKey}`,
+      cacheKey,
       fullData,
       () => {
         const now = effectiveNow;
@@ -131,7 +135,7 @@ export const useDashboardTopExercises = (args: {
       },
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, topExerciseMode, topExercisesBarData, effectiveNow]);
+  }, [fullData, topExerciseMode, topExercisesBarData, effectiveNow, filterCacheKey]);
 
   const topExercisesOverTimeData = useMemo(() => {
     const names = (topExercisesBarData.length > 0 ? topExercisesBarData : topExercisesData).map((e) => e.name);
@@ -148,13 +152,14 @@ export const useDashboardTopExercises = (args: {
         : preferred;
 
     const namesKey = names.join('|');
+    const cacheKey = dashboardCacheKeys.topExercisesOverTime(filterCacheKey, rangeMode, mode, namesKey);
     return computationCache.getOrCompute(
-      `topExercisesOverTime:${rangeMode}:${mode}:${namesKey}:${effectiveNow.getTime()}`,
+      cacheKey,
       fullData,
       () => getTopExercisesOverTime(filtered, names, mode as any),
       { ttl: 10 * 60 * 1000 }
     );
-  }, [fullData, topExercisesBarData, topExercisesData, topExerciseMode, allAggregationMode, effectiveNow]);
+  }, [fullData, topExercisesBarData, topExercisesData, topExerciseMode, allAggregationMode, effectiveNow, filterCacheKey]);
 
   const topExerciseNames = useMemo(
     () => (topExercisesBarData.length > 0 ? topExercisesBarData : topExercisesData).map((e) => e.name),

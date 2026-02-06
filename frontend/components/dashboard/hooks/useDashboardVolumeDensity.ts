@@ -7,8 +7,8 @@ import {
   formatDayYearContraction,
   formatLastRollingWindow,
   formatMonthYearContraction,
-  formatVsPrevRollingWindow,
   formatWeekContraction,
+  formatVsPrevRollingWindow,
   getRollingWindowDaysForMode,
   getRollingWindowStartForMode,
   DEFAULT_CHART_MAX_POINTS,
@@ -16,6 +16,7 @@ import {
 } from '../../../utils/date/dateUtils';
 import { getDisplayVolume } from '../../../utils/format/volumeDisplay';
 import { computationCache } from '../../../utils/storage/computationCache';
+import { dashboardCacheKeys } from '../../../utils/storage/cacheKeys';
 import type { TimeFilterMode, WeightUnit } from '../../../utils/storage/localStorage';
 
 export const useDashboardVolumeDensity = (args: {
@@ -25,11 +26,12 @@ export const useDashboardVolumeDensity = (args: {
   weightUnit: WeightUnit;
   effectiveNow: Date;
   dashboardInsights: any;
+  filterCacheKey: string;
 }): {
   volumeDurationData: any;
   volumeDensityTrend: any;
 } => {
-  const { dailyData, rangeMode, smartMode, weightUnit, effectiveNow, dashboardInsights } = args;
+  const { dailyData, rangeMode, smartMode, weightUnit, effectiveNow, dashboardInsights, filterCacheKey } = args;
 
   const pickAutoMode = (data: DailySummary[], preferred: 'all' | 'weekly' | 'monthly'): 'all' | 'weekly' | 'monthly' => {
     if (data.length <= 0) return preferred;
@@ -67,8 +69,9 @@ export const useDashboardVolumeDensity = (args: {
 
     const mode = pickAutoMode(source, baseMode);
 
+    const cacheKey = dashboardCacheKeys.volumeDensity(filterCacheKey, rangeMode, weightUnit);
     return computationCache.getOrCompute(
-      `volumeDurationData:${rangeMode}:${mode}:${weightUnit}:${effectiveNow.getTime()}`,
+      cacheKey,
       dailyData,
       () => {
         if (mode === 'all') {
@@ -146,7 +149,7 @@ export const useDashboardVolumeDensity = (args: {
       },
       { ttl: 10 * 60 * 1000 }
     );
-  }, [dailyData, rangeMode, smartMode, weightUnit, effectiveNow]);
+  }, [dailyData, rangeMode, smartMode, weightUnit, effectiveNow, filterCacheKey]);
 
   const volumeDensityTrend = useMemo(() => {
     const days = getRollingWindowDaysForMode(rangeMode) ?? 30;
