@@ -105,6 +105,8 @@ export const AppTabContent: React.FC<AppTabContentProps> = ({
         {activeTab === Tab.EXERCISES && (
           <ExerciseView
             stats={exerciseStats}
+            filteredData={filteredData}
+            filterCacheKey={filterCacheKey}
             filtersSlot={filtersSlot}
             highlightedExercise={highlightedExercise}
             onHighlightApplied={onHighlightApplied}
@@ -119,6 +121,7 @@ export const AppTabContent: React.FC<AppTabContentProps> = ({
         {activeTab === Tab.HISTORY && (
           <HistoryView
             data={filteredData}
+            filterCacheKey={filterCacheKey}
             filtersSlot={filtersSlot}
             weightUnit={weightUnit}
             bodyMapGender={bodyMapGender}

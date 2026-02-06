@@ -8,6 +8,7 @@ import { getExerciseAssets, ExerciseAsset } from '../../../utils/data/exerciseAs
 import { calculateDashboardInsights } from '../../../utils/analysis/insights';
 import { computationCache } from '../../../utils/storage/computationCache';
 import { dashboardCacheKeys } from '../../../utils/storage/cacheKeys';
+import { prefetchExerciseData } from '../../../utils/prefetch/prefetchStrategies';
 import { isWarmupSet } from '../../../utils/analysis/classification';
 import { useDashboardIntensityEvolution } from '../hooks/useDashboardIntensityEvolution';
 import { useDashboardMuscleTrend } from '../hooks/useDashboardMuscleTrend';
@@ -158,6 +159,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
       { ttl: 10 * 60 * 1000 }
     );
   }, [fullData, dailyData, effectiveNow, filterCacheKey]);
+
+  // Prefetch Exercise view data after 3 seconds on Dashboard
+  useEffect(() => {
+    if (fullData.length === 0) return;
+    
+    const timer = setTimeout(() => {
+      prefetchExerciseData(filterCacheKey, fullData);
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, [filterCacheKey, fullData]);
 
   const { activePlateauExercises } = useDashboardPlateaus({
     fullData,

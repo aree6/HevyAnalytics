@@ -33,18 +33,18 @@
     "@lottiefiles/dotlottie-react": "^0.17.10",
     "date-fns": "^4.1.0",
     "gsap": "^3.14.2",
-    "lucide-react": "^0.562.0",
+    "lucide-react": "^0.563.0",
     "lz-string": "^1.5.0",
-    "motion": "^12.23.26",
+    "motion": "^12.31.0",
     "ogl": "^1.0.11",
     "papaparse": "^5.4.1",
-    "posthog-js": "^1.266.0",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
-    "react-router-dom": "^6.22.3",
-    "recharts": "^3.5.1",
-    "styled-components": "^6.1.13",
-    "vike": "^0.4.250",
+    "posthog-js": "^1.342.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^6.30.3",
+    "recharts": "^3.7.0",
+    "styled-components": "^6.3.8",
+    "vike": "^0.4.253",
     "vike-react": "^0.6.18"
   },
   "devDependencies": {
@@ -54,7 +54,7 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "terser": "^5.31.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
   }
 }

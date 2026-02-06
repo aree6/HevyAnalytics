@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WorkoutSet } from '../../../types';
 import { ViewHeader } from '../../layout/ViewHeader';
 import { Activity, Dumbbell } from 'lucide-react';
@@ -12,6 +12,7 @@ import { useMuscleAnalysisHandlers } from '../hooks/useMuscleAnalysisHandlers';
 import { MuscleAnalysisBodyMapPanel } from './MuscleAnalysisBodyMapPanel';
 import { MuscleAnalysisDetailPanel } from './MuscleAnalysisDetailPanel';
 import { TooltipData } from '../../ui/Tooltip';
+import { prefetchHistoryData } from '../../../utils/prefetch/prefetchStrategies';
 
 interface MuscleAnalysisProps {
   data: WorkoutSet[];
@@ -74,6 +75,17 @@ export const MuscleAnalysis: React.FC<MuscleAnalysisProps> = ({
     weeklySetsWindow,
     now,
   });
+
+  // Prefetch History view data after 3 seconds on Muscle Analysis
+  useEffect(() => {
+    if (data.length === 0 || !effectiveNow) return;
+    
+    const timer = setTimeout(() => {
+      prefetchHistoryData(filterCacheKey, data, effectiveNow);
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, [filterCacheKey, data, effectiveNow]);
 
   const {
     muscleVolumes,

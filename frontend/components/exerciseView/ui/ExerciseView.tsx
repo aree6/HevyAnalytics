@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ExerciseStats } from '../../../types';
+import { ExerciseStats, WorkoutSet } from '../../../types';
 import { getExerciseAssets, ExerciseAsset } from '../../../utils/data/exerciseAssets';
 import { createExerciseAssetLookup, ExerciseAssetLookup } from '../../../utils/exercise/exerciseAssetLookup';
 import { loadExerciseMuscleData, ExerciseMuscleData, toHeadlessVolumeMap } from '../../../utils/muscle/mapping';
 import { ExerciseTrendMode, WeightUnit, getSmartFilterMode } from '../../../utils/storage/localStorage';
 import { summarizeExerciseHistory, analyzeExerciseTrendCore, type ExerciseSessionEntry } from '../../../utils/analysis/exerciseTrend';
 import { getRechartsCategoricalTicks, getRechartsTickIndexMap } from '../../../utils/chart/chartEnhancements';
+import { prefetchMuscleData } from '../../../utils/prefetch/prefetchStrategies';
 
 import { buildExerciseChartData } from '../utils/exerciseChartData';
 import { computeEffectiveNowFromStats, resolveEffectiveNow } from '../utils/effectiveNow';
@@ -20,6 +21,8 @@ import { buildExerciseMuscleTargets, getBodyMapHoverMeta, getExerciseSpanDays, g
 
 interface ExerciseViewProps {
   stats: ExerciseStats[];
+  filteredData: WorkoutSet[];
+  filterCacheKey: string;
   filtersSlot?: React.ReactNode;
   highlightedExercise?: string | null;
   onHighlightApplied?: () => void;
@@ -33,6 +36,8 @@ interface ExerciseViewProps {
 
 export const ExerciseView: React.FC<ExerciseViewProps> = ({
   stats,
+  filteredData,
+  filterCacheKey,
   filtersSlot,
   highlightedExercise,
   onHighlightApplied,
@@ -119,6 +124,17 @@ export const ExerciseView: React.FC<ExerciseViewProps> = ({
       .then((m) => { if (mounted) setExerciseMuscleData(m); });
     return () => { mounted = false; };
   }, []);
+
+  // Prefetch Muscle Analysis data after 3 seconds on Exercise view
+  useEffect(() => {
+    if (!assetsMap || filteredData.length === 0) return;
+    
+    const timer = setTimeout(() => {
+      prefetchMuscleData(filterCacheKey, filteredData, assetsMap, effectiveNow);
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, [filterCacheKey, filteredData, assetsMap, effectiveNow]);
 
   const selectedSessions = useMemo(() => {
     if (!selectedStats) return [] as ExerciseSessionEntry[];

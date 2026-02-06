@@ -16,9 +16,11 @@ import { useHistoryTooltip } from '../hooks/useHistoryTooltip';
 import { HistoryPaginationControls } from './HistoryPaginationControls';
 import { HistorySessionBlock } from './HistorySessionBlock';
 import { ITEMS_PER_PAGE, isSameCalendarDay } from '../utils/historyViewConstants';
+import { prefetchFlexData } from '../../../utils/prefetch/prefetchStrategies';
 
 interface HistoryViewProps {
   data: WorkoutSet[];
+  filterCacheKey: string;
   filtersSlot?: React.ReactNode;
   weightUnit?: WeightUnit;
   bodyMapGender?: BodyMapGender;
@@ -32,6 +34,7 @@ interface HistoryViewProps {
 
 export const HistoryView: React.FC<HistoryViewProps> = ({
   data,
+  filterCacheKey,
   filtersSlot,
   weightUnit = 'kg',
   bodyMapGender = 'male',
@@ -70,6 +73,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
       .then((m) => { if (mounted) setExerciseMuscleData(m); });
     return () => { mounted = false; };
   }, []);
+
+  // Prefetch Flex view data after 3 seconds on History view
+  useEffect(() => {
+    if (data.length === 0) return;
+    
+    const timer = setTimeout(() => {
+      prefetchFlexData(filterCacheKey, data, effectiveNow);
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, [filterCacheKey, data, effectiveNow]);
 
   const sessions: Session[] = useMemo(() => buildHistorySessions(data), [data]);
   const totalPages = Math.ceil(sessions.length / ITEMS_PER_PAGE);
