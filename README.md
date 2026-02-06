@@ -20,43 +20,43 @@ https://liftshift.app
 
 ## UI Screenshots
 <div align="center">
-  <img src="./frontend/public/1.avif" alt="UI Screenshot 1" />
+  <img src="./frontend/public/images/misc/1.avif" alt="UI Screenshot 1" />
 </div>
 
 <div align="center">
-  <img src="./frontend/public/2.avif" alt="UI Screenshot 2" />
+  <img src="./frontend/public/images/misc/2.avif" alt="UI Screenshot 2" />
 </div>
 
 <div align="center">
-  <img src="./frontend/public/3.avif" alt="UI Screenshot 3" />
+  <img src="./frontend/public/images/misc/3.avif" alt="UI Screenshot 3" />
 </div>
 
 <div align="center">
-  <img src="./frontend/public/4.avif" alt="UI Screenshot 4" />
+  <img src="./frontend/public/images/misc/4.avif" alt="UI Screenshot 4" />
 </div>
 
 <div align="center">
-  <img src="./frontend/public/5.avif" alt="UI Screenshot 5" />
+  <img src="./frontend/public/images/misc/5.avif" alt="UI Screenshot 5" />
 </div>
 
 <div align="center">
-  <img src="./frontend/public/6.avif" alt="UI Screenshot 6" />
+  <img src="./frontend/public/images/misc/6.avif" alt="UI Screenshot 6" />
 </div>
 
 <div align="center">
-  <img src="./frontend/public/7.avif" alt="UI Screenshot 7" />
+  <img src="./frontend/public/images/misc/7.avif" alt="UI Screenshot 7" />
 </div>
 
 <div align="center">
-  <img src="./frontend/public/8.avif" alt="UI Screenshot 8" />
+  <img src="./frontend/public/images/misc/8.avif" alt="UI Screenshot 8" />
 </div>
 
 <div align="center">
-  <img src="./frontend/public/9.avif" alt="UI Screenshot 9" />
+  <img src="./frontend/public/images/misc/9.avif" alt="UI Screenshot 9" />
 </div>
 
 <div align="center">
-  <img src="./frontend/public/10.avif" alt="UI Screenshot 10" />
+  <img src="./frontend/public/images/misc/10.avif" alt="UI Screenshot 10" />
 </div>
 
 
@@ -86,10 +86,10 @@ Attribution must be reasonably discoverable during normal use (for example: foot
 ## Quick Start
 
 <div align="center">
-  <img src="./frontend/public/Step1.avif" alt="Export data from Hevy app" width="200" />
-  <img src="./frontend/public/Step2.avif" alt="Upload CSV to LiftShift" width="200" />
-  <img src="./frontend/public/Step3.avif" alt="Explore analytics dashboard" width="200" />
-  <img src="./frontend/public/Step4.avif" alt="Get real-time feedback and filter data" width="200" />
+  <img src="./frontend/public/images/steps/Step1.avif" alt="Export data from Hevy app" width="200" />
+  <img src="./frontend/public/images/steps/Step2.avif" alt="Upload CSV to LiftShift" width="200" />
+  <img src="./frontend/public/images/steps/Step3.avif" alt="Explore analytics dashboard" width="200" />
+  <img src="./frontend/public/images/steps/Step4.avif" alt="Get real-time feedback and filter data" width="200" />
 </div>
 
 
@@ -117,7 +117,7 @@ Do the following:
 3. Re-upload it to LiftShift
 
 <div align="center">
-  <img src="./frontend/public/step5.avif" alt="Set Hevy export language to English" width="260" />
+  <img src="./frontend/public/images/steps/step5.avif" alt="Set Hevy export language to English" width="260" />
 </div>
 
 ---
