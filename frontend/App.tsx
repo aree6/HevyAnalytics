@@ -283,7 +283,7 @@ const App: React.FC = () => {
         onLyfatSyncSaved={handleLyfatSyncSaved}
       />
 
-      <AppLoadingOverlay open={isAnalyzing} loadingKind={loadingKind} loadingStep={loadingStep} progress={progress} />
+      <AppLoadingOverlay open={isAnalyzing} loadingStep={loadingStep} progress={progress} />
     </div>
   );
 };

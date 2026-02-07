@@ -10,6 +10,10 @@ import { hydrateBackendWorkoutSets } from '../auth/hydrateBackendWorkoutSets';
 import { getHevyErrorMessage } from '../ui/appErrorMessages';
 import { trackEvent } from '../../utils/integrations/analytics';
 import type { StartupAutoLoadParams } from './startupAutoLoadTypes';
+import { APP_LOADING_STEPS } from '../loadingSteps';
+
+// Simple 3-step timeline
+const STEP = APP_LOADING_STEPS;
 
 interface TokenTrackConfig {
   successMethod: string;
@@ -19,17 +23,16 @@ interface TokenTrackConfig {
 export const loadHevyFromProKey = (deps: StartupAutoLoadParams, apiKey: string): void => {
   deps.setLoadingKind('hevy');
   deps.setIsAnalyzing(true);
-  deps.setLoadingStep(0);
+  deps.setLoadingStep(STEP.INIT);
   const startedAt = deps.startProgress();
 
-  Promise.resolve()
-    .then(() => {
-      deps.setLoadingStep(1);
-      return hevyBackendGetSetsWithProApiKey<WorkoutSet>(apiKey);
-    })
+  deps.setLoadingStep(STEP.PROCESS);
+  hevyBackendGetSetsWithProApiKey<WorkoutSet>(apiKey)
     .then((resp) => {
-      deps.setLoadingStep(2);
-      const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
+      const sets = resp.sets ?? [];
+
+      // Instant processing
+      const hydrated = hydrateBackendWorkoutSets(sets);
       if (hydrated.length === 0 || hydrated.every((s) => !s.parsedDate)) {
         clearHevyProApiKey();
         saveSetupComplete(false);
@@ -37,7 +40,9 @@ export const loadHevyFromProKey = (deps: StartupAutoLoadParams, apiKey: string):
         deps.setOnboarding({ intent: 'initial', step: 'platform' });
         return;
       }
+
       const enriched = identifyPersonalRecords(hydrated);
+      deps.setLoadingStep(STEP.BUILD);
       deps.setParsedData(enriched);
       deps.setHevyLoginError(null);
       deps.setCsvImportError(null);
@@ -60,21 +65,22 @@ export const loadHevyFromToken = (
 ): void => {
   deps.setLoadingKind('hevy');
   deps.setIsAnalyzing(true);
-  deps.setLoadingStep(0);
+  deps.setLoadingStep(STEP.INIT);
   const startedAt = deps.startProgress();
 
-  Promise.resolve()
-    .then(() => hevyBackendGetAccount(token))
+  hevyBackendGetAccount(token)
     .then(({ username }) => {
-      deps.setLoadingStep(1);
+      deps.setLoadingStep(STEP.PROCESS);
       return hevyBackendGetSets<WorkoutSet>(token, username);
     })
     .then((resp) => {
-      deps.setLoadingStep(2);
       if (trackConfig) {
         trackEvent('hevy_sync_success', { method: trackConfig.successMethod, workouts: resp.meta?.workouts });
       }
-      const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
+      const sets = resp.sets ?? [];
+
+      // Instant processing
+      const hydrated = hydrateBackendWorkoutSets(sets);
       if (hydrated.length === 0 || hydrated.every((s) => !s.parsedDate)) {
         clearHevyAuthToken();
         saveSetupComplete(false);
@@ -82,7 +88,9 @@ export const loadHevyFromToken = (
         deps.setOnboarding({ intent: 'initial', step: 'platform' });
         return;
       }
+
       const enriched = identifyPersonalRecords(hydrated);
+      deps.setLoadingStep(STEP.BUILD);
       deps.setParsedData(enriched);
       deps.setHevyLoginError(null);
       deps.setCsvImportError(null);

@@ -8,6 +8,10 @@ import { getErrorMessage } from '../../app/ui';
 import { parseWorkoutCSVAsyncWithUnit, ParseWorkoutCsvResult } from '../../utils/csv/csvParser';
 import { trackEvent } from '../../utils/integrations/analytics';
 import type { AppAuthHandlersDeps } from './appAuthTypes';
+import { APP_LOADING_STEPS } from '../../app/loadingSteps';
+
+// Simple 3-step timeline for CSV
+const STEP = APP_LOADING_STEPS;
 
 export const runCsvImport = (
   deps: AppAuthHandlersDeps,
@@ -18,19 +22,20 @@ export const runCsvImport = (
   trackEvent('csv_import_start', { platform, unit: unitOverride ?? deps.weightUnit });
   deps.setLoadingKind('csv');
   deps.setIsAnalyzing(true);
-  deps.setLoadingStep(0);
+  deps.setLoadingStep(STEP.INIT);
   const startedAt = deps.startProgress();
 
   const reader = new FileReader();
+
   reader.onload = (e) => {
     const text = e.target?.result;
     if (typeof text === 'string') {
       deps.setCsvImportError(null);
-      deps.setLoadingStep(1);
+      deps.setLoadingStep(STEP.PROCESS);
+
       const unit = unitOverride ?? deps.weightUnit;
       parseWorkoutCSVAsyncWithUnit(text, { unit })
         .then((result: ParseWorkoutCsvResult) => {
-          deps.setLoadingStep(2);
           const enriched = identifyPersonalRecords(result.sets);
           trackEvent('csv_import_success', {
             platform,
@@ -38,6 +43,8 @@ export const runCsvImport = (
             sets: result.sets?.length,
             enriched_sets: enriched?.length,
           });
+
+          deps.setLoadingStep(STEP.BUILD);
           deps.setParsedData(enriched);
           saveCSVData(text);
           saveLastCsvPlatform(platform);
@@ -61,5 +68,11 @@ export const runCsvImport = (
         });
     }
   };
+
+  reader.onerror = () => {
+    deps.setCsvImportError('Failed to read file');
+    deps.finishProgress(startedAt);
+  };
+
   reader.readAsText(file);
 };

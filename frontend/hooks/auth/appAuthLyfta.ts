@@ -1,4 +1,4 @@
-import { WorkoutSet } from '../types';
+import { WorkoutSet } from '../../types';
 import {
   getLyfataApiKey,
   saveLyfataApiKey,
@@ -12,6 +12,10 @@ import { hydrateBackendWorkoutSets } from '../../app/auth';
 import { getLyfatErrorMessage } from '../../app/ui';
 import { trackEvent } from '../../utils/integrations/analytics';
 import type { AppAuthHandlersDeps } from './appAuthTypes';
+import { APP_LOADING_STEPS } from '../../app/loadingSteps';
+
+// Simple 3-step timeline
+const STEP = APP_LOADING_STEPS;
 
 export const runLyfatSyncSaved = (deps: AppAuthHandlersDeps): void => {
   const apiKey = getLyfataApiKey();
@@ -22,14 +26,17 @@ export const runLyfatSyncSaved = (deps: AppAuthHandlersDeps): void => {
   deps.setLyfatLoginError(null);
   deps.setLoadingKind('lyfta');
   deps.setIsAnalyzing(true);
-  deps.setLoadingStep(0);
+  deps.setLoadingStep(STEP.INIT);
   const startedAt = deps.startProgress();
 
+  deps.setLoadingStep(STEP.PROCESS);
   lyfatBackendGetSets<WorkoutSet>(apiKey)
     .then((resp) => {
-      deps.setLoadingStep(2);
-      const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
+      const sets = resp.sets ?? [];
+      const hydrated = hydrateBackendWorkoutSets(sets);
       const enriched = identifyPersonalRecords(hydrated);
+
+      deps.setLoadingStep(STEP.BUILD);
       deps.setParsedData(enriched);
       deps.setDataSource('lyfta');
       saveSetupComplete(true);
@@ -50,17 +57,20 @@ export const runLyfatLogin = (deps: AppAuthHandlersDeps, apiKey: string): void =
   deps.setLyfatLoginError(null);
   deps.setLoadingKind('lyfta');
   deps.setIsAnalyzing(true);
-  deps.setLoadingStep(0);
+  deps.setLoadingStep(STEP.INIT);
   const startedAt = deps.startProgress();
 
+  deps.setLoadingStep(STEP.PROCESS);
   lyfatBackendGetSets<WorkoutSet>(apiKey)
     .then((resp) => {
-      deps.setLoadingStep(2);
       trackEvent('lyfta_sync_success', { method: 'api_key', workouts: resp.meta?.workouts });
       saveLyfataApiKey(apiKey);
       saveLastLoginMethod('lyfta', 'apiKey');
-      const hydrated = hydrateBackendWorkoutSets(resp.sets ?? []);
+      const sets = resp.sets ?? [];
+      const hydrated = hydrateBackendWorkoutSets(sets);
       const enriched = identifyPersonalRecords(hydrated);
+
+      deps.setLoadingStep(STEP.BUILD);
       deps.setParsedData(enriched);
       deps.setDataSource('lyfta');
       saveSetupComplete(true);
