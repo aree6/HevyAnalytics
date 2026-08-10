@@ -10,6 +10,8 @@ import { HeroIllustration } from './HeroIllustration';
 import LightRays from '../lightRays/LightRays';
 import { Flame, CalendarDays, Trophy, BarChart3, Activity, Bone, Scale } from 'lucide-react';
 import { FANCY_FONT } from '../../../utils/ui/uiConstants';
+import { PopIn } from '../../ui/PopIn';
+import { Reveal } from '../../ui/Reveal';
 import { assetPath } from '../../../constants';
 import lightBgImage from '../../../src/assets/images/misc/light-bg1.avif';
 import darkBgImage from '../../../src/assets/images/misc/dark-bg5.avif';
@@ -211,7 +213,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-16">
                 <h2 className={`text-3xl sm:text-4xl font-bold tracking-tight mb-4 ${isLight ? 'text-slate-900' : 'text-slate-200'}`} style={FANCY_FONT}>
-                  What your workout app doesn&apos;t tell you
+                  <PopIn
+                    text="What your workout app doesn't tell you"
+                    animateOnView
+                    overshoot={1.12}
+                  />
                 </h2>
                 <p className={`max-w-2xl mx-auto text-lg ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                   Hevy, Strong, and Lyfta are great at logging. But their built-in charts leave you guessing. LiftShift gives you the answers you actually want.
@@ -219,7 +225,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
               </div>
 
               {/* Muscle heatmaps, image: 1.avif */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center mb-24">
+              <Reveal variant="pop" className="grid lg:grid-cols-2 gap-12 items-center mb-24">
                 <div className="lg:order-2 rounded-2xl overflow-hidden aspect-[1/1]">
                   <img src={assetPath('/images/misc/weeklyset.avif')} alt="LiftShift interactive muscle heatmap with exercise drill-down" loading="lazy" className={`w-full h-full object-contain ${isLight ? 'invert' : ''}`} />
                 </div>
@@ -227,7 +233,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center mb-4">
                     <Flame className="w-5 h-5 text-orange-400" />
                   </div>
-                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}>Interactive muscle heatmaps</h3>
+                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}><PopIn text="Interactive muscle heatmaps" animateOnView overshoot={1.12} /></h3>
                   <p className={`${isLight ? 'text-slate-600' : 'text-slate-400'} leading-relaxed mb-3`}>
                     Click any muscle to see exactly which exercises built it, with primary and secondary sets weighted separately. Rolling 7-day windows match your body&apos;s real recovery patterns.
                   </p>
@@ -235,10 +241,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                     Hypertrophy score &middot; Volume zones &middot; Radar chart &middot; Per-muscle drill-down
                   </p>
                 </div>
-              </div>
+              </Reveal>
 
               {/* Plateau detection, image: 2.avif */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center mb-24">
+              <Reveal variant="pop" className="grid lg:grid-cols-2 gap-12 items-center mb-24">
                 <div className="lg:order-1 rounded-2xl overflow-hidden aspect-[4/3]">
                   <img src={assetPath('/images/misc/plateau.avif')} alt="LiftShift exercise status: Getting stronger, Plateauing, Taking a dip" loading="lazy" className={`w-full h-full object-contain ${isLight ? 'invert' : ''}`} />
                 </div>
@@ -246,7 +252,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center mb-4">
                     <Trophy className="w-5 h-5 text-yellow-400" />
                   </div>
-                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}>Plateau detection that actually helps</h3>
+                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}><PopIn text="Plateau detection that actually helps" animateOnView overshoot={1.12} /></h3>
                   <p className={`${isLight ? 'text-slate-600' : 'text-slate-400'} leading-relaxed mb-3`}>
                     Every exercise gets a clear status, Getting stronger, Plateauing, or Taking a dip, with confidence levels. When you&apos;re stuck, LiftShift suggests exactly what to change: add 1 rep, bump 2.5 kg, or deload.
                   </p>
@@ -254,10 +260,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                     Static vs general plateaus &middot; Per-exercise trend analysis &middot; Evidence badges
                   </p>
                 </div>
-              </div>
+              </Reveal>
 
               {/* Set-by-set, image: 5.avif */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center mb-24">
+              <Reveal variant="pop" className="grid lg:grid-cols-2 gap-12 items-center mb-24">
                 <div className="lg:order-2 rounded-2xl overflow-hidden aspect-[4/3]">
                   <img src={assetPath('/images/misc/setbyset.avif')} alt="LiftShift set-by-set coaching feedback on each set" loading="lazy" className={`w-full h-full object-contain ${isLight ? 'invert' : ''}`} />
                 </div>
@@ -265,7 +271,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center mb-4">
                     <BarChart3 className="w-5 h-5 text-emerald-400" />
                   </div>
-                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}>Set-by-set coaching feedback</h3>
+                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}><PopIn text="Set-by-set coaching feedback" animateOnView overshoot={1.12} /></h3>
                   <p className={`${isLight ? 'text-slate-600' : 'text-slate-400'} leading-relaxed mb-3`}>
                     Open any past workout. LiftShift analyzes every set across 19 scenarios, normal fatigue, premature weight jumps, effective back-off sets, with plain-English badges and improvement suggestions.
                   </p>
@@ -273,18 +279,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                     19 feedback scenarios &middot; Weight-up/down suggestions &middot; Drop set &amp; AMRAP detection
                   </p>
                 </div>
-              </div>
+              </Reveal>
 
               {/* Injury risk, image: injury-risk.avif */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center mb-24">
+              <Reveal variant="pop" className="grid lg:grid-cols-2 gap-12 items-center mb-24">
                 <div className="lg:order-1 rounded-2xl overflow-hidden aspect-[4/3]">
-                  <img src={assetPath('/images/misc/injury-risk.avif')} alt="LiftShift per-joint injury risk scoring card" loading="lazy" className={`w-full h-full object-contain ${isLight ? 'invert' : ''}`} />
+                  <img src={assetPath('/images/misc/injury-risk.avif')} alt="LiftShift per-joint injury risk scoring card" loading="lazy" className={`w-full h-full object-contain scale-[1.3] ${isLight ? 'invert' : ''}`} />
                 </div>
                 <div className="lg:order-2">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center mb-4">
                     <Bone className="w-5 h-5 text-amber-400" />
                   </div>
-                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}>Per-joint injury risk</h3>
+                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}><PopIn text="Per-joint injury risk" animateOnView overshoot={1.12} /></h3>
                   <p className={`${isLight ? 'text-slate-600' : 'text-slate-400'} leading-relaxed mb-3`}>
                     LiftShift scores every joint from 0 to 100 percent, combining your workload ratio (this week vs. your 4-week average), back-to-back recovery days, and antagonist muscle balance. A spike above 40 is a cue to consider a deload &mdash; a load-management hint, not a diagnosis.
                   </p>
@@ -292,18 +298,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                     Workload ratio &middot; Recovery days &middot; Antagonist balance &middot; 0-100 risk score
                   </p>
                 </div>
-              </div>
+              </Reveal>
 
               {/* Strength imbalance, image: strength-imbalance.avif */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center mb-24">
+              <Reveal variant="pop" className="grid lg:grid-cols-2 gap-12 items-center mb-24">
                 <div className="lg:order-2 rounded-2xl overflow-hidden aspect-[4/3]">
-                  <img src={assetPath('/images/misc/strength-imbalance.avif')} alt="LiftShift strength imbalance trend chart with typical band" loading="lazy" className={`w-full h-full object-contain ${isLight ? 'invert' : ''}`} />
+                  <img src={assetPath('/images/misc/strength-imbalance.avif')} alt="LiftShift strength imbalance trend chart with typical band" loading="lazy" className={`w-full h-full object-contain scale-[1.3] ${isLight ? 'invert' : ''}`} />
                 </div>
                 <div className="lg:order-1">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center mb-4">
                     <Scale className="w-5 h-5 text-red-400" />
                   </div>
-                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}>Strength imbalance detection</h3>
+                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}><PopIn text="Strength imbalance detection" animateOnView overshoot={1.12} /></h3>
                   <p className={`${isLight ? 'text-slate-600' : 'text-slate-400'} leading-relaxed mb-3`}>
                     Compares your strength across 13 related exercise pairs &mdash; bench vs. press, rows vs. bench, legs vs. back &mdash; against population statistics. See your weekly trend against the typical band and whether the gap is closing or widening over the last month.
                   </p>
@@ -311,10 +317,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                     13 ratio pairs &middot; Typical band &middot; Monthly gap trend &middot; A hint, not a diagnosis
                   </p>
                 </div>
-              </div>
+              </Reveal>
 
               {/* AI export, image: AI.avif */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center mb-24">
+              <Reveal variant="pop" className="grid lg:grid-cols-2 gap-12 items-center mb-24">
                 <div className="lg:order-1 rounded-2xl overflow-hidden aspect-[1/1]">
                   <img src={assetPath('/images/misc/AI.avif')} alt="LiftShift AI analysis prompt generator" loading="lazy" className={`w-full h-full object-contain ${isLight ? 'invert' : ''}`} />
                 </div>
@@ -322,7 +328,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center mb-4">
                     <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a4 4 0 0 0-4 4v1H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3V6a4 4 0 0 0-4-4z"/><path d="M12 11v4"/><path d="M8 11v4"/><path d="M16 11v4"/></svg>
                   </div>
-                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}>AI-ready analysis export</h3>
+                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}><PopIn text="AI-ready analysis export" animateOnView overshoot={1.12} /></h3>
                   <p className={`${isLight ? 'text-slate-600' : 'text-slate-400'} leading-relaxed mb-3`}>
                     Export your structured training data in one click. Choose from 8 built-in analysis modules, junk volume audit, structural balance, joint health, or write your own prompt. Paste into any AI.
                   </p>
@@ -330,10 +336,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                     8 analysis modules &middot; Custom prompts &middot; Timeframe selection &middot; Runs in your browser
                   </p>
                 </div>
-              </div>
+              </Reveal>
 
               {/* Hypertrophy scatter, image: hypertrophy.avif */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center mb-24">
+              <Reveal variant="pop" className="grid lg:grid-cols-2 gap-12 items-center mb-24">
                 <div className="lg:order-2 rounded-2xl overflow-hidden aspect-[1/1]">
                   <img src={assetPath('/images/misc/hypertrophy.avif')} alt="LiftShift hypertrophy scatter plot showing volume vs progressive overload by muscle" loading="lazy" className={`w-full h-full object-contain ${isLight ? 'invert' : ''}`} />
                 </div>
@@ -341,7 +347,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center mb-4">
                     <Activity className="w-5 h-5 text-emerald-400" />
                   </div>
-                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}>Volume vs progressive overload</h3>
+                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}><PopIn text="Volume vs progressive overload" animateOnView overshoot={1.12} /></h3>
                   <p className={`${isLight ? 'text-slate-600' : 'text-slate-400'} leading-relaxed mb-3`}>
                     Are you doing enough volume, or just going through the motions? The hypertrophy scatter plot maps every muscle across four quadrants, efficiency zone, optimal growth, neglected, and volume focus, so you see exactly which muscles need more stimulus and which need progressive overload.
                   </p>
@@ -349,10 +355,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                     Per-muscle scatter plot &middot; 4-zone quadrant analysis &middot; Actionable recommendations
                   </p>
                 </div>
-              </div>
+              </Reveal>
 
               {/* Calendar filtering, image: calender.avif */}
-              <div className="grid lg:grid-cols-2 gap-12 items-center">
+              <Reveal variant="pop" className="grid lg:grid-cols-2 gap-12 items-center">
                 <div className="lg:order-1 rounded-2xl overflow-hidden aspect-[1/1]">
                   <img src={assetPath('/images/misc/calender.avif')} alt="LiftShift calendar filtering with date range selection and filtered dashboard" loading="lazy" className={`w-full h-full object-contain ${isLight ? 'invert' : ''}`} />
                 </div>
@@ -360,7 +366,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center mb-4">
                     <CalendarDays className="w-5 h-5 text-blue-400" />
                   </div>
-                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}>Calendar filtering that rebuilds everything</h3>
+                  <h3 className={`text-2xl font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'} mb-3`}><PopIn text="Calendar filtering that rebuilds everything" animateOnView overshoot={1.12} /></h3>
                   <p className={`${isLight ? 'text-slate-600' : 'text-slate-400'} leading-relaxed mb-3`}>
                     Pick any date range, last month, all of 2025, a single week. Every chart, metric, and insight recalculates for just that window. Compare training blocks in seconds.
                   </p>
@@ -368,7 +374,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectPlatform, onTr
                     Day / week / month / year selection &middot; Multi-range picker &middot; Instant recalculation
                   </p>
                 </div>
-              </div>
+              </Reveal>
             </div>
           </section>
 
