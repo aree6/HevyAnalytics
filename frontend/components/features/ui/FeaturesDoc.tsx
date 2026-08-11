@@ -1,4 +1,5 @@
 import React from 'react';
+import { Reveal } from '../../ui/Reveal';
 import { useTheme } from '../../theme/ThemeProvider';
 import { Info } from 'lucide-react';
 import { assetPath } from '../../../constants';
@@ -71,7 +72,7 @@ export const FeaturesDoc: React.FC<Props> = ({ className = '', showTitle = true 
 
       {featureGroups.map((g, idx) => (
         <section key={g.group}>
-          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 items-start ${idx % 2 === 1 ? 'lg:[direction:rtl]' : ''}`}>
+          <Reveal className={`grid grid-cols-1 lg:grid-cols-2 gap-6 items-start ${idx % 2 === 1 ? 'lg:[direction:rtl]' : ''}`}>
             <div className={idx % 2 === 1 ? 'lg:[direction:ltr]' : ''}>
               <h2 className={`text-lg font-semibold mb-3 ${isLight ? 'text-slate-900' : 'text-white'}`}>{g.group}</h2>
               <ul className={`list-disc list-inside space-y-2 leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
@@ -88,7 +89,7 @@ export const FeaturesDoc: React.FC<Props> = ({ className = '', showTitle = true 
                 className="w-full"
               />
             </div>
-          </div>
+          </Reveal>
         </section>
       ))}
 

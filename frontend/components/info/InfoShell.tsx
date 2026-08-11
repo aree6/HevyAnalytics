@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigation } from '../layout/Navigation';
+import { PopIn } from '../ui/PopIn';
 import { useTheme } from '../theme/ThemeProvider';
 import { assetPath } from '../../constants';
 import { clientOnly } from 'vike-react/clientOnly';
@@ -119,7 +120,9 @@ export const InfoShell: React.FC<InfoShellProps> = ({ activeNav = null, title, s
       </div>
 
       <main className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-8 pb-44">
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">{title}</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
+          <PopIn key={title} text={title} />
+        </h1>
         {subtitle ? <p className={`mt-3 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{subtitle}</p> : null}
         <div className="mt-8 space-y-7">{children}</div>
       </main>
