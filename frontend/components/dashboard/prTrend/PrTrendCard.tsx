@@ -23,6 +23,7 @@ import {
   TrendBadge,
   TrendIcon,
 } from '../insights/ChartBits';
+import { Reveal } from '../../ui/Reveal';
 import { LazyRender } from '../../ui/LazyRender';
 import { ChartSkeleton } from '../../ui/ChartSkeleton';
 import { SegmentControl } from '../../ui/SegmentControl';
@@ -79,7 +80,7 @@ export const PrTrendCard = ({
   }, [tickIndexMap, chartData.length]);
 
   return (
-    <div className="bg-black/20 border border-slate-700/50 px-2 sm:px-3 py-4 sm:py-6 rounded-xl min-h-[400px] sm:min-h-[480px] flex flex-col transition-[opacity,transform] duration-300" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
+    <Reveal className="bg-black/20 border border-slate-700/50 px-2 sm:px-3 py-4 sm:py-6 rounded-xl min-h-[400px] sm:min-h-[480px] flex flex-col transition-colors duration-300" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
       <div className="flex flex-row justify-between items-center mb-3 gap-3">
         <h3 className="text-sm sm:text-lg font-semibold text-white flex items-center gap-2 transition-opacity duration-200 hover:opacity-90">
           <Trophy className="w-5 h-5 text-yellow-500 transition-opacity duration-200 hover:opacity-80" />
@@ -226,6 +227,6 @@ export const PrTrendCard = ({
         </InsightLine>
         <InsightText text="PRs are new all-time max weights per exercise. Use this to see whether your progress is clustering in bursts or staying steady." />
       </ChartDescription>
-    </div>
+    </Reveal>
   );
 };

@@ -10,6 +10,7 @@ import {
   TrendBadge,
   TrendIcon,
 } from '../insights/ChartBits';
+import { Reveal } from '../../ui/Reveal';
 import { MuscleTrendHeader } from './MuscleTrendHeader';
 import { MuscleTrendChart } from './MuscleTrendChart';
 import { SEMI_FANCY_FONT } from '../../../utils/ui/uiConstants';
@@ -51,7 +52,7 @@ export const MuscleTrendCard = ({
   tooltipStyle: Record<string, unknown>;
   muscleVsLabel: string;
 }) => (
-  <div className="bg-black/20 border border-slate-700/50 px-2 sm:px-3 py-4 sm:py-6 rounded-xl min-h-[400px] sm:min-h-[520px] flex flex-col transition-[opacity,transform] duration-300 min-w-0" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
+  <Reveal className="bg-black/20 border border-slate-700/50 px-2 sm:px-3 py-4 sm:py-6 rounded-xl min-h-[400px] sm:min-h-[520px] flex flex-col transition-colors duration-300 min-w-0" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
     <MuscleTrendHeader
       muscleGrouping={muscleGrouping}
       setMuscleGrouping={setMuscleGrouping}
@@ -131,5 +132,5 @@ export const MuscleTrendCard = ({
 
       <InsightText text="Use this to spot volume drift. If one area rises while others fade, you are gradually specializing. This can be intentional, or accidental." />
     </ChartDescription>
-  </div>
+  </Reveal>
 );

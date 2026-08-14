@@ -12,6 +12,7 @@ import {
   formatEta,
   formatMonths,
 } from '../../../utils/training/trainingTimeline';
+import { Reveal } from '../../ui/Reveal';
 import { useTooltip, Tooltip } from '../../ui/Tooltip';
 import type { TrainingLevel } from '../../../utils/muscle/hypertrophy/muscleParams';
 import { useIsMobile } from '../../insights/useIsMobile';
@@ -397,7 +398,7 @@ export const TrainingTimelineCard: React.FC<TrainingTimelineCardProps> = ({ prog
   };
 
   return (
-    <div className="bg-black/20 border border-slate-700/50 rounded-xl p-4 transition-[opacity,transform] duration-300" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
+    <Reveal className="bg-black/20 border border-slate-700/50 rounded-xl p-4 transition-colors duration-300" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -446,6 +447,6 @@ export const TrainingTimelineCard: React.FC<TrainingTimelineCardProps> = ({ prog
       </div>
 
       {tooltip && <Tooltip data={tooltip} />}
-    </div>
+    </Reveal>
   );
 };

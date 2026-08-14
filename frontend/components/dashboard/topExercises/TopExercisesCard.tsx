@@ -11,6 +11,7 @@ import {
   TrendIcon,
 } from '../insights/ChartBits';
 import { formatVsPrevRollingWindow } from '../../../utils/date/dateUtils';
+import { Reveal } from '../../ui/Reveal';
 import { TopExercisesHeader } from './TopExercisesHeader';
 import { TopExercisesBarView } from './TopExercisesBarView';
 import { TopExercisesAreaView } from './TopExercisesAreaView';
@@ -60,7 +61,7 @@ export const TopExercisesCard = ({
   const vsPrevLabel = formatVsPrevRollingWindow(windowDays);
 
   return (
-    <div className="bg-black/20 border border-slate-700/50 px-2 sm:px-3 py-4 sm:py-6 rounded-xl min-h-[360px] flex flex-col transition-[opacity,transform] duration-300 min-w-0" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
+    <Reveal className="bg-black/20 border border-slate-700/50 px-2 sm:px-3 py-4 sm:py-6 rounded-xl min-h-[360px] flex flex-col transition-colors duration-300 min-w-0" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
       <TopExercisesHeader
         topExerciseMode={topExerciseMode}
         setTopExerciseMode={setTopExerciseMode}
@@ -155,6 +156,6 @@ export const TopExercisesCard = ({
         </InsightLine>
         <InsightText text="This highlights your most frequent exercise. The percentage shows its share of all sets in this window. If one movement dominates, consider adding more variety to avoid overuse." />
       </ChartDescription>
-    </div>
+    </Reveal>
   );
 };

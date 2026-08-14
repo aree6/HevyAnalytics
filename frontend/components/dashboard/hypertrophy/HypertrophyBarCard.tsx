@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { TrendingUp, BarChart3 } from 'lucide-react';
+import { Reveal } from '../../ui/Reveal';
 import { Tooltip, useTooltip } from '../../ui/Tooltip';
 import { SegmentControl } from '../../ui/SegmentControl';
 import { SEMI_FANCY_FONT } from '../../../utils/ui/uiConstants';
@@ -153,7 +154,7 @@ export const HypertrophyBarCard: React.FC<HypertrophyBarCardProps> = ({
   };
 
   return (
-    <div className="bg-black/20 rounded-xl border border-slate-700/50 px-2 sm:px-3 py-4 sm:py-6 min-h-[400px] sm:min-h-[520px] lg:min-h-0 lg:h-full flex flex-col" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
+    <Reveal className="bg-black/20 rounded-xl border border-slate-700/50 px-2 sm:px-3 py-4 sm:py-6 min-h-[400px] sm:min-h-[520px] lg:min-h-0 lg:h-full flex flex-col" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
       <div className="flex-shrink-0">
         <div className="flex items-center justify-between mb-3 gap-3">
           <div>
@@ -276,6 +277,6 @@ export const HypertrophyBarCard: React.FC<HypertrophyBarCardProps> = ({
         <InsightText text="The hypertrophy score estimates muscle growth potential from 0 to 100 percent. It combines three factors: volume how many weekly sets, progress how much your strength is trending up, and frequency how often you train each muscle. Higher scores mean a better stimulus for growth." />
       </ChartDescription>
       {tooltip && <Tooltip data={tooltip} />}
-    </div>
+    </Reveal>
   );
 };

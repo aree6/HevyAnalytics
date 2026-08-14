@@ -9,6 +9,7 @@ import {
   ReferenceArea,
   Cell,
 } from 'recharts';
+import { Reveal } from '../../ui/Reveal';
 import { SegmentControl } from '../../ui/SegmentControl';
 import { SEMI_FANCY_FONT } from '../../../utils/ui/uiConstants';
 import {
@@ -336,7 +337,7 @@ export const HypertrophyScatterCard: React.FC<HypertrophyScatterCardProps> = ({
 
 
   return (
-    <div className="bg-black/20 rounded-xl border border-slate-700/50 overflow-hidden h-[450px] sm:h-[650px] lg:h-full flex flex-col" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
+    <Reveal className="bg-black/20 rounded-xl border border-slate-700/50 overflow-hidden h-[450px] sm:h-[650px] lg:h-full flex flex-col" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
       <div className="p-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
@@ -480,6 +481,6 @@ export const HypertrophyScatterCard: React.FC<HypertrophyScatterCardProps> = ({
           <div className="text-[10px] sm:text-xs text-slate-500 py-4 text-center">No muscle data available.</div>
         )}
       </div>
-    </div>
+    </Reveal>
   );
 };

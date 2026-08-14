@@ -18,6 +18,7 @@ import {
 import { getStrengthMovement } from '../../../utils/analysis/strengthBalance/ratioRegistry';
 import { RECHARTS_XAXIS_PADDING, RECHARTS_YAXIS_MARGIN, formatAxisNumber, getRechartsCategoricalTicks } from '../../../utils/chart/chartEnhancements';
 import { CHART_TOOLTIP_STYLE } from '../../../utils/ui/uiConstants';
+import { Reveal } from '../../ui/Reveal';
 import { SegmentControl } from '../../ui/SegmentControl';
 import { ChartDescription, InsightText } from '../insights/ChartBits';
 import { SEMI_FANCY_FONT } from '../../../utils/ui/uiConstants';
@@ -216,7 +217,7 @@ export const StrengthBalanceCard: React.FC<{
   const current = allPairs.length > 0 ? allPairs[active] : null;
 
   return (
-    <div
+    <Reveal
       className="bg-black/20 rounded-xl border border-slate-700/50 px-2 sm:px-3 py-4 sm:py-6 min-h-[400px] sm:min-h-[480px] lg:min-h-0 lg:h-full flex flex-col"
       style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}
     >
@@ -309,6 +310,6 @@ export const StrengthBalanceCard: React.FC<{
       <ChartDescription>
         <InsightText text="Strength imbalance compares your estimated 1-rep max across related exercises (bench vs press, push vs pull, legs vs back) against population statistics from roughly 28 million logged lifts. Ratios far outside the typical band are hints worth investigating, never verdicts — your next session plan can close the gap over a few weeks." />
       </ChartDescription>
-    </div>
+    </Reveal>
   );
 };

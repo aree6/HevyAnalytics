@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, Flame, TrendingUp, TrendingDown, AlertTriangle, Trophy, Activity, Target, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import { Reveal } from '../../ui/Reveal';
 import type { DashboardSummaryResult, SummarySegment } from '../../../utils/analysis/dashboardSummary/dashboardSummary';
 
 interface DashboardSummaryCardProps {
@@ -133,7 +134,7 @@ export const DashboardSummaryCard: React.FC<DashboardSummaryCardProps> = ({
   const isLongText = summary.text.length > 70;
 
   return (
-    <div
+    <Reveal
       className="bg-black/20 border border-slate-700/50 rounded-xl p-4 relative"
       onClick={() => !isExpanded && isLongText && setIsExpanded(true)}
     >
@@ -203,6 +204,6 @@ export const DashboardSummaryCard: React.FC<DashboardSummaryCardProps> = ({
           ) : null}
         </div>
       </div>
-    </div>
+    </Reveal>
   );
 };
