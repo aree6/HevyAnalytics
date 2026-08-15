@@ -337,7 +337,7 @@ export const HypertrophyScatterCard: React.FC<HypertrophyScatterCardProps> = ({
 
 
   return (
-    <Reveal className="bg-black/20 rounded-xl border border-slate-700/50 overflow-hidden h-[450px] sm:h-[650px] lg:h-full flex flex-col" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
+    <Reveal className="bg-black/20 rounded-xl border border-slate-700/50 overflow-hidden min-h-[450px] sm:min-h-[650px] lg:min-h-0 lg:h-full flex flex-col" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
       <div className="p-3 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>

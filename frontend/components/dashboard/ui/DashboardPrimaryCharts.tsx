@@ -157,8 +157,8 @@ export const DashboardPrimaryCharts: React.FC<DashboardPrimaryChartsProps> = ({
 </div>
 
 <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-2">
-      <LazyRender className="lg:h-auto" placeholder={<ChartSkeleton className="h-[350px] sm:h-[450px]" />}>
-        <Suspense fallback={<ChartSkeleton className="h-[350px] sm:h-[450px]" />}>
+      <LazyRender className="lg:h-auto" placeholder={<ChartSkeleton className="h-[450px] sm:h-[650px]" />}>
+        <Suspense fallback={<ChartSkeleton className="h-[450px] sm:h-[650px]" />}>
           <HypertrophyScatterCard
             hypertrophyData={scatterHypertrophyData}
             hypertrophyPeriod={hypertrophyPeriod}
@@ -167,8 +167,8 @@ export const DashboardPrimaryCharts: React.FC<DashboardPrimaryChartsProps> = ({
         </Suspense>
       </LazyRender>
 
-      <LazyRender className=" lg:h-auto" placeholder={<ChartSkeleton className="h-[350px] sm:h-[450px]" />}>
-        <Suspense fallback={<ChartSkeleton className="h-[350px] sm:h-[450px]" />}>
+      <LazyRender className=" lg:h-auto" placeholder={<ChartSkeleton className="min-h-[400px] sm:min-h-[520px]" />}>
+        <Suspense fallback={<ChartSkeleton className="min-h-[400px] sm:min-h-[520px]" />}>
           <HypertrophyBarCard
             hypertrophyData={hypertrophyData}
             hypertrophyData30d={hypertrophyData30d}
@@ -184,8 +184,8 @@ export const DashboardPrimaryCharts: React.FC<DashboardPrimaryChartsProps> = ({
     {(injuryRiskData.length > 0 || strengthBalanceResults.length > 0) && (
       <div className={injuryRiskData.length > 0 && strengthBalanceResults.length > 0 ? 'grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-2' : ''}>
         {injuryRiskData.length > 0 && (
-          <LazyRender className="min-w-0" placeholder={<ChartSkeleton className="min-h-[400px] sm:min-h-[480px]" />}>
-            <Suspense fallback={<ChartSkeleton className="min-h-[400px] sm:min-h-[480px]" />}>
+          <LazyRender className="min-w-0" placeholder={<ChartSkeleton className="min-h-[400px] sm:min-h-[520px]" />}>
+            <Suspense fallback={<ChartSkeleton className="min-h-[400px] sm:min-h-[520px]" />}>
               <InjuryRiskCard injuryRiskData={injuryRiskData} />
             </Suspense>
           </LazyRender>
