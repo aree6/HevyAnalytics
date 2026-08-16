@@ -8,6 +8,7 @@ import type { BodyMapGender } from '../../bodyMap/BodyMap';
 import { HistorySessionHeaderCard } from './HistorySessionHeaderCard';
 import { HistorySessionExercises } from './HistorySessionExercises';
 import { HistoryRestDivider } from './HistoryRestDivider';
+import { Reveal } from '../../ui/Reveal';
 import { formatRestDuration, isSameCalendarDay } from '../utils/historyViewConstants';
 import { findPreviousRoutineSession } from '../utils/routineNameMatcher';
 import type { ExerciseBestEvent, ExerciseVolumePrEvent } from '../utils/historyViewTypes';
@@ -105,7 +106,7 @@ export const HistorySessionBlock: React.FC<HistorySessionBlockProps> = ({
       {index > 0 && restText && (
         <HistoryRestDivider restText={restText} isDayBreak={restIsDayBreak} />
       )}
-      <div
+      <Reveal
         className="space-y-1 sm:space-y-2"
         style={{ animationDelay: `${index * 100}ms` }}
       >
@@ -146,7 +147,7 @@ export const HistorySessionBlock: React.FC<HistorySessionBlockProps> = ({
             setTooltip={setTooltip}
           />
         )}
-      </div>
+      </Reveal>
     </React.Fragment>
   );
 };

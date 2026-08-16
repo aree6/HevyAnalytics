@@ -9,6 +9,7 @@ import { HistoryCardSkeleton } from './HistoryCardSkeleton';
 import { HistoryExerciseHeader } from './HistoryExerciseHeader';
 import { HistorySetList } from './HistorySetList';
 import { LazyRender } from '../../ui/LazyRender';
+import { Reveal } from '../../ui/Reveal';
 import { ExerciseAsset } from '../../../utils/data/exerciseAssets';
 import type { TooltipState } from './HistoryTooltipPortal';
 import type { WorkoutSet } from '../../../types';
@@ -131,7 +132,7 @@ export const HistoryExerciseCard: React.FC<HistoryExerciseCardProps> = ({
       placeholder={<HistoryCardSkeleton minHeight={260} />}
       rootMargin="400px 0px"
     >
-      <div className="bg-black/20 border border-slate-700/50 rounded-2xl p-4 sm:p-5 transition-all flex flex-col h-full" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
+      <Reveal className="bg-black/20 border border-slate-700/50 rounded-2xl p-4 sm:p-5 transition-colors flex flex-col h-full" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
         <HistoryExerciseHeader
           group={group}
           asset={asset}
@@ -155,7 +156,7 @@ export const HistoryExerciseCard: React.FC<HistoryExerciseCardProps> = ({
             onClearTooltip={onClearTooltip}
           />
         </div>
-      </div>
+      </Reveal>
     </LazyRender>
   );
 };
