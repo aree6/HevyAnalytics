@@ -1,4 +1,5 @@
 import React from 'react';
+import { Reveal } from '../../ui/Reveal';
 import { ExerciseStats } from '../../../types';
 import { ExerciseAssetLookup } from '../../../utils/exercise/exerciseAssetLookup';
 import { BodyMap, BodyMapGender } from '../../bodyMap/BodyMap';
@@ -28,7 +29,7 @@ export const ExerciseOverviewCard: React.FC<ExerciseOverviewCardProps> = ({
   volumeThresholds,
 }) => {
   return (
-    <div className="flex items-center gap-3 shrink-0 rounded-xl p-3 w-full lg:w-fit lg:self-start max-w-full">
+    <Reveal className="flex items-center gap-3 shrink-0 rounded-xl p-3 w-full lg:w-fit lg:self-start max-w-full">
       {/* BodyMap - Left side, fixed size */}
       <div className="w-24 h-20 flex items-center justify-center rounded-lg relative flex-none">
         <BodyMap
@@ -106,6 +107,6 @@ export const ExerciseOverviewCard: React.FC<ExerciseOverviewCardProps> = ({
           </div>
         );
       })()}
-    </div>
+    </Reveal>
   );
 };

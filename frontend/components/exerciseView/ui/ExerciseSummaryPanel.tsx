@@ -1,4 +1,5 @@
 import React from 'react';
+import { Reveal } from '../../ui/Reveal';
 import { ExerciseStats } from '../../../types';
 import { SEMI_FANCY_FONT } from '../../../utils/ui/uiConstants';
 import type { ExerciseTrendCoreResult } from '../../../utils/analysis/exerciseTrend';
@@ -29,7 +30,7 @@ export const ExerciseSummaryPanel: React.FC<ExerciseSummaryPanelProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full gap-2">
+    <Reveal className="flex flex-col h-full gap-2">
       <div className="flex items-baseline gap-3">
         <h2
           className="text-xl sm:text-3xl text-white tracking-tight drop-shadow-lg"
@@ -46,6 +47,6 @@ export const ExerciseSummaryPanel: React.FC<ExerciseSummaryPanelProps> = ({
         inactiveReason={inactiveReason}
         selectedPrematurePrTooltip={selectedPrematurePrTooltip}
       />
-    </div>
+    </Reveal>
   );
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Reveal } from '../../ui/Reveal';
 import { FANCY_FONT } from '../../../utils/ui/uiConstants';
 import type { ExerciseTrendCoreResult } from '../../../utils/analysis/exerciseTrend';
 import { ConfidenceBadge } from './ExerciseBadges';
@@ -23,7 +24,7 @@ export const ExerciseStatusCard: React.FC<ExerciseStatusCardProps> = ({
 }) => {
   if (!isSelectedEligible) {
     return (
-      <div
+      <Reveal
         className="rounded-lg p-3 border border-slate-700/50 relative overflow-hidden"
         style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.85)' }}
       >
@@ -39,12 +40,12 @@ export const ExerciseStatusCard: React.FC<ExerciseStatusCardProps> = ({
           </p>
         </div>
         <div className="absolute -right-10 -top-10 w-32 h-32 rounded-full blur-3xl opacity-10 bg-slate-600" />
-      </div>
+      </Reveal>
     );
   }
 
   return (
-    <div
+    <Reveal
       className={`rounded-lg p-2.5 sm:p-3 border ${currentStatus.borderColor} relative overflow-hidden transition-colors duration-500`}
       style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.85)' }}
     >
@@ -134,6 +135,6 @@ export const ExerciseStatusCard: React.FC<ExerciseStatusCardProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </Reveal>
   );
 };
