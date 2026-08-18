@@ -1,4 +1,5 @@
 import React from 'react';
+import { Reveal } from '../../ui/Reveal';
 import { resolveDarkBgByMode, resolveLightBg } from '../../../src/assets/images/misc/bgConfig';
 import { useTheme } from '../../theme/ThemeProvider';
 import { useAppPreferences } from '../../../hooks/app';
@@ -26,13 +27,13 @@ export const FlexCard: React.FC<FlexCardProps> = ({ children, theme, className =
     : 'shadow-[0_28px_60px_rgba(13,71,88,0.14)]';
 
   return (
-    <div className={`relative isolate overflow-hidden rounded-3xl ${cardShadow} transition-shadow duration-500`}>
+    <Reveal className={`relative isolate overflow-hidden rounded-3xl ${cardShadow} transition-shadow duration-500`}>
       <div className={`absolute inset-0 ${cardBgClass}`} style={cardBgStyle} />
       {isDark && <div className="absolute inset-0 bg-black/50" />}
       <div className={`relative z-10 h-full ${className}`}>
         {children}
       </div>
-    </div>
+    </Reveal>
   );
 };
 

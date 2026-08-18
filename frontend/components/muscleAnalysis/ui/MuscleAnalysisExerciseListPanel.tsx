@@ -5,6 +5,7 @@ import type { ExerciseMuscleData } from '../../../utils/muscle/mapping';
 import type { MuscleVolumeThresholds } from '../../../utils/muscle/hypertrophy/muscleParams';
 import type { BodyMapGender } from '../../bodyMap/BodyMap';
 import { SEMI_FANCY_FONT } from '../../../utils/ui/uiConstants';
+import { Reveal } from '../../ui/Reveal';
 
 interface MuscleAnalysisExerciseListPanelProps {
   contributingExercises: Array<{ name: string; sets: number; primarySets: number; secondarySets: number; strengthTrend: number | null; strengthLabel: string | null }>;
@@ -32,7 +33,7 @@ export const MuscleAnalysisExerciseListPanel: React.FC<MuscleAnalysisExerciseLis
   const displayTitle = `Exercises for ${selectedMuscle ? selectedMuscle.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Full Body'}`;
   
   return (
-    <div className="bg-black/20 rounded-xl border border-slate-700/50 overflow-hidden flex flex-col h-full min-h-0">
+    <Reveal className="bg-black/20 rounded-xl border border-slate-700/50 overflow-hidden flex flex-col h-full min-h-0">
       <div className="bg-black/20  p-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold text-white" style={SEMI_FANCY_FONT}>{displayTitle}</span>
@@ -54,7 +55,7 @@ export const MuscleAnalysisExerciseListPanel: React.FC<MuscleAnalysisExerciseLis
           secondarySetMultiplier={secondarySetMultiplier}
         />
       </div>
-    </div>
+    </Reveal>
   );
 });
 

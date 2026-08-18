@@ -16,6 +16,7 @@ import { CHART_TOOLTIP_STYLE, RADAR_TICK_FILL } from '../../../utils/ui/uiConsta
 import type { WeeklySetsWindow } from '../../../utils/muscle/analytics';
 import type { MuscleVolumeThresholds } from '../../../utils/muscle/hypertrophy/muscleParams';
 import { SegmentControl } from '../../ui/SegmentControl';
+import { Reveal } from '../../ui/Reveal';
 
 interface MuscleAnalysisBodyMapPanelProps {
   bodyMapGender: BodyMapGender;
@@ -70,7 +71,7 @@ export const MuscleAnalysisBodyMapPanel: React.FC<MuscleAnalysisBodyMapPanelProp
   };
 
   return (
-    <div className="bg-black/20 rounded-xl border border-slate-700/50 p-4 relative flex flex-col h-full">
+    <Reveal className="bg-black/20 rounded-xl border border-slate-700/50 p-4 relative flex flex-col h-full">
       <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-end gap-2">
         <SegmentControl
           options={[
@@ -180,6 +181,6 @@ export const MuscleAnalysisBodyMapPanel: React.FC<MuscleAnalysisBodyMapPanelProp
       )}
 
       {hoverTooltip && <HoverTooltip data={hoverTooltip} />}
-    </div>
+    </Reveal>
   );
 };

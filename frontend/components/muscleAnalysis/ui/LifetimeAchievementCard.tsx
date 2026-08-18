@@ -34,6 +34,7 @@ import {
 } from '../../../utils/muscle/hypertrophy/hypertrophyScore';
 import { weeklyStimulusFromThresholds } from '../../../utils/muscle/hypertrophy/hypertrophyCalculations';
 import { getVolumeThresholds, type TrainingLevel } from '../../../utils/muscle/hypertrophy/muscleParams';
+import { Reveal } from '../../ui/Reveal';
 
 /** Format weeks to human-readable string */
 function formatEta(weeks: number | null): string {
@@ -491,7 +492,7 @@ export const LifetimeAchievementCard: React.FC<LifetimeAchievementCardProps> = (
   ] as const;
 
   return (
-    <div className="bg-black/20 rounded-xl border border-slate-700/50 overflow-hidden h-full min-h-0 flex flex-col" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.7)' }}>
+    <Reveal className="bg-black/20 rounded-xl border border-slate-700/50 overflow-hidden h-full min-h-0 flex flex-col" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.7)' }}>
       {/* Header */}
       <div className="p-3 flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
@@ -612,6 +613,6 @@ export const LifetimeAchievementCard: React.FC<LifetimeAchievementCardProps> = (
         )}
       </div>
       {tooltip && <Tooltip data={tooltip} />}
-    </div>
+    </Reveal>
   );
 };

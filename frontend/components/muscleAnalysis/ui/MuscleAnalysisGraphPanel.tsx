@@ -22,6 +22,7 @@ import {
   getVolumeZone,
 } from "../../../utils/muscle/hypertrophy/muscleParams";
 import { useIsMobile } from "../../insights/useIsMobile";
+import { Reveal } from "../../ui/Reveal";
 
 const usePillSizing = (count: number) =>
   useMemo(
@@ -402,7 +403,7 @@ export const MuscleAnalysisGraphPanel: React.FC<MuscleAnalysisGraphPanelProps> =
       }, [legendMax, zones, arrowPosition, legendPillSizing, TOTAL_PILLS]);
 
       return (
-        <div
+        <Reveal
           id="all-muscles-graph"
           className="bg-black/20 rounded-xl border border-slate-700/50 overflow-hidden flex flex-col h-full min-h-0"
         >
@@ -601,7 +602,7 @@ export const MuscleAnalysisGraphPanel: React.FC<MuscleAnalysisGraphPanelProps> =
               </div>
             )}
           </div>
-        </div>
+        </Reveal>
       );
     },
   );

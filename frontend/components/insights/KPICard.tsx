@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
 
 import CountUp from '../ui/CountUp';
+import { Reveal } from '../ui/Reveal';
 import type { DeltaResult, SparklinePoint } from '../../utils/analysis/insights';
 import { Sparkline } from './Sparkline';
 
@@ -174,7 +175,7 @@ export const KPICard: React.FC<KPICardProps> = ({
   };
 
   return (
-    <div
+    <Reveal
       className={`bg-black/20 border border-slate-700/50 rounded-xl ${compact ? 'p-3' : 'p-4'} hover:border-slate-600/50 transition-colors group overflow-hidden`}
       style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.7)' }}
     >
@@ -209,6 +210,6 @@ export const KPICard: React.FC<KPICardProps> = ({
           />
         </div>
       )}
-    </div>
+    </Reveal>
   );
 };

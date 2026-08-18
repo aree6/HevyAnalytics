@@ -7,6 +7,7 @@ import type { PRInsights } from '../../utils/analysis/insights';
 import { getExerciseAssets, type ExerciseAsset } from '../../utils/data/exerciseAssets';
 import type { WeightUnit } from '../../utils/storage/localStorage';
 import { RecentPRCard } from './RecentPRCard';
+import { Reveal } from '../ui/Reveal';
 import { stripExerciseSourceLabel } from '../../utils/exercise/exerciseSourceLabel';
 
 // Recent PRs Timeline Panel
@@ -28,7 +29,7 @@ export const RecentPRsPanel: React.FC<RecentPRsPanelProps> = memo(function Recen
   if (recentPRs.length === 0) return null;
 
   return (
-    <div className="bg-black/20 border border-slate-700/50 rounded-xl p-4" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.7)' }}>
+    <Reveal className="bg-black/20 border border-slate-700/50 rounded-xl p-4" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.7)' }}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-yellow-500/10">
@@ -65,6 +66,6 @@ export const RecentPRsPanel: React.FC<RecentPRsPanelProps> = memo(function Recen
           ))}
         </div>
       </div>
-    </div>
+    </Reveal>
   );
 });
