@@ -15,17 +15,45 @@ const STARTUP_RECAPTCHA_WARMUP_ENABLED = false;
 
 const app = express();
 
-// Browser-based caching is now primary. This simple wrapper just prevents duplicate concurrent requests.
+// Browser-based caching is primary. This wrapper dedups concurrent requests and
+// keeps successful responses for a short TTL so sequential repeats (refresh,
+// second tab, retry) don't replay full-history upstream fetches. Failures are
+// never cached, so errors don't stick.
 const inFlightRequests = new Map<string, Promise<unknown>>();
+const completedResponses = new Map<string, { at: number; value: unknown }>();
+const CACHE_TTL_MS = 60_000;
+const CACHE_MAX_ENTRIES = 200;
 
 const getCachedResponse = async <T>(key: string, compute: () => Promise<T>): Promise<T> => {
+  const now = Date.now();
+  const hit = completedResponses.get(key);
+  if (hit && now - hit.at < CACHE_TTL_MS) {
+    // LRU touch.
+    completedResponses.delete(key);
+    completedResponses.set(key, hit);
+    return hit.value as T;
+  } else if (hit) {
+    completedResponses.delete(key);
+  }
+
   const existing = inFlightRequests.get(key);
   if (existing) return existing as Promise<T>;
 
-  const promise = compute()
-    .finally(() => {
-      inFlightRequests.delete(key);
-    });
+  const promise = compute().then(
+    (value) => {
+      completedResponses.set(key, { at: Date.now(), value });
+      if (completedResponses.size > CACHE_MAX_ENTRIES) {
+        const oldest = completedResponses.keys().next();
+        if (!oldest.done) completedResponses.delete(oldest.value);
+      }
+      return value;
+    },
+    (err) => {
+      throw err;
+    },
+  ).finally(() => {
+    inFlightRequests.delete(key);
+  });
 
   inFlightRequests.set(key, promise);
   return promise;
