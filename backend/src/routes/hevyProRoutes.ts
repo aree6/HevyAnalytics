@@ -44,17 +44,25 @@ export const createHevyProRouter = (opts: {
       const username = extractUsernameFromUrl(userInfo.data.url);
 
       const cacheKey = `hevyProSets:${apiKey}`;
-      const { workouts, sets } = await getCachedResponse(cacheKey, async () => {
-        const workouts = await hevyProGetAllWorkouts(apiKey);
+      const { workouts, sets, truncated } = await getCachedResponse(cacheKey, async () => {
+        const { workouts, truncated } = await hevyProGetAllWorkouts(apiKey);
         const sets = mapHevyProWorkoutsToWorkoutSets(workouts);
-        return { workouts, sets };
+        return { workouts, sets, truncated };
       });
 
       const durationMs = Date.now() - startedAt;
-      const ipCountryCode = await getCountryFromIP(getClientIP(req));
-      const countryInfo = ipCountryCode ? `[${ipCountryCode}] ` : '';
-      console.log(`👤 ${userInfo.data.name || username} ${countryInfo}| ${userInfo.data.url} ✅ Sync successful: ${sets.length} sets (${formatDuration(durationMs)})`);
-      res.json({ sets, meta: { workouts: workouts.length }, username });
+      res.json({ sets, meta: { workouts: workouts.length, truncated }, username });
+
+      // Logging only — must not block the response (geo lookup adds 1 RTT).
+      void (async () => {
+        try {
+          const ipCountryCode = await getCountryFromIP(getClientIP(req));
+          const countryInfo = ipCountryCode ? `[${ipCountryCode}] ` : '';
+          console.log(`👤 ${userInfo.data.name || username} ${countryInfo}| ${userInfo.data.url} ✅ Sync successful: ${sets.length} sets (${formatDuration(durationMs)})`);
+        } catch {
+          // Silent fail
+        }
+      })();
     } catch (err) {
       const status = (err as any).statusCode ?? 500;
       const message = (err as Error).message || 'Failed to fetch sets';

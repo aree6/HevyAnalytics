@@ -45,6 +45,7 @@ export const hevyProGetWorkoutsPage = async (
   const res = await fetch(`${HEVY_PRO_BASE_URL}/v1/workouts?${params.toString()}`, {
     method: 'GET',
     headers: buildHeaders(apiKey),
+    signal: AbortSignal.timeout(20_000),
   });
 
   if (!res.ok) {
@@ -61,6 +62,7 @@ export const hevyProGetUserInfo = async (apiKey: string): Promise<HevyProUserInf
   const res = await fetch(`${HEVY_PRO_BASE_URL}/v1/user/info`, {
     method: 'GET',
     headers: buildHeaders(apiKey),
+    signal: AbortSignal.timeout(20_000),
   });
 
   if (!res.ok) {
@@ -80,21 +82,29 @@ export const hevyProValidateApiKey = async (apiKey: string): Promise<boolean> =>
   } catch (err) {
     const status = (err as any)?.statusCode;
     if (status === 401 || status === 403) return false;
+    // A timeout/abort is a network blip, not proof the key is bad — surfacing
+    // `{valid:false}` here made users delete good keys. Let it throw (500).
+    if ((err as any)?.name === 'TimeoutError' || (err as any)?.name === 'AbortError') throw err;
     return false;
   }
 };
 
-export const hevyProGetAllWorkouts = async (apiKey: string): Promise<HevyProWorkout[]> => {
+export const hevyProGetAllWorkouts = async (apiKey: string): Promise<{ workouts: HevyProWorkout[]; truncated: boolean }> => {
   const out: HevyProWorkout[] = [];
   let page = 1;
   let pageCount = 1;
+  // Safety cap: page_count is server-controlled; never loop unbounded.
+  // Truncation is surfaced (not silent) so callers can say so.
+  const MAX_PAGES = 500;
+  let truncated = false;
 
-  while (page <= pageCount) {
+  while (page <= pageCount && page <= MAX_PAGES) {
     const resp = await hevyProGetWorkoutsPage(apiKey, { page, pageSize: 10 });
     pageCount = Number(resp.page_count ?? 1) || 1;
     out.push(...(resp.workouts ?? []));
     page += 1;
   }
+  if (page <= pageCount) truncated = true;
 
-  return out;
+  return { workouts: out, truncated };
 };
