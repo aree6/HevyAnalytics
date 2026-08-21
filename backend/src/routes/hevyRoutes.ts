@@ -1,4 +1,5 @@
 import express from 'express';
+import { createHash } from 'node:crypto';
 import { hevyGetAccount, hevyGetWorkoutsPaged, hevyLogin, hevyRefreshToken, hevyValidateAuthToken } from '../hevyApi';
 import { warmRecaptchaSession } from '../hevyRecaptcha';
 import { mapHevyWorkoutsToWorkoutSets } from '../mapToWorkoutSets';
@@ -39,10 +40,12 @@ export const createHevyRouter = (opts: {
 
       void (async () => {
         try {
-          const account = await hevyGetAccount(data.auth_token);
+          const [account, apiCountryCode] = await Promise.all([
+            hevyGetAccount(data.auth_token),
+            getCountryFromIP(getClientIP(req)),
+          ]);
           const profileUrl = `https://hevy.com/user/${account.username}`;
           const displayEmail = emailOrUsername?.includes('@') ? emailOrUsername : (account.email || '');
-          const apiCountryCode = await getCountryFromIP(getClientIP(req));
           const countryInfo = apiCountryCode ? `[${apiCountryCode}] ` : '';
           console.log(`👤 ${account.full_name || account.username} (${displayEmail}) ${countryInfo}| ${profileUrl} ✅ Login OK (${formatDuration(loginDurationMs)})`);
         } catch {
@@ -126,10 +129,12 @@ export const createHevyRouter = (opts: {
 
       void (async () => {
         try {
-          const account = await hevyGetAccount(data.auth_token);
+          const [account, apiCountryCode] = await Promise.all([
+            hevyGetAccount(data.auth_token),
+            getCountryFromIP(getClientIP(req)),
+          ]);
           const profileUrl = `https://hevy.com/user/${account.username}`;
           const displayEmail = emailOrUsername?.includes('@') ? emailOrUsername : (account.email || '');
-          const apiCountryCode = await getCountryFromIP(getClientIP(req));
           const countryInfo = apiCountryCode ? `[${apiCountryCode}] ` : '';
           console.log(`👤 ${account.full_name || account.username} (${displayEmail}) ${countryInfo}| ${profileUrl} ✅ Refresh OK (${formatDuration(refreshDurationMs)})`);
         } catch {
@@ -190,28 +195,64 @@ export const createHevyRouter = (opts: {
 
     try {
       const token = requireAuthTokenHeader(req);
-      const cacheKey = `hevySets:${username}:${maxPages ?? 'all'}`;
-      
-      const { workouts, sets } = await getCachedResponse(cacheKey, async () => {
+      // Bind the key to the credential: the username alone is not enough —
+      // a stale/invalid token for the same username must never receive
+      // another token's cached computation.
+      const tokenId = createHash('sha256').update(token).digest('hex').slice(0, 16);
+      const cacheKey = `hevySets:${username}:${maxPages ?? 'all'}:${tokenId}`;
+
+      // Safety cap: a buggy/ever-growing upstream listing must not pin this
+      // request (and its buffered arrays) forever. Pages are fetched with
+      // bounded concurrency; order is preserved by construction.
+      const SETS_PAGE_SIZE = 10;
+      const SETS_MAX_PAGES = 500;
+      const SETS_PAGE_CONCURRENCY = 4;
+
+      const { workouts, sets, truncated } = await getCachedResponse(cacheKey, async () => {
         const allWorkouts = [] as any[];
         let offset = 0;
         let page = 0;
+        let truncated = false;
 
         while (true) {
           if (maxPages != null && page >= maxPages) break;
+          if (page >= SETS_MAX_PAGES) {
+            truncated = true;
+            break;
+          }
 
-          const data = await hevyGetWorkoutsPaged(token, { username, offset, limit: 10 });
-          const workouts = data.workouts ?? [];
-          
-          if (workouts.length === 0) break;
+          const batch: number[] = [];
+          while (
+            batch.length < SETS_PAGE_CONCURRENCY &&
+            (maxPages == null || page + batch.length < maxPages) &&
+            page + batch.length < SETS_MAX_PAGES
+          ) {
+            batch.push(offset + batch.length * SETS_PAGE_SIZE);
+          }
+          if (batch.length === 0) break;
 
-          allWorkouts.push(...workouts);
-          offset += 10;
-          page += 1;
+          const results = await Promise.all(
+            batch.map((batchOffset) =>
+              hevyGetWorkoutsPaged(token, { username, offset: batchOffset, limit: SETS_PAGE_SIZE }),
+            ),
+          );
+
+          let stopped = false;
+          for (const data of results) {
+            const workouts = data.workouts ?? [];
+            if (workouts.length === 0) {
+              stopped = true;
+              break;
+            }
+            allWorkouts.push(...workouts);
+            offset += SETS_PAGE_SIZE;
+            page += 1;
+          }
+          if (stopped) break;
         }
 
         const sets = mapHevyWorkoutsToWorkoutSets(allWorkouts);
-        return { workouts: allWorkouts, sets };
+        return { workouts: allWorkouts, sets, truncated };
       });
       
       const setsDurationMs = Date.now() - startedAt;
@@ -219,9 +260,11 @@ export const createHevyRouter = (opts: {
       // Log with full user info
       void (async () => {
         try {
-          const account = await hevyGetAccount(token);
+          const [account, apiCountryCode] = await Promise.all([
+            hevyGetAccount(token),
+            getCountryFromIP(getClientIP(req)),
+          ]);
           const profileUrl = `https://hevy.com/user/${account.username}`;
-          const apiCountryCode = await getCountryFromIP(getClientIP(req));
           const countryInfo = apiCountryCode ? `[${apiCountryCode}] ` : '';
           console.log(`👤 ${account.full_name || account.username} ${countryInfo}| ${profileUrl} ✅ Sets OK: ${sets.length} sets (${formatDuration(setsDurationMs)})`);
         } catch {
@@ -230,7 +273,7 @@ export const createHevyRouter = (opts: {
         }
       })();
       
-      res.json({ sets, meta: { workouts: workouts.length }, username, _timing: { setsMs: setsDurationMs } });
+      res.json({ sets, meta: { workouts: workouts.length, truncated }, username, _timing: { setsMs: setsDurationMs } });
     } catch (err) {
       const status = (err as any).statusCode ?? 500;
       const message = (err as Error).message || 'Failed to fetch sets';
