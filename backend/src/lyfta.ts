@@ -88,6 +88,7 @@ export const lyfatGetWorkouts = async (
   const res = await fetch(`${LYFTA_BASE_URL}/api/v1/workouts?${params.toString()}`, {
     method: 'GET',
     headers: buildHeaders(apiKey),
+    signal: AbortSignal.timeout(20_000),
   });
 
   if (!res.ok) {
@@ -117,12 +118,16 @@ export const lyfatValidateApiKey = async (apiKey: string): Promise<boolean> => {
   }
 };
 
-export const lyfatGetAllWorkouts = async (apiKey: string): Promise<LyfatGetWorkoutsResponse['workouts']> => {
+export const lyfatGetAllWorkouts = async (apiKey: string): Promise<{ workouts: LyfatGetWorkoutsResponse['workouts']; truncated: boolean }> => {
   const allWorkouts: LyfatGetWorkoutsResponse['workouts'] = [];
   let page = 1;
   let hasMore = true;
+  // Safety cap: total_pages is server-controlled; never loop unbounded.
+  // Truncation is surfaced (not silent) so callers can say so.
+  const MAX_PAGES = 500;
+  let truncated = false;
 
-  while (hasMore) {
+  while (hasMore && page <= MAX_PAGES) {
     const response = await lyfatGetWorkouts(apiKey, { limit: 100, page });
     if (!Array.isArray(response.workouts)) {
       throw new Error('Invalid response from Lyfta API');
@@ -135,8 +140,9 @@ export const lyfatGetAllWorkouts = async (apiKey: string): Promise<LyfatGetWorko
       page++;
     }
   }
+  if (hasMore) truncated = true;
 
-  return allWorkouts;
+  return { workouts: allWorkouts, truncated };
 };
 
 export const lyfatGetWorkoutSummaries = async (
@@ -152,6 +158,8 @@ export const lyfatGetWorkoutSummaries = async (
   const res = await fetch(`${LYFTA_BASE_URL}/api/v1/workouts/summary?${params.toString()}`, {
     method: 'GET',
     headers: buildHeaders(apiKey),
+    // Summary pages carry up to 1000 records — allow longer than the 20s default.
+    signal: AbortSignal.timeout(45_000),
   });
 
   if (!res.ok) {
@@ -214,12 +222,16 @@ export const lyfatGetExerciseWeightUnits = async (
   return unitMap;
 };
 
-export const lyfatGetAllWorkoutSummaries = async (apiKey: string): Promise<LyfatGetWorkoutSummaryResponse['workouts']> => {
+export const lyfatGetAllWorkoutSummaries = async (apiKey: string): Promise<{ summaries: LyfatGetWorkoutSummaryResponse['workouts']; truncated: boolean }> => {
   const allSummaries: LyfatGetWorkoutSummaryResponse['workouts'] = [];
   let page = 1;
   let hasMore = true;
+  // Safety cap: total_pages is server-controlled; never loop unbounded.
+  // Truncation is surfaced (not silent) so callers can say so.
+  const MAX_PAGES = 500;
+  let truncated = false;
 
-  while (hasMore) {
+  while (hasMore && page <= MAX_PAGES) {
     const response = await lyfatGetWorkoutSummaries(apiKey, { limit: 1000, page });
     if (!Array.isArray(response.workouts)) {
       throw new Error('Invalid response from Lyfta API');
@@ -232,6 +244,7 @@ export const lyfatGetAllWorkoutSummaries = async (apiKey: string): Promise<Lyfat
       page++;
     }
   }
+  if (hasMore) truncated = true;
 
-  return allSummaries;
+  return { summaries: allSummaries, truncated };
 };

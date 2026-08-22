@@ -40,14 +40,14 @@ export const createLyftaRouter = (opts: {
 
     try {
       const cacheKey = `lyftaSets:${apiKey}`;
-      const { workouts, sets } = await getCachedResponse(cacheKey, async () => {
-        const [workouts, summaries] = await Promise.all([
+      const { workouts, sets, truncated } = await getCachedResponse(cacheKey, async () => {
+        const [{ workouts, truncated: workoutsTruncated }, { summaries, truncated: summariesTruncated }] = await Promise.all([
           lyfatGetAllWorkouts(apiKey),
           lyfatGetAllWorkoutSummaries(apiKey),
         ]);
 
         const sets = mapLyfataWorkoutsToWorkoutSets(workouts, summaries, weightUnit);
-        return { workouts, sets };
+        return { workouts, sets, truncated: workoutsTruncated || summariesTruncated };
       });
 
       const durationMs = Date.now() - startedAt;
@@ -55,7 +55,7 @@ export const createLyftaRouter = (opts: {
       const ipCountryCode = await getCountryFromIP(getClientIP(req));
       const countryInfo = ipCountryCode ? `[${ipCountryCode}] ` : '';
       console.log(`👤 ${username} ${countryInfo}✅ Lyfta sync successful: ${sets.length} sets (${formatDuration(durationMs)})`);
-      res.json({ sets, meta: { workouts: workouts.length }, username });
+      res.json({ sets, meta: { workouts: workouts.length, truncated }, username });
     } catch (err) {
       const status = (err as any).statusCode ?? 500;
       const message = (err as Error).message || 'Failed to fetch sets';
