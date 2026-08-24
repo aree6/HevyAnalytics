@@ -174,6 +174,9 @@ export const hevyGetAccount = async (accessToken: string): Promise<HevyAccountRe
   const res = await fetch(`${HEVY_BASE_URL}/user/account`, {
     method: 'GET',
     headers: buildHeaders(accessToken),
+    // Fail fast: a hung upstream must not park the Express request (and its
+    // buffered history) until the client's own timeout fires.
+    signal: timeoutSignal(20_000),
   });
 
   if (!res.ok) {
@@ -205,6 +208,7 @@ export const hevyGetWorkoutsPaged = async (
     const res = await fetch(`${HEVY_BASE_URL}/user_workouts_paged?${params.toString()}`, {
       method: 'GET',
       headers: buildHeaders(accessToken),
+      signal: timeoutSignal(20_000),
     });
 
     if (!res.ok) {

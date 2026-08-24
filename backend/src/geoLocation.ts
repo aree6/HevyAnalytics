@@ -50,12 +50,23 @@ export const getCountryFromIP = async (ip: string): Promise<string | null> => {
   }
 
   const cached = geoCache.get(cleanIp);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return cached.countryCode;
+  if (cached) {
+    if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      // LRU touch with fresh timestamp: eviction sorts by timestamp, so a
+      // touch without refresh would still let hot IPs get bulk-evicted.
+      geoCache.delete(cleanIp);
+      const refreshed = { countryCode: cached.countryCode, timestamp: Date.now() };
+      geoCache.set(cleanIp, refreshed);
+      return refreshed.countryCode;
+    }
+    geoCache.delete(cleanIp);
   }
 
   try {
-    const res = await fetch(`https://ip-api.com/json/${cleanIp}?fields=countryCode`);
+    const res = await fetch(`https://ip-api.com/json/${cleanIp}?fields=countryCode`, {
+      signal: AbortSignal.timeout(3_000),
+    });
+    if (!res.ok) throw new Error(`geo lookup failed: ${res.status}`);
     const data = (await res.json()) as GeoLocationResponse;
     const countryCode = data.countryCode || null;
 
