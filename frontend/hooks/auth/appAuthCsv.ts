@@ -9,7 +9,6 @@ import { parseWorkoutCSVAsyncWithUnit, ParseWorkoutCsvResult } from '../../utils
 import { parseMotraCSV } from '../../utils/csv/motraParser';
 import { trackEvent } from '../../utils/integrations/analytics';
 import type { AppAuthHandlersDeps } from './appAuthTypes';
-import * as XLSX from 'xlsx';
 
 
 export const runCsvImport = (
@@ -32,10 +31,12 @@ export const runCsvImport = (
 
   const reader = new FileReader();
 
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     let text = '';
     try {
       if (isXlsx) {
+        // Heavy parser (~MBs) loaded only on the .xlsx path so CSV users never download it.
+        const XLSX = await import('xlsx');
         const data = e.target?.result as ArrayBuffer;
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
