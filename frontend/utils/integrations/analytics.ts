@@ -194,6 +194,15 @@ export const initAnalytics = (): void => {
   } catch {
     // ignore
   }
+
+  // Field Web Vitals (RUM): dynamic import so a RUM failure can never affect
+  // analytics init or the app. No static import (avoids a module cycle with
+  // webVitals.ts, which reports through trackEvent).
+  import('./webVitals')
+    .then((m) => m.initWebVitals())
+    .catch(() => {
+      // ignore
+    });
 };
 
 export const trackPageView = (path: string, properties?: AnalyticsProperties): void => {

@@ -13,7 +13,22 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-initGA();
+// Analytics must not compete with first paint — idle-deferred, never render-blocking.
+// initAnalytics is idempotent (module INIT_FLAG), so the visibility retry below
+// is a safe no-op when init already ran. It covers hidden-tab boot, where
+// requestIdleCallback may never fire and its timeout isn't guaranteed.
+const scheduleInitGA = () => {
+  const idle = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+  if (typeof idle === 'function') {
+    idle(() => initGA(), { timeout: 2000 });
+  } else {
+    window.setTimeout(() => initGA(), 0);
+  }
+};
+scheduleInitGA();
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) scheduleInitGA();
+}, { once: true });
 
 // Preload the background image for instant display
 const preloadLink = document.createElement('link');

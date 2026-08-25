@@ -27,7 +27,8 @@
   "scripts": {
     "dev": "npm run build --prefix backend && concurrently -n tsc,backend,frontend --hide tsc -c yellow,blue,yellow \"tsc -w --preserveWatchOutput -p backend/tsconfig.json\" \"node --watch --watch-preserve-output --env-file=backend/.env backend/dist/index.js\" \"vike dev\"",
     "build": "vike build",
-    "preview": "vike preview"
+    "preview": "vike preview",
+    "perf:budget": "node scripts/check-bundle-budget.mjs"
   },
   "dependencies": {
     "@lottiefiles/dotlottie-react": "^0.19.0",
@@ -48,6 +49,7 @@
     "tailwindcss": "^4.2.4",
     "vike": "^0.4.258",
     "vike-react": "^0.6.21",
+    "web-vitals": "^6.2.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
