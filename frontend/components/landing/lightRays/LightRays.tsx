@@ -27,6 +27,9 @@ const LightRays: React.FC<LightRaysProps> = ({
   const smoothMouseRef = useRef({ x: 0.5, y: 0.5 });
   const animationIdRef = useRef<number | null>(null);
   const meshRef = useRef<Mesh | null>(null);
+  // Effect-time accumulator so hidden-tab gaps don't fast-forward the shader.
+  const visibleTimeRef = useRef(0);
+  const lastVisibleTRef = useRef<number | null>(null);
   const cleanupFunctionRef = useRef<(() => void) | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -68,7 +71,9 @@ const LightRays: React.FC<LightRaysProps> = ({
       if (!containerRef.current) return;
 
       const renderer = new Renderer({
-        dpr: Math.min(window.devicePixelRatio, 2),
+        // Cap DPR: fullscreen fragment shader at DPR 2 is pure GPU cost
+        // with no visible gain for soft light rays.
+        dpr: Math.min(window.devicePixelRatio, 1.5),
         alpha: true
       });
       rendererRef.current = renderer;
@@ -115,7 +120,7 @@ const LightRays: React.FC<LightRaysProps> = ({
       const updatePlacement = () => {
         if (!containerRef.current || !renderer) return;
 
-        renderer.dpr = Math.min(window.devicePixelRatio, 2);
+        renderer.dpr = Math.min(window.devicePixelRatio, 1.5);
 
         const { clientWidth: wCSS, clientHeight: hCSS } = containerRef.current;
         renderer.setSize(wCSS, hCSS);
@@ -136,7 +141,20 @@ const LightRays: React.FC<LightRaysProps> = ({
           return;
         }
 
-        uniforms.iTime.value = t * 0.001;
+        // Hidden tab: skip GPU work, keep the rAF chain alive for resume.
+        // Freeze effect time too — wall-clock rAF timestamps leap across the
+        // hidden gap and would otherwise cause a visible time skip on return.
+        if (document.hidden) {
+          lastVisibleTRef.current = t;
+          animationIdRef.current = requestAnimationFrame(loop);
+          return;
+        }
+        if (lastVisibleTRef.current !== null) {
+          visibleTimeRef.current += Math.min(t - lastVisibleTRef.current, 100);
+        }
+        lastVisibleTRef.current = t;
+
+        uniforms.iTime.value = visibleTimeRef.current * 0.001;
 
         if (followMouse && mouseInfluence > 0.0) {
           const smoothing = 0.92;
@@ -260,7 +278,7 @@ const LightRays: React.FC<LightRaysProps> = ({
     };
 
     if (followMouse) {
-      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mousemove', handleMouseMove, { passive: true });
       return () => window.removeEventListener('mousemove', handleMouseMove);
     }
   }, [followMouse]);

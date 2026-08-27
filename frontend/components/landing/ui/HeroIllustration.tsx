@@ -113,6 +113,8 @@ function AnimatedSVG({
   iconSize?: number;
 }) {
   const lineStroke = isLight ? '#cbd5e1' : '#475569';
+  // Perpetual SMIL timelines are paused entirely for reduced-motion users.
+  const reduceMotion = useReducedMotion();
 
   // ── SVG filters (CSS filter= broken on iOS Safari <image>) ──
   // Dark‑mode input: invert + brighten  (black→white, white→gray)
@@ -190,7 +192,7 @@ function AnimatedSVG({
         </filter>
       </defs>
 
-      <style>{`
+      <style>{reduceMotion ? '' : `
         @keyframes dash { to { stroke-dashoffset: -40; } }
         .flow-line { stroke-dasharray: 4 6; animation: dash 1.5s linear infinite; }
         .flow-line-slow { stroke-dasharray: 4 6; animation: dash 2.4s linear infinite; }
@@ -199,13 +201,13 @@ function AnimatedSVG({
       {/* Dashed connector lines */}
       <g stroke={lineStroke} strokeWidth="1.5" strokeLinecap="round" opacity="0.5">
         {inputPaths.map((_, i) => (
-          <use key={`u${i}`} href={`#p-in-${i}`} className={i % 2 === 0 ? 'flow-line' : 'flow-line-slow'} />
+          <use key={`u${i}`} href={`#p-in-${i}`} className={reduceMotion ? undefined : (i % 2 === 0 ? 'flow-line' : 'flow-line-slow')} />
         ))}
-        <use href="#p-out" className="flow-line" />
+        <use href="#p-out" className={reduceMotion ? undefined : 'flow-line'} />
       </g>
 
       {/* Traveling input icons — each path has its own phase offset */}
-      {inputIcons.map((src, i) => {
+      {!reduceMotion && inputIcons.map((src, i) => {
         const dur = INPUT_DURATION;
         const spacing = dur / inputIcons.length;
         const pathIdx = i % inputPaths.length;
@@ -234,7 +236,7 @@ function AnimatedSVG({
       })}
 
       {/* Traveling output icons — golden CSS filter, single output line */}
-      {outputIcons.map((src, i) => {
+      {!reduceMotion && outputIcons.map((src, i) => {
         const dur = OUTPUT_DURATION;
         const spacing = dur / outputIcons.length;
         const begin = -(i * spacing + outputPhase);
@@ -365,7 +367,11 @@ function PhoneSlideshow() {
                       src={assetPath(`${MOCKUPS_DIR}/${mockupScreenshots[imgIdx]}`)}
                       alt="LiftShift dashboard"
                       className="w-full h-auto object-contain drop-shadow-xl"
-                      loading="lazy"
+                      // Center slot is the LCP element: discover + fetch it at high
+                      // priority instead of lazy-loading it with the side slots.
+                      loading={slotIdx === 1 ? 'eager' : 'lazy'}
+                      fetchPriority={slotIdx === 1 ? 'high' : undefined}
+                      decoding="async"
                     />
                   </motion.div>
                 )}
@@ -384,7 +390,12 @@ export const HeroIllustration: React.FC<{ className?: string }> = ({ className =
   const [isMobile, setIsMobile] = React.useState(true);
 
   React.useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
+    // Same-value guard: without it every resize tick re-renders + reshuffles
+    // the slideshow (key={isMobile} remount below).
+    const check = () => setIsMobile((prev) => {
+      const next = window.innerWidth < 768;
+      return prev === next ? prev : next;
+    });
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
