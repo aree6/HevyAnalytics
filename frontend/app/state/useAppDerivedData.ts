@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { getDailySummaries, getExerciseStats } from '../../utils/analysis/core';
 import { computationCache } from '../../utils/storage/computationCache';
+import { cacheKeys } from '../../utils/storage/cacheKeys';
 import { getEffectiveNowFromWorkoutData } from '../../utils/date/dateUtils';
 import { getDataAgeInfo } from '../../hooks/app';
 import type { WorkoutSet } from '../../types';
@@ -34,12 +35,15 @@ export const useAppDerivedData = ({ parsedData, filteredData, filterCacheKey }: 
   }, [parsedData]);
 
   const dailySummaries = useMemo(() => {
-    const cacheKey = `dailySummaries:${filterCacheKey}`;
+    // Versioned shared key (was unversioned `dailySummaries:${filterCacheKey}`,
+    // which never hit entries written under cacheKeys by prefetch/dashboard).
+    const cacheKey = cacheKeys.dailySummaries(filterCacheKey);
     return computationCache.getOrCompute(cacheKey, filteredData, () => getDailySummaries(filteredData), { ttl: 10 * 60 * 1000 });
   }, [filteredData, filterCacheKey]);
 
   const exerciseStats = useMemo(() => {
-    const cacheKey = `exerciseStats:${filterCacheKey}`;
+    // Versioned shared key (was unversioned `exerciseStats:${filterCacheKey}`).
+    const cacheKey = cacheKeys.exerciseStats(filterCacheKey);
     return computationCache.getOrCompute(cacheKey, filteredData, () => getExerciseStats(filteredData), { ttl: 10 * 60 * 1000 });
   }, [filteredData, filterCacheKey]);
 

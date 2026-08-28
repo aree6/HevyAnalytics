@@ -88,43 +88,80 @@ export const identifyPersonalRecords = (data: WorkoutSet[], referenceDate?: Date
     effectiveReferenceDate
   );
   
+  // Index PRs by composite match key for O(1) candidate lookup, then verify
+  // candidates with prMatchesSet so match semantics (incl. NaN handling) are
+  // identical to the old nested scan. Was O(N×P) with a key alloc per inner
+  // iteration; now O(N+P).
+  const prKeyOf = (exercise: string, timestamp: number, weight: number, reps: number): string =>
+    `${exercise}|${timestamp}|${weight}|${reps}`;
+  const goldPRKeyMap = new Map<string, typeof goldPRs>();
+  for (const pr of goldPRs) {
+    if (pr.granularity === 'session') continue;
+    const k = prKeyOf(pr.exercise, pr.date.getTime(), pr.weight, pr.reps);
+    const arr = goldPRKeyMap.get(k);
+    if (arr) arr.push(pr);
+    else goldPRKeyMap.set(k, [pr]);
+  }
+  const silverPRKeyMap = new Map<string, typeof silverPRs>();
+  for (const pr of silverPRs) {
+    if (pr.granularity === 'session') continue;
+    const k = prKeyOf(pr.exercise, pr.date.getTime(), pr.weight, pr.reps);
+    const arr = silverPRKeyMap.get(k);
+    if (arr) arr.push(pr);
+    else silverPRKeyMap.set(k, [pr]);
+  }
+
   // Create lookup maps using object pooling for efficiency
   const goldPRMap = new Map<number, PrType[]>();
   const silverPRMap = new Map<number, PrType[]>();
-  
-  // Build index of PRs by set index for O(1) lookup
+
+  // Single pass over sets with keyed lookup (was a nested loop per set).
   for (let i = 0; i < sorted.length; i++) {
     const set = sorted[i];
     if (!set.parsedDate || isWarmupSet(set)) continue;
-    
+
+    const k = prKeyOf(set.exercise_title, set.parsedDate.getTime(), set.weight_kg, set.reps);
+
     // Check for gold PR match
-    const goldTypes: PrType[] = [];
-    for (const pr of goldPRs) {
-      if (pr.granularity === 'session') continue;
-      if (prMatchesSet(createPRMatchKey(pr), set)) {
-        goldTypes.push(pr.type);
+    const goldCandidates = goldPRKeyMap.get(k);
+    if (goldCandidates) {
+      const goldTypes: PrType[] = [];
+      for (const pr of goldCandidates) {
+        if (prMatchesSet(createPRMatchKey(pr), set)) {
+          goldTypes.push(pr.type);
+        }
+      }
+      if (goldTypes.length > 0) {
+        goldPRMap.set(i, goldTypes);
       }
     }
-    if (goldTypes.length > 0) {
-      goldPRMap.set(i, goldTypes);
-    }
-    
+
     // Check for silver PR match
-    const silverTypes: PrType[] = [];
-    for (const pr of silverPRs) {
-      if (pr.granularity === 'session') continue;
-      if (prMatchesSet(createPRMatchKey(pr), set)) {
-        silverTypes.push(pr.type);
+    const silverCandidates = silverPRKeyMap.get(k);
+    if (silverCandidates) {
+      const silverTypes: PrType[] = [];
+      for (const pr of silverCandidates) {
+        if (prMatchesSet(createPRMatchKey(pr), set)) {
+          silverTypes.push(pr.type);
+        }
       }
-    }
-    if (silverTypes.length > 0) {
-      silverPRMap.set(i, silverTypes);
+      if (silverTypes.length > 0) {
+        silverPRMap.set(i, silverTypes);
+      }
     }
   }
-  
+
+  // Identity index: sort copies the array, not the set objects, so object
+  // identity is stable across sorts. Was O(N²) indexOf-in-map. First-wins
+  // guard preserves indexOf semantics if an input ever aliases one object.
+  const positionBySet = new Map<WorkoutSet, number>();
+  for (let i = 0; i < sorted.length; i++) {
+    if (!positionBySet.has(sorted[i])) positionBySet.set(sorted[i], i);
+  }
+
   // Map PRs back to sets
-  return sortByParsedDate(sorted, false).map((set, index) => {
-    const originalIndex = sorted.indexOf(set);
+  return sortByParsedDate(sorted, false).map((set) => {
+    const originalIndex = positionBySet.get(set) ?? -1;
     const prTypes = goldPRMap.get(originalIndex) ?? [];
     const silverPrTypes = silverPRMap.get(originalIndex) ?? [];
     
