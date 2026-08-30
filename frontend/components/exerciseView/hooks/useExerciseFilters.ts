@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useCallback, useDeferredValue } from 'react';
 import { ExerciseStats } from '../../../types';
 import { analyzeExerciseTrendCore, ExerciseTrendStatus, summarizeExerciseHistory } from '../../../utils/analysis/exerciseTrend';
 import type { ExerciseTrendMode } from '../../../utils/storage/localStorage';
@@ -52,16 +52,18 @@ export function useExerciseFilters({
   muscleDataMap,
 }: UseExerciseFiltersProps): UseExerciseFiltersReturn {
   const [searchTerm, setSearchTerm] = useState('');
+  // Deferred filter term: keystrokes paint immediately while the 50–200-row
+  // filter+sort resolves at lower priority (was fully synchronous per char).
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [trendFilter, setTrendFilter] = useState<ExerciseTrendStatus | null>(null);
   const [exerciseListSortMode, setExerciseListSortMode] = useState<ExerciseListSortMode>('recent');
   const [exerciseListSortDir, setExerciseListSortDir] = useState<'desc' | 'asc'>('desc');
   const [showUnilateral, setShowUnilateral] = useState(false);
   const [viewModeOverride, setViewModeOverride] = useState<'all' | 'weekly' | 'monthly' | 'yearly' | null>(null);
 
-  // Ensure sort direction defaults to latest first on mount
-  useEffect(() => {
-    setExerciseListSortDir('desc');
-  }, []);
+  // (Removed: mount-only effect resetting sort dir to 'desc' — the useState
+  // initializer above is already 'desc', so the effect only added one wasted
+  // commit per mount.)
 
   // Summarize history for all exercises
   const summarizedHistoryByName = useMemo(() => {
@@ -149,26 +151,32 @@ export function useExerciseFilters({
     };
   }, [effectiveNow, exerciseTrendMode, stats, statusMap, summarizedHistoryByName]);
 
-  // Filtered and sorted exercises
-  const filteredExercises = useMemo(() =>
-    stats
-      .filter(s => {
-        const term = searchTerm.toLowerCase();
-        if (s.name.toLowerCase().includes(term)) return true;
-        const m = muscleDataMap?.get(s.name.toLowerCase());
-        if (!m) return false;
-        return (
-          (m.primary_muscle && m.primary_muscle.toLowerCase().includes(term)) ||
-          (m.secondary_muscle && m.secondary_muscle.toLowerCase().includes(term))
-        );
-      })
-      .filter(s => {
-        if (!trendFilter) return true;
-        if (!trainingStructure.eligibleNames.has(s.name)) return false;
+  // Filtered and sorted exercises: single pass, hoisted term/lower-casing.
+  // (Was three chained passes with toLowerCase() re-allocated per row per
+  // pass — the per-keystroke cost on 50–200 rows.)
+  const filteredExercises = useMemo(() => {
+    const term = deferredSearchTerm.toLowerCase();
+    const hasTerm = term.length > 0;
+    const out: ExerciseStats[] = [];
+    for (const s of stats) {
+      if (hasTerm) {
+        const lowerName = s.name.toLowerCase();
+        if (!lowerName.includes(term)) {
+          const m = muscleDataMap?.get(lowerName);
+          if (!m) continue;
+          const inPrimary = m.primary_muscle ? m.primary_muscle.toLowerCase().includes(term) : false;
+          const inSecondary = m.secondary_muscle ? m.secondary_muscle.toLowerCase().includes(term) : false;
+          if (!inPrimary && !inSecondary) continue;
+        }
+      }
+      if (trendFilter) {
+        if (!trainingStructure.eligibleNames.has(s.name)) continue;
         const st = trainingStructure.statusByName.get(s.name);
-        return st === trendFilter;
-      })
-      .sort((a, b) => {
+        if (st !== trendFilter) continue;
+      }
+      out.push(s);
+    }
+    out.sort((a, b) => {
         const aEligible = trainingStructure.eligibleNames.has(a.name);
         const bEligible = trainingStructure.eligibleNames.has(b.name);
         if (aEligible !== bEligible) return aEligible ? -1 : 1;
@@ -188,8 +196,10 @@ export function useExerciseFilters({
         const bt = lastSessionByName.get(b.name)?.getTime() ?? -Infinity;
         if (bt !== at) return (bt - at) * dir;
         return a.name.localeCompare(b.name);
-      }),
-    [exerciseListSortDir, exerciseListSortMode, lastSessionByName, stats, searchTerm, statusMap, trendFilter, trainingStructure.eligibleNames, trainingStructure.statusByName]);
+      });
+      return out;
+    },
+    [exerciseListSortDir, exerciseListSortMode, lastSessionByName, muscleDataMap, stats, deferredSearchTerm, statusMap, trendFilter, trainingStructure.eligibleNames, trainingStructure.statusByName]);
 
   return {
     searchTerm,

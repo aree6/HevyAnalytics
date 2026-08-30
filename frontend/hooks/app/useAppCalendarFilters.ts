@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { format, isSameDay, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { format, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { WorkoutSet } from '../../types';
 import { formatDayYearContraction, formatHumanReadableDate } from '../../utils/date/dateUtils';
 
@@ -52,27 +52,33 @@ export function useAppCalendarFilters({
     return Array.from(months).sort().reverse();
   }, [parsedData]);
 
+  // Normalized bounds, hoisted out of the per-set filter: startOfDay/endOfDay
+  // were re-allocated for every set × every selected week on each keystroke.
+  const normalizedWeeks = useMemo(
+    () => selectedWeeks.map((r) => ({ start: startOfDay(r.start).getTime(), end: endOfDay(r.end).getTime() })),
+    [selectedWeeks],
+  );
+  const normalizedRange = useMemo(
+    () => (selectedRange ? { start: startOfDay(selectedRange.start).getTime(), end: endOfDay(selectedRange.end).getTime() } : null),
+    [selectedRange],
+  );
+
   // Apply filters
   const filteredData = useMemo(() => {
     return parsedData.filter(d => {
       if (!d.parsedDate) return false;
+      const ts = d.parsedDate.getTime();
       if (selectedDay) return isSameDay(d.parsedDate, selectedDay);
-      if (selectedWeeks.length > 0) {
-        return selectedWeeks.some(r => isWithinInterval(d.parsedDate as Date, {
-          start: startOfDay(r.start),
-          end: endOfDay(r.end),
-        }));
+      if (normalizedWeeks.length > 0) {
+        return normalizedWeeks.some(r => ts >= r.start && ts <= r.end);
       }
-      if (selectedRange) {
-        return isWithinInterval(d.parsedDate as Date, {
-          start: startOfDay(selectedRange.start),
-          end: endOfDay(selectedRange.end),
-        });
+      if (normalizedRange) {
+        return ts >= normalizedRange.start && ts <= normalizedRange.end;
       }
       if (selectedMonth !== 'all') return format(d.parsedDate, 'yyyy-MM') === selectedMonth;
       return true;
     });
-  }, [parsedData, selectedMonth, selectedDay, selectedRange, selectedWeeks]);
+  }, [parsedData, selectedMonth, selectedDay, normalizedRange, normalizedWeeks]);
 
   const hasActiveCalendarFilter = !!selectedDay || selectedWeeks.length > 0 || !!selectedRange;
 
@@ -103,13 +109,20 @@ export function useAppCalendarFilters({
     return { minDate, maxDate, availableDatesSet: set };
   }, [effectiveNow, parsedData]);
 
-  // Simple cache key
+  // Cache key carries the actual week bounds (was count-only `w:length`,
+  // so two different week selections with the same count shared entries).
   const filterCacheKey = useMemo(() => {
     const parts: string[] = [];
     if (selectedMonth !== 'all') parts.push(`m:${selectedMonth}`);
     if (selectedDay) parts.push(`d:${selectedDay.toISOString()}`);
     if (selectedRange) parts.push(`r:${selectedRange.start.toISOString()}-${selectedRange.end.toISOString()}`);
-    if (selectedWeeks.length > 0) parts.push(`w:${selectedWeeks.length}`);
+    if (selectedWeeks.length > 0) {
+      const weeks = selectedWeeks
+        .map((w) => `${w.start.toISOString()}-${w.end.toISOString()}`)
+        .sort()
+        .join(',');
+      parts.push(`w:${weeks}`);
+    }
     return parts.join('|') || 'all';
   }, [selectedMonth, selectedDay, selectedRange, selectedWeeks]);
 
