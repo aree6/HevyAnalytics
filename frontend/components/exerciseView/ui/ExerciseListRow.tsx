@@ -19,11 +19,14 @@ interface ExerciseListRowProps {
   inactiveLabel: string;
   lastDone: Date | null;
   effectiveNow: Date;
-  onSelect: () => void;
+  onSelect: (exerciseName: string) => void;
   rowRef: (el: HTMLButtonElement | null) => void;
 }
 
-export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
+// Memoized: the list re-renders per keystroke/filter change, and rows are
+// otherwise identical. Props must stay referentially stable (see panel:
+// stable onSelect/rowRef) for this to skip work.
+export const ExerciseListRow: React.FC<ExerciseListRowProps> = React.memo(function ExerciseListRow({
   exercise,
   asset,
   status,
@@ -34,7 +37,7 @@ export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
   effectiveNow,
   onSelect,
   rowRef,
-}) => {
+}) {
   const subLabel = isEligible ? status.label : inactiveLabel;
   const lastDoneLabel = lastDone ? formatRelativeTime(lastDone, effectiveNow) : '—';
   const selectedHighlight = getSelectedHighlightClasses(status.status, !isEligible ? 'soft' : 'strong');
@@ -49,12 +52,13 @@ export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
   return (
     <button
       ref={rowRef}
+      data-exercise-name={exercise.name}
       onClick={(e) => {
         e.preventDefault();
         e.currentTarget.blur();
-        onSelect();
+        onSelect(exercise.name);
       }}
-      className={`w-full text-left px-2 py-1.5 rounded-md transition-colors duration-200 flex items-center justify-between group border cursor-pointer ${isSelected
+      className={`w-full text-left px-2 py-1.5 rounded-md transition-colors duration-200 flex items-center justify-between group border cursor-pointer [content-visibility:auto] [contain-intrinsic-size:auto_72px] print:[content-visibility:visible] ${isSelected
         ? selectedHighlight.button
         : 'border-transparent hover:bg-black/60 hover:border-slate-600/50'
         } ${!isEligible ? 'opacity-60' : ''}`}
@@ -99,4 +103,4 @@ export const ExerciseListRow: React.FC<ExerciseListRowProps> = ({
       </div>
     </button>
   );
-};
+});

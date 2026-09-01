@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { WorkoutSet } from '../../../types';
 import { Calendar, Dumbbell } from 'lucide-react';
 import { getExerciseAssets, ExerciseAsset } from '../../../utils/data/exerciseAssets';
@@ -144,17 +144,39 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     return data.reduce((acc, s) => (isWarmupSet(s) ? acc : acc + 1), 0);
   }, [data]);
 
+  const pageChangeScrollRef = useRef(false);
+
+  const scrollHistoryToTop = useCallback(() => {
+    const historyElement = document.querySelector('[data-history-view]') as HTMLElement;
+    if (historyElement) {
+      historyElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 100, behavior: 'smooth' });
+    }
+  }, []);
+
   const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
-    setTimeout(() => {
-      const historyElement = document.querySelector('[data-history-view]') as HTMLElement;
-      if (historyElement) {
-        historyElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        window.scrollTo({ top: 100, behavior: 'smooth' });
-      }
-    }, 150);
+    if (newPage === currentPage) {
+      scrollHistoryToTop();
+      return;
+    }
+    // Page turns rebuild session blocks: keep the click responsive and let
+    // React render the next page at lower priority. The scroll runs in the
+    // effect below so it can't fire before the new blocks commit.
+    pageChangeScrollRef.current = true;
+    React.startTransition(() => {
+      setCurrentPage(newPage);
+    });
   };
+
+  useEffect(() => {
+    if (!pageChangeScrollRef.current) return;
+    pageChangeScrollRef.current = false;
+    const t = setTimeout(() => {
+      scrollHistoryToTop();
+    }, 150);
+    return () => clearTimeout(t);
+  }, [currentPage]);
 
   const paginationControls = (
     <HistoryPaginationControls
@@ -189,7 +211,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
         </div>
       )}
 
-      <div key={currentPage} className="space-y-2 sm:space-y-3">
+      {/* Stable key: remounting the whole page container on every page turn
+      re-ran all block effects/animations and lost collapsed/tooltip state.
+      Blocks reconcile by session.key instead. */}
+      <div className="space-y-2 sm:space-y-3">
         {currentSessions.map((session, index) => (
           <HistorySessionBlock
             key={session.key}

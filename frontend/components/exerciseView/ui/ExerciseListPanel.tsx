@@ -4,7 +4,6 @@ import { ExerciseStats } from '../../../types';
 import { ExerciseAssetLookup } from '../../../utils/exercise/exerciseAssetLookup';
 import type { ExerciseListSortMode, UseExerciseFiltersReturn } from '../hooks/useExerciseFilters';
 import { ExerciseListRow } from './ExerciseListRow';
-import { Reveal } from '../../ui/Reveal';
 
 interface ExerciseListPanelProps {
   searchTerm: string;
@@ -67,6 +66,21 @@ export const ExerciseListPanel: React.FC<ExerciseListPanelProps> = ({
   const [isSortOpen, setIsSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
 
+  // Stable per-name ref callbacks (identity memoized per exercise name):
+  // mount writes the node, unmount writes null — same contract as before,
+  // but stable across renders so memoized rows actually skip work.
+  const rowRefCallbacks = useRef(new Map<string, (el: HTMLButtonElement | null) => void>());
+  const getRowRef = useCallback((name: string) => {
+    let cb = rowRefCallbacks.current.get(name);
+    if (!cb) {
+      cb = (el) => {
+        exerciseButtonRefs.current[name] = el;
+      };
+      rowRefCallbacks.current.set(name, cb);
+    }
+    return cb;
+  }, [exerciseButtonRefs]);
+
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
@@ -94,7 +108,7 @@ export const ExerciseListPanel: React.FC<ExerciseListPanelProps> = ({
   };
 
   return (
-    <Reveal className="lg:col-span-1 flex flex-col gap-1 h-[34vh] lg:h-0 lg:min-h-full">
+    <div className="lg:col-span-1 flex flex-col gap-1 h-[34vh] lg:h-0 lg:min-h-full">
       <div className="relative shrink-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
         <input
@@ -170,15 +184,13 @@ export const ExerciseListPanel: React.FC<ExerciseListPanelProps> = ({
                 inactiveLabel={inactiveLabel}
                 lastDone={lastDone}
                 effectiveNow={effectiveNow}
-                onSelect={() => handleSelect(exercise.name)}
-                rowRef={(el) => {
-                  exerciseButtonRefs.current[exercise.name] = el;
-                }}
+                onSelect={handleSelect}
+                rowRef={getRowRef(exercise.name)}
               />
             );
           })}
         </div>
       </div>
-    </Reveal>
+    </div>
   );
 };
