@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { Bone, TrendingUp } from 'lucide-react';
-import { Reveal } from '../../ui/Reveal';
 import { Tooltip, useTooltip } from '../../ui/Tooltip';
 import { SEMI_FANCY_FONT } from '../../../utils/ui/uiConstants';
 import { useIsMobile } from '../../insights/useIsMobile';
@@ -22,9 +21,11 @@ const RiskProgressBar: React.FC<{
   const isMobile = useIsMobile(768);
   const TOTAL_PILLS = isMobile ? 6 : 10;
 
+  // Deterministic pill widths: Math.random here reshuffled the bar on every
+  // remount (visual jitter + wasted recompute for a purely decorative pattern).
   const pillData = useMemo(() =>
-    Array.from({ length: TOTAL_PILLS }).map(() => {
-      const flexGrow = Math.floor(Math.random() * 3) + 1;
+    Array.from({ length: TOTAL_PILLS }).map((_, idx) => {
+      const flexGrow = (idx % 3) + 1;
       return { flexGrow, marginLeft: flexGrow > 1 ? '1px' : '2px' };
     }),
     [TOTAL_PILLS],
@@ -118,7 +119,7 @@ export const InjuryRiskCard: React.FC<{
   const rating = stats ? getRiskRating(stats.avgRisk) : { label: 'Low', color: '#22c55e' };
 
   return (
-    <Reveal className="bg-black/20 rounded-xl border border-slate-700/50 px-2 sm:px-3 py-4 sm:py-6 min-h-[400px] sm:min-h-[520px] lg:min-h-0 lg:h-full flex flex-col" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
+    <div className="bg-black/20 rounded-xl border border-slate-700/50 px-2 sm:px-3 py-4 sm:py-6 min-h-[400px] sm:min-h-[520px] lg:min-h-0 lg:h-full flex flex-col" style={{ backgroundColor: 'rgb(var(--panel-rgb) / 0.5)' }}>
       <div className="flex-shrink-0">
         <div className="flex items-center justify-between mb-3 gap-3">
           <div className="flex items-center gap-2">
@@ -215,6 +216,6 @@ export const InjuryRiskCard: React.FC<{
         <InsightText text="The injury risk score estimates joint stress from 0 to 100 percent. It combines three factors: workload ratio compares your recent volume to your 4-week average, recovery checks for back-to-back training days on the same joint, and balance measures antagonist muscle ratios. Lower scores mean safer training. A spike above 40 percent suggests considering a deload or rebalancing your program." />
       </ChartDescription>
       {tooltip && <Tooltip data={tooltip} />}
-    </Reveal>
+    </div>
   );
 };

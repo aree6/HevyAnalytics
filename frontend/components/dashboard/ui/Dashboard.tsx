@@ -85,10 +85,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const spanDays = useMemo(() => {
     if (!filteredData.length) return 0;
-    const dates = filteredData.map((s) => s.parsedDate?.getTime() || 0).filter((t) => t > 0);
-    if (dates.length === 0) return 0;
-    const min = Math.min(...dates);
-    const max = Math.max(...dates);
+    // Loop min/max: spread over a large dates array risks arg-limit RangeError
+    // and forces a full argument-array alloc on every filter change.
+    let min = Number.POSITIVE_INFINITY;
+    let max = 0;
+    for (const s of filteredData) {
+      const t = s.parsedDate?.getTime() || 0;
+      if (t <= 0) continue;
+      if (t < min) min = t;
+      if (t > max) max = t;
+    }
+    if (max === 0) return 0;
     return Math.max(1, Math.round((max - min) / (1000 * 60 * 60 * 24)) + 1);
   }, [filteredData]);
 

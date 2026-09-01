@@ -117,7 +117,12 @@ export const VolumeComparisonCard: React.FC<{
                   src={assetPath(`/comparisonImages/${comparison.filename.replace(/\.svg$/, '.avif')}`)}
                   alt={comparison.item.label}
                   className="relative w-40 h-40 sm:w-52 sm:h-52 object-contain drop-shadow-lg"
-                  loading="eager"
+                  // Below-fold share card: lazy + async decode. (Was eager with
+                  // no decode/dims; worst-case source is a 1.3MB AVIF.)
+                  loading="lazy"
+                  decoding="async"
+                  width={416}
+                  height={416}
                 />
               </div>
 

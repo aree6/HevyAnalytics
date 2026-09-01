@@ -32,15 +32,43 @@ export const FlexCarousel: React.FC<FlexCarouselProps> = ({ cards, onSelectCard,
       drag.current = { active: true, startX: e.pageX, scrollLeft: el.scrollLeft, moved: false };
     };
 
+    const rafId = { current: 0 };
+    const pendingX = { current: null as number | null };
+
+    const flushPendingScroll = () => {
+      if (pendingX.current === null) return;
+      const x = pendingX.current;
+      pendingX.current = null;
+      const s = drag.current;
+      if (!s.active) return;
+      el.scrollLeft = s.scrollLeft - (x - s.startX);
+    };
+
     const onMouseMove = (e: MouseEvent) => {
       const state = drag.current;
       if (!state.active) return;
+      // Click-suppression must be synchronous: if mouseup lands within the
+      // same frame, the rAF below never fires and the drag would register
+      // as a click on the card.
       const dx = Math.abs(e.pageX - state.startX);
       if (dx > 5) state.moved = true;
-      el.scrollLeft = state.scrollLeft - (e.pageX - state.startX);
+      // One scroll write per frame: mousemove fires 60–120Hz and each write
+      // forces sync layout on the scroll container.
+      pendingX.current = e.pageX;
+      if (rafId.current) return;
+      rafId.current = requestAnimationFrame(() => {
+        rafId.current = 0;
+        flushPendingScroll();
+      });
     };
 
     const onMouseUp = () => {
+      // Flush any pending frame so the final position lands, then release.
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current);
+        rafId.current = 0;
+        flushPendingScroll();
+      }
       drag.current.active = false;
     };
 
@@ -56,6 +84,7 @@ export const FlexCarousel: React.FC<FlexCarouselProps> = ({ cards, onSelectCard,
     window.addEventListener('mouseup', onMouseUp);
 
     return () => {
+      if (rafId.current) cancelAnimationFrame(rafId.current);
       el.removeEventListener('mousedown', onMouseDown);
       el.removeEventListener('click', onClickCapture, true);
       window.removeEventListener('mousemove', onMouseMove);
