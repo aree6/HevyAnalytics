@@ -1,4 +1,5 @@
 import type { HevyProWorkout } from './types';
+import { timeoutSignal } from './abortSignal';
 
 const HEVY_PRO_BASE_URL = 'https://api.hevyapp.com';
 
@@ -45,7 +46,7 @@ export const hevyProGetWorkoutsPage = async (
   const res = await fetch(`${HEVY_PRO_BASE_URL}/v1/workouts?${params.toString()}`, {
     method: 'GET',
     headers: buildHeaders(apiKey),
-    signal: AbortSignal.timeout(20_000),
+    signal: timeoutSignal(20_000),
   });
 
   if (!res.ok) {
@@ -62,7 +63,7 @@ export const hevyProGetUserInfo = async (apiKey: string): Promise<HevyProUserInf
   const res = await fetch(`${HEVY_PRO_BASE_URL}/v1/user/info`, {
     method: 'GET',
     headers: buildHeaders(apiKey),
-    signal: AbortSignal.timeout(20_000),
+    signal: timeoutSignal(20_000),
   });
 
   if (!res.ok) {

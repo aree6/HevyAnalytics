@@ -4,6 +4,7 @@ import type {
   HevyPagedWorkoutsResponse,
 } from './types';
 import { clearTokenCache, getRecaptchaToken } from './hevyRecaptcha';
+import { timeoutSignal } from './abortSignal';
 
 const formatDuration = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
 
@@ -53,12 +54,6 @@ const parseErrorBody = async (res: Response): Promise<string> => {
   } catch {
     return `${res.status} ${res.statusText}`;
   }
-};
-
-const timeoutSignal = (timeoutMs: number): AbortSignal | undefined => {
-  if (typeof AbortSignal === 'undefined') return undefined;
-  if (typeof AbortSignal.timeout !== 'function') return undefined;
-  return AbortSignal.timeout(timeoutMs);
 };
 
 const buildEndpointUrl = (path: string): string => (

@@ -18,11 +18,19 @@ const app = express();
 // Browser-based caching is primary. This wrapper dedups concurrent requests and
 // keeps successful responses for a short TTL so sequential repeats (refresh,
 // second tab, retry) don't replay full-history upstream fetches. Failures are
-// never cached, so errors don't stick.
+// never cached, so errors don't stick. Hits are deep-cloned so downstream
+// handlers can't mutate the cached arrays in place and pollute later callers.
 const inFlightRequests = new Map<string, Promise<unknown>>();
 const completedResponses = new Map<string, { at: number; value: unknown }>();
 const CACHE_TTL_MS = 60_000;
-const CACHE_MAX_ENTRIES = 200;
+// Full-sync payloads are MBs (raw + mapped arrays); keep the entry cap small
+// so a burst of distinct users can't pin GBs for the full TTL.
+const CACHE_MAX_ENTRIES = 50;
+
+const cloneCachedValue = <T>(value: T): T => {
+  if (typeof structuredClone === 'function') return structuredClone(value);
+  return JSON.parse(JSON.stringify(value)) as T;
+};
 
 const getCachedResponse = async <T>(key: string, compute: () => Promise<T>): Promise<T> => {
   const now = Date.now();
@@ -31,7 +39,7 @@ const getCachedResponse = async <T>(key: string, compute: () => Promise<T>): Pro
     // LRU touch.
     completedResponses.delete(key);
     completedResponses.set(key, hit);
-    return hit.value as T;
+    return cloneCachedValue(hit.value as T);
   } else if (hit) {
     completedResponses.delete(key);
   }

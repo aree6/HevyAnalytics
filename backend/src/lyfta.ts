@@ -1,4 +1,5 @@
 import type { HevyPagedWorkoutsResponse } from './types';
+import { timeoutSignal } from './abortSignal';
 
 const LYFTA_BASE_URL = 'https://my.lyfta.app';
 
@@ -88,7 +89,7 @@ export const lyfatGetWorkouts = async (
   const res = await fetch(`${LYFTA_BASE_URL}/api/v1/workouts?${params.toString()}`, {
     method: 'GET',
     headers: buildHeaders(apiKey),
-    signal: AbortSignal.timeout(20_000),
+    signal: timeoutSignal(20_000),
   });
 
   if (!res.ok) {
@@ -159,7 +160,7 @@ export const lyfatGetWorkoutSummaries = async (
     method: 'GET',
     headers: buildHeaders(apiKey),
     // Summary pages carry up to 1000 records — allow longer than the 20s default.
-    signal: AbortSignal.timeout(45_000),
+    signal: timeoutSignal(45_000),
   });
 
   if (!res.ok) {

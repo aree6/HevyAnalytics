@@ -1,4 +1,5 @@
 import type { Request } from 'express';
+import { timeoutSignal } from './abortSignal';
 
 interface GeoLocationResponse {
   countryCode?: string;
@@ -39,12 +40,15 @@ export const getCountryFromIP = async (ip: string): Promise<string | null> => {
         geoCache.delete(key);
       }
     }
-    // If still full, remove oldest entries to make space
+    // If still full, remove oldest by insertion order (LRU: hits reorder via
+    // delete+set below) to make space. Timestamp stays absolute expiry.
     if (geoCache.size >= MAX_CACHE_SIZE) {
-      const sortedEntries = [...geoCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
-      const toRemove = Math.min(sortedEntries.length, Math.ceil(MAX_CACHE_SIZE * 0.2));
-      for (let i = 0; i < toRemove; i++) {
-        geoCache.delete(sortedEntries[i][0]);
+      const toRemove = Math.ceil(MAX_CACHE_SIZE * 0.2);
+      let removed = 0;
+      for (const key of geoCache.keys()) {
+        if (removed >= toRemove) break;
+        geoCache.delete(key);
+        removed += 1;
       }
     }
   }
@@ -52,19 +56,20 @@ export const getCountryFromIP = async (ip: string): Promise<string | null> => {
   const cached = geoCache.get(cleanIp);
   if (cached) {
     if (Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      // LRU touch with fresh timestamp: eviction sorts by timestamp, so a
-      // touch without refresh would still let hot IPs get bulk-evicted.
+      // LRU reorder without refreshing the expiry timestamp: eviction sorts
+      // by timestamp, and Map insertion order already protects hot entries
+      // from the bulk-evict pass. Refreshing here would convert the absolute
+      // TTL into sliding expiry and pin reassigned IPs forever.
       geoCache.delete(cleanIp);
-      const refreshed = { countryCode: cached.countryCode, timestamp: Date.now() };
-      geoCache.set(cleanIp, refreshed);
-      return refreshed.countryCode;
+      geoCache.set(cleanIp, cached);
+      return cached.countryCode;
     }
     geoCache.delete(cleanIp);
   }
 
   try {
     const res = await fetch(`https://ip-api.com/json/${cleanIp}?fields=countryCode`, {
-      signal: AbortSignal.timeout(3_000),
+      signal: timeoutSignal(3_000),
     });
     if (!res.ok) throw new Error(`geo lookup failed: ${res.status}`);
     const data = (await res.json()) as GeoLocationResponse;
