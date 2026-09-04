@@ -1,4 +1,5 @@
 import express from 'express';
+import { createHash } from 'node:crypto';
 import { lyfatGetAllWorkouts, lyfatGetAllWorkoutSummaries, lyfatValidateApiKey } from '../lyfta';
 import { mapLyfataWorkoutsToWorkoutSets } from '../mapLyfataWorkoutsToWorkoutSets';
 import { getClientIP, getCountryFromIP } from '../geoLocation';
@@ -39,7 +40,11 @@ export const createLyftaRouter = (opts: {
     const startedAt = Date.now();
 
     try {
-      const cacheKey = `lyftaSets:${apiKey}`;
+      // Bind the key to the credential hash (never retain the raw secret) and
+      // to weightUnit: mapped sets carry per-set weight_unit, so kg/lbs must
+      // not share a cache entry.
+      const keyId = createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+      const cacheKey = `lyftaSets:${keyId}:${weightUnit}`;
       const { workouts, sets, truncated } = await getCachedResponse(cacheKey, async () => {
         const [{ workouts, truncated: workoutsTruncated }, { summaries, truncated: summariesTruncated }] = await Promise.all([
           lyfatGetAllWorkouts(apiKey),
@@ -52,10 +57,18 @@ export const createLyftaRouter = (opts: {
 
       const durationMs = Date.now() - startedAt;
       const username = workouts[0]?.user?.username || 'unknown';
-      const ipCountryCode = await getCountryFromIP(getClientIP(req));
-      const countryInfo = ipCountryCode ? `[${ipCountryCode}] ` : '';
-      console.log(`👤 ${username} ${countryInfo}✅ Lyfta sync successful: ${sets.length} sets (${formatDuration(durationMs)})`);
       res.json({ sets, meta: { workouts: workouts.length, truncated }, username });
+
+      // Logging only — must not block the response (geo lookup adds 1 RTT).
+      void (async () => {
+        try {
+          const ipCountryCode = await getCountryFromIP(getClientIP(req));
+          const countryInfo = ipCountryCode ? `[${ipCountryCode}] ` : '';
+          console.log(`👤 ${username} ${countryInfo}✅ Lyfta sync successful: ${sets.length} sets (${formatDuration(durationMs)})`);
+        } catch {
+          // Silent fail
+        }
+      })();
     } catch (err) {
       const status = (err as any).statusCode ?? 500;
       const message = (err as Error).message || 'Failed to fetch sets';

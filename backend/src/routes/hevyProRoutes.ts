@@ -1,4 +1,5 @@
 import express from 'express';
+import { createHash } from 'node:crypto';
 import { hevyProGetAllWorkouts, hevyProGetUserInfo, hevyProValidateApiKey } from '../hevyProApi';
 import { mapHevyProWorkoutsToWorkoutSets } from '../mapHevyProWorkoutsToWorkoutSets';
 import { getClientIP, getCountryFromIP } from '../geoLocation';
@@ -43,7 +44,9 @@ export const createHevyProRouter = (opts: {
       const userInfo = await hevyProGetUserInfo(apiKey);
       const username = extractUsernameFromUrl(userInfo.data.url);
 
-      const cacheKey = `hevyProSets:${apiKey}`;
+      // Hash the credential so the raw API key is never retained in memory.
+      const keyId = createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+      const cacheKey = `hevyProSets:${keyId}`;
       const { workouts, sets, truncated } = await getCachedResponse(cacheKey, async () => {
         const { workouts, truncated } = await hevyProGetAllWorkouts(apiKey);
         const sets = mapHevyProWorkoutsToWorkoutSets(workouts);
