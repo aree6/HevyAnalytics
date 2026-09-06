@@ -30,6 +30,7 @@ import {
 } from '../../utils/api/hevyBackend';
 import { identifyPersonalRecords } from '../../utils/analysis/core';
 import { hydrateBackendWorkoutSetsWithSource } from '../../app/auth/hydrateBackendWorkoutSets';
+import { reportHistoryTruncation } from '../../app/state/historyTruncation';
 import { getHevyErrorMessage } from '../../app/ui';
 import { trackEvent, identifyUser } from '../../utils/integrations/analytics';
 import type { AppAuthHandlersDeps } from './appAuthTypes';
@@ -44,6 +45,7 @@ export const runHevySyncSaved = (deps: AppAuthHandlersDeps): void => {
 
     hevyBackendGetSetsWithProApiKey<WorkoutSet>(savedProKey)
       .then((resp) => {
+        reportHistoryTruncation(resp.meta);
         const sets = resp.sets ?? [];
         const hydrated = hydrateBackendWorkoutSetsWithSource(sets, 'hevy');
         const enriched = identifyPersonalRecords(hydrated);
@@ -95,7 +97,8 @@ export const runHevySyncSaved = (deps: AppAuthHandlersDeps): void => {
     return expires <= Date.now() + 60_000; // Within 60s of expiry
   };
 
-  const applySetsResponse = (resp: { sets?: WorkoutSet[]; username?: string; email?: string }, accessToken?: string): void => {
+  const applySetsResponse = (resp: { sets?: WorkoutSet[]; meta?: { workouts?: number; truncated?: boolean }; username?: string; email?: string }, accessToken?: string): void => {
+    reportHistoryTruncation(resp.meta);
     const sets = resp.sets ?? [];
     const hydrated = hydrateBackendWorkoutSetsWithSource(sets, 'hevy');
     const enriched = identifyPersonalRecords(hydrated);
@@ -200,6 +203,7 @@ export const runHevyApiKeyLogin = (deps: AppAuthHandlersDeps, apiKey: string): v
       return hevyBackendGetSetsWithProApiKey<WorkoutSet>(trimmed);
     })
     .then((resp) => {
+      reportHistoryTruncation(resp.meta);
       const sets = resp.sets ?? [];
       const hydrated = hydrateBackendWorkoutSetsWithSource(sets, 'hevy');
       const enriched = identifyPersonalRecords(hydrated);
@@ -259,6 +263,7 @@ export const runHevyLogin = (deps: AppAuthHandlersDeps, emailOrUsername: string,
       return hevyBackendGetSets<WorkoutSet>(token, username);
     })
     .then((resp) => {
+      reportHistoryTruncation(resp.meta);
       const sets = resp.sets ?? [];
       const hydrated = hydrateBackendWorkoutSetsWithSource(sets, 'hevy');
       const enriched = identifyPersonalRecords(hydrated);

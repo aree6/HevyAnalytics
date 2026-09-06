@@ -17,6 +17,7 @@ import {
   getLyftaApiKey,
 } from '../../utils/storage/hevyCredentialsStorage';
 import { OnboardingDemoStep } from './OnboardingDemoStep';
+import { clearHistoryTruncation } from '../../app/state/historyTruncation';
 import { AddSourcePickerModal } from './AddSourcePickerModal';
 import { UnifiedPlatformModal } from '../modals/platform/UnifiedPlatformModal';
 
@@ -80,6 +81,7 @@ export const AppOnboardingSteps: React.FC<AppOnboardingStepsProps> = ({
     onboarding.intent === 'update'
       ? () => {
           clearCSVData();
+          clearHistoryTruncation();
           onSetOnboarding(null);
         }
       : undefined;

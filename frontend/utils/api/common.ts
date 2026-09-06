@@ -4,6 +4,7 @@ export interface BackendSetsResponse<TSet> {
   sets: TSet[];
   meta?: {
     workouts?: number;
+    truncated?: boolean;
   };
   username?: string;
 }

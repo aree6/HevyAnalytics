@@ -23,6 +23,7 @@ import {
   saveHevyUsernameOrEmail,
 } from '../../utils/storage/hevyCredentialsStorage';
 import { hydrateBackendWorkoutSetsWithSource } from '../auth/hydrateBackendWorkoutSets';
+import { reportHistoryTruncation } from '../state/historyTruncation';
 import { getHevyErrorMessage } from '../ui/appErrorMessages';
 import { trackEvent } from '../../utils/integrations/analytics';
 import type { StartupAutoLoadParams } from './startupAutoLoadTypes';
@@ -49,6 +50,7 @@ export const loadHevyFromProKey = (
 
   hevyBackendGetSetsWithProApiKey<WorkoutSet>(apiKey)
     .then((resp) => {
+      reportHistoryTruncation(resp.meta);
       const sets = resp.sets ?? [];
 
       // Instant processing
@@ -95,10 +97,11 @@ export const loadHevyFromToken = (
     hevyBackendGetAccount(accessToken)
       .then(({ username }) => hevyBackendGetSets<WorkoutSet>(accessToken, username));
 
-  const applySetsResponse = (resp: { sets?: WorkoutSet[]; meta?: { workouts?: number } }): void => {
+  const applySetsResponse = (resp: { sets?: WorkoutSet[]; meta?: { workouts?: number; truncated?: boolean } }): void => {
     if (trackConfig) {
       trackEvent('hevy_sync_success', { method: trackConfig.successMethod, workouts: resp.meta?.workouts });
     }
+    reportHistoryTruncation(resp.meta);
     const sets = resp.sets ?? [];
 
     const hydrated = hydrateBackendWorkoutSetsWithSource(sets, 'hevy');
@@ -213,6 +216,7 @@ export const loadHevyFromCredentials = async (
     const resp = await hevyBackendGetSets<WorkoutSet>(loginResp.auth_token, accountUsername);
 
     trackEvent('hevy_sync_success', { method: 'auto_credentials_reload', workouts: resp.meta?.workouts });
+    reportHistoryTruncation(resp.meta);
 
     const sets = resp.sets ?? [];
     const hydrated = hydrateBackendWorkoutSetsWithSource(sets, 'hevy');

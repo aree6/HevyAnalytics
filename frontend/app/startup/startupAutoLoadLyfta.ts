@@ -3,6 +3,7 @@ import { lyfatBackendGetSets } from '../../utils/api/lyfataBackend';
 import { identifyPersonalRecords } from '../../utils/analysis/core';
 import { saveSetupComplete } from '../../utils/storage/dataSourceStorage';
 import { hydrateBackendWorkoutSetsWithSource } from '../auth/hydrateBackendWorkoutSets';
+import { reportHistoryTruncation } from '../state/historyTruncation';
 import { getLyfatErrorMessage } from '../ui/appErrorMessages';
 import type { StartupAutoLoadParams } from './startupAutoLoadTypes';
 
@@ -22,6 +23,7 @@ export const loadLyftaFromApiKey = (
 
   lyfatBackendGetSets<WorkoutSet>(apiKey)
     .then((resp) => {
+      reportHistoryTruncation(resp.meta);
       const sets = resp.sets ?? [];
 
       // Instant processing

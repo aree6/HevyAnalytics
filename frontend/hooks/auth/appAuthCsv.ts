@@ -3,6 +3,7 @@ import type { DataSourceChoice } from '../../utils/storage/dataSourceStorage';
 import { addCombinedDataSource, saveLastCsvPlatform, saveLastLoginMethod, saveSetupComplete } from '../../utils/storage/dataSourceStorage';
 import { getHevyUsernameOrEmail } from '../../utils/storage/hevyCredentialsStorage';
 import { saveCSVData } from '../../utils/storage/localStorage';
+import { clearHistoryTruncation } from '../../app/state/historyTruncation';
 import { identifyPersonalRecords } from '../../utils/analysis/core';
 import { getErrorMessage } from '../../app/ui';
 import { parseWorkoutCSVAsyncWithUnit, ParseWorkoutCsvResult } from '../../utils/csv/csvParser';
@@ -73,6 +74,7 @@ export const runCsvImport = (
           });
 
           deps.setParsedData(sourced);
+          clearHistoryTruncation();
           saveCSVData(text);
           saveLastCsvPlatform(platform);
           saveLastLoginMethod(

@@ -11,6 +11,7 @@ import {
 import { lyfatBackendGetSets } from '../../utils/api/lyfataBackend';
 import { identifyPersonalRecords } from '../../utils/analysis/core';
 import { hydrateBackendWorkoutSetsWithSource } from '../../app/auth/hydrateBackendWorkoutSets';
+import { reportHistoryTruncation } from '../../app/state/historyTruncation';
 import { getLyfatErrorMessage } from '../../app/ui';
 import { trackEvent, identifyUser } from '../../utils/integrations/analytics';
 import type { AppAuthHandlersDeps } from './appAuthTypes';
@@ -29,6 +30,7 @@ export const runLyfatSyncSaved = (deps: AppAuthHandlersDeps): void => {
 
   lyfatBackendGetSets<WorkoutSet>(apiKey)
     .then((resp) => {
+      reportHistoryTruncation(resp.meta);
       const sets = resp.sets ?? [];
       const hydrated = hydrateBackendWorkoutSetsWithSource(sets, 'lyfta');
       const enriched = identifyPersonalRecords(hydrated);
@@ -62,6 +64,7 @@ export const runLyfatLogin = (deps: AppAuthHandlersDeps, apiKey: string): void =
   lyfatBackendGetSets<WorkoutSet>(apiKey)
     .then((resp) => {
       trackEvent('lyfta_sync_success', { method: 'api_key', workouts: resp.meta?.workouts });
+      reportHistoryTruncation(resp.meta);
       saveLyftaApiKey(apiKey);
       saveLastLoginMethod('lyfta', 'apiKey');
       const sets = resp.sets ?? [];
