@@ -6,6 +6,7 @@ import { trackEvent } from '../../utils/integrations/analytics';
 export interface UseAppNavigationReturn {
   activeTab: Tab;
   isTabPending: boolean;
+  pendingTab: Tab | null;
   highlightedExercise: string | null;
   initialMuscleForAnalysis: { muscleId: string } | null;
   initialWeeklySetsWindow: 'all' | '7d' | '30d' | '365d' | null;
@@ -27,6 +28,7 @@ export function useAppNavigation(): UseAppNavigationReturn {
   
   const [activeTab, setActiveTab] = useState<Tab>(() => getTabFromPathname(location.pathname));
   const [isTabPending, startTabTransition] = useTransition();
+  const [pendingTab, setPendingTab] = useState<Tab | null>(null);
   const [highlightedExercise, setHighlightedExercise] = useState<string | null>(null);
   const [initialMuscleForAnalysis, setInitialMuscleForAnalysis] = useState<{ muscleId: string } | null>(null);
   const [initialWeeklySetsWindow, setInitialWeeklySetsWindow] = useState<'all' | '7d' | '30d' | '365d' | null>(null);
@@ -40,6 +42,7 @@ export function useAppNavigation(): UseAppNavigationReturn {
 
   useLayoutEffect(() => {
     activeTabRef.current = activeTab;
+    setPendingTab(null);
   }, [activeTab]);
 
   // Scroll position tracking
@@ -88,7 +91,8 @@ export function useAppNavigation(): UseAppNavigationReturn {
     pendingNavRef.current = { tab, kind };
     // Tab trees are heavy (charts/lists remount): keep the current UI
     // responsive and let React render the next tab at lower priority.
-    // Consumers can read isTabPending for a pending affordance.
+    // Consumers can read isTabPending/pendingTab for a pending affordance.
+    setPendingTab(tab);
     startTabTransition(() => {
       setActiveTab(tab);
     });
@@ -219,6 +223,7 @@ export function useAppNavigation(): UseAppNavigationReturn {
   return {
     activeTab,
     isTabPending,
+    pendingTab,
     highlightedExercise,
     initialMuscleForAnalysis,
     initialWeeklySetsWindow,

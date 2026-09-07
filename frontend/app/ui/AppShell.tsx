@@ -3,6 +3,7 @@ import { AnimatePresence } from 'motion/react';
 import { AppHeader } from '../../components/app/AppHeader';
 import { AppCalendarOverlay } from '../../components/app/AppCalendarOverlay';
 import { AppTabContent } from '../../components/app/AppTabContent';
+import { useHistoryTruncated } from '../state/historyTruncation';
 import type { Tab } from '../navigation/tabs';
 import type { DailySummary, ExerciseStats, WorkoutSet } from '../../types';
 
@@ -12,6 +13,8 @@ interface AppShellProps {
   onboardingIntent: 'initial' | 'update' | null;
   onSetOnboarding: (next: OnboardingFlow | null) => void;
   activeTab: Tab;
+  isTabPending?: boolean;
+  pendingTab?: Tab | null;
   onSelectTab: (tab: Tab) => void;
   onOpenUpdateFlow: () => void;
   onOpenPreferences: () => void;
@@ -60,10 +63,11 @@ interface AppShellProps {
   now: Date;
 }
 
-export const AppShell: React.FC<AppShellProps> = ({
-  onboardingIntent,
+export const AppShell: React.FC<AppShellProps> = ({  onboardingIntent,
   onSetOnboarding,
   activeTab,
+  isTabPending = false,
+  pendingTab = null,
   onSelectTab,
   onOpenUpdateFlow,
   onOpenPreferences,
@@ -111,6 +115,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   secondarySetMultiplier,
   now,
 }) => {
+  const isHistoryTruncated = useHistoryTruncated();
   if (onboardingIntent === 'initial') return null;
 
   return (
@@ -118,6 +123,8 @@ export const AppShell: React.FC<AppShellProps> = ({
       <AppHeader
         onSetOnboarding={onSetOnboarding}
         activeTab={activeTab}
+        isTabPending={isTabPending}
+        pendingTab={pendingTab}
         onSelectTab={onSelectTab}
         onOpenUpdateFlow={onOpenUpdateFlow}
         onOpenPreferences={onOpenPreferences}
@@ -126,6 +133,14 @@ export const AppShell: React.FC<AppShellProps> = ({
         hasActiveCalendarFilter={hasActiveCalendarFilter}
         onClearCalendarFilter={onClearCalendarFilter}
       />
+
+      {isHistoryTruncated ? (
+        <div className="px-2 sm:px-3 pt-1" role="status" aria-live="polite">
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] sm:text-xs text-amber-200">
+            Showing newest history only — early workouts were capped by the source API. Lifetime totals, PRs, and streaks reflect partial history.
+          </div>
+        </div>
+      ) : null}
 
       <AnimatePresence>
         {calendarOpen ? (
@@ -153,6 +168,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       <AppTabContent
         mainRef={mainRef}
         activeTab={activeTab}
+        isTabPending={isTabPending}
         hasActiveCalendarFilter={hasActiveFilters}
         dailySummaries={dailySummaries}
         exerciseStats={exerciseStats}

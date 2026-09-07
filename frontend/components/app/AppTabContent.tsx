@@ -23,6 +23,7 @@ interface AppTabContentProps {
   mainRef: React.RefObject<HTMLElement | null>;
 
   activeTab: Tab;
+  isTabPending?: boolean;
   hasActiveCalendarFilter: boolean;
 
   dailySummaries: DailySummary[];
@@ -61,6 +62,7 @@ interface AppTabContentProps {
 export const AppTabContent: React.FC<AppTabContentProps> = ({
   mainRef,
   activeTab,
+  isTabPending = false,
   hasActiveCalendarFilter,
   dailySummaries,
   exerciseStats,
@@ -88,7 +90,8 @@ export const AppTabContent: React.FC<AppTabContentProps> = ({
   return (
     <main
       ref={mainRef}
-      className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain bg-black/20 px-2 py-0 sm:px-3 sm:py-0 md:px-1 md:py-0 lg:px-2 lg:py-0"
+      aria-busy={isTabPending}
+      className={`flex-1 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain bg-black/20 px-2 py-0 sm:px-3 sm:py-0 md:px-1 md:py-0 lg:px-2 lg:py-0 transition-opacity duration-150 ${isTabPending ? 'opacity-70' : ''}`}
     >
       {activeTab === Tab.DASHBOARD && (
         <Suspense fallback={<DashboardSkeleton />}>

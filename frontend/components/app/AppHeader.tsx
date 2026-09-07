@@ -6,6 +6,7 @@ import { SupportLinks } from '../layout/SupportLinks';
 import { ThemeToggleButton } from '../theme/ThemeToggleButton';
 import type { OnboardingFlow } from '../../app/onboarding/types';
 import { clearCSVData } from '../../utils/storage/localStorage';
+import { clearHistoryTruncation } from '../../app/state/historyTruncation';
 import { SEMI_FANCY_FONT } from '../../utils/ui/uiConstants';
 
 const DEMO_MODE_KEY = 'hevy_analytics_demo_mode';
@@ -15,6 +16,8 @@ const isDemoMode = (): boolean => localStorage.getItem(DEMO_MODE_KEY) === '1';
 interface AppHeaderProps {
   onSetOnboarding: (next: OnboardingFlow | null) => void;
   activeTab: Tab;
+  isTabPending?: boolean;
+  pendingTab?: Tab | null;
   onSelectTab: (tab: Tab) => void;
   onOpenUpdateFlow: () => void;
   onOpenPreferences: () => void;
@@ -27,6 +30,8 @@ interface AppHeaderProps {
 export const AppHeader: React.FC<AppHeaderProps> = ({
   onSetOnboarding,
   activeTab,
+  isTabPending = false,
+  pendingTab = null,
   onSelectTab,
   onOpenUpdateFlow,
   onOpenPreferences,
@@ -38,8 +43,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const handleExitDemo = () => {
     localStorage.removeItem(DEMO_MODE_KEY);
     clearCSVData();
+    clearHistoryTruncation();
     onSetOnboarding({ intent: 'update', step: 'platform' });
   };
+  const isPendingFor = (tab: Tab): boolean => isTabPending && pendingTab === tab;
 
   return (
     <header className="bg-black/20 flex-shrink-0">
@@ -142,7 +149,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         <nav className="grid grid-cols-6 gap-1 sm:grid sm:grid-cols-5 sm:gap-2">
           <button
             onClick={() => onSelectTab(Tab.DASHBOARD)}
-            className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md whitespace-nowrap focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border transition-colors duration-200 cursor-pointer ${activeTab === Tab.DASHBOARD ? 'bg-black/40 border-slate-600/60 text-white shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+            aria-busy={isPendingFor(Tab.DASHBOARD)}
+            data-pending={isPendingFor(Tab.DASHBOARD) ? 'true' : undefined}
+            className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md whitespace-nowrap focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border transition-colors duration-200 cursor-pointer ${activeTab === Tab.DASHBOARD ? 'bg-black/40 border-slate-600/60 text-white shadow-sm' : isPendingFor(Tab.DASHBOARD) ? 'bg-white/5 border-slate-500/60 text-slate-200 animate-pulse' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
           >
             <LayoutDashboard className="w-5 h-5" />
             <span className="font-medium text-[7px] sm:text-xs scale-140 sm:scale-100">Dashboard</span>
@@ -150,7 +159,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
           <button
             onClick={() => onSelectTab(Tab.EXERCISES)}
-            className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md whitespace-nowrap focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border transition-colors duration-200 cursor-pointer ${activeTab === Tab.EXERCISES ? 'bg-black/40 border-slate-600/60 text-white shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+            aria-busy={isPendingFor(Tab.EXERCISES)}
+            data-pending={isPendingFor(Tab.EXERCISES) ? 'true' : undefined}
+            className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md whitespace-nowrap focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border transition-colors duration-200 cursor-pointer ${activeTab === Tab.EXERCISES ? 'bg-black/40 border-slate-600/60 text-white shadow-sm' : isPendingFor(Tab.EXERCISES) ? 'bg-white/5 border-slate-500/60 text-slate-200 animate-pulse' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
           >
             <svg
               className="w-5 h-5"
@@ -175,7 +186,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
           <button
             onClick={() => onSelectTab(Tab.MUSCLE_ANALYSIS)}
-            className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md whitespace-nowrap focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border transition-colors duration-200 cursor-pointer ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-black/40 border-slate-600/60 text-white shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+            aria-busy={isPendingFor(Tab.MUSCLE_ANALYSIS)}
+            data-pending={isPendingFor(Tab.MUSCLE_ANALYSIS) ? 'true' : undefined}
+            className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md whitespace-nowrap focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border transition-colors duration-200 cursor-pointer ${activeTab === Tab.MUSCLE_ANALYSIS ? 'bg-black/40 border-slate-600/60 text-white shadow-sm' : isPendingFor(Tab.MUSCLE_ANALYSIS) ? 'bg-white/5 border-slate-500/60 text-slate-200 animate-pulse' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
           >
             <svg
               className="w-5 h-5"
@@ -194,7 +207,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
           <button
             onClick={() => onSelectTab(Tab.HISTORY)}
-            className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md whitespace-nowrap focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border transition-colors duration-200 cursor-pointer ${activeTab === Tab.HISTORY ? 'bg-black/40 border-slate-600/60 text-white shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+            aria-busy={isPendingFor(Tab.HISTORY)}
+            data-pending={isPendingFor(Tab.HISTORY) ? 'true' : undefined}
+            className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md whitespace-nowrap focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border transition-colors duration-200 cursor-pointer ${activeTab === Tab.HISTORY ? 'bg-black/40 border-slate-600/60 text-white shadow-sm' : isPendingFor(Tab.HISTORY) ? 'bg-white/5 border-slate-500/60 text-slate-200 animate-pulse' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
           >
             <svg
               className="w-5 h-5"
@@ -226,7 +241,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
           <button
             onClick={() => onSelectTab(Tab.FLEX)}
-            className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md whitespace-nowrap focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border transition-colors duration-200 cursor-pointer ${activeTab === Tab.FLEX ? 'bg-black/40 border-slate-600/60 text-white shadow-sm' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
+            aria-busy={isPendingFor(Tab.FLEX)}
+            data-pending={isPendingFor(Tab.FLEX) ? 'true' : undefined}
+            className={`w-full flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 rounded-md whitespace-nowrap focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border transition-colors duration-200 cursor-pointer ${activeTab === Tab.FLEX ? 'bg-black/40 border-slate-600/60 text-white shadow-sm' : isPendingFor(Tab.FLEX) ? 'bg-white/5 border-slate-500/60 text-slate-200 animate-pulse' : 'bg-transparent border-black/70 text-slate-400 hover:border-white hover:text-white hover:bg-white/5'}`}
           >
             <svg
               className="w-5 h-5"

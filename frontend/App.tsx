@@ -284,6 +284,8 @@ const App: React.FC = () => {
 
   const {
     activeTab,
+    isTabPending,
+    pendingTab,
     highlightedExercise,
     initialMuscleForAnalysis,
     initialWeeklySetsWindow,
@@ -685,6 +687,8 @@ const App: React.FC = () => {
         onboardingIntent={onboarding?.intent ?? null}
         onSetOnboarding={setOnboarding}
         activeTab={activeTab}
+        isTabPending={isTabPending}
+        pendingTab={pendingTab}
         onSelectTab={handleSelectTab}
         onOpenUpdateFlow={handleOpenUpdateFlow}
         onOpenPreferences={() => setPreferencesModalOpen(true)}
