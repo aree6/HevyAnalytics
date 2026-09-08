@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useDeferredValue } from 'react';
+import { useState, useMemo, useDeferredValue } from 'react';
 import { ExerciseStats } from '../../../types';
 import { analyzeExerciseTrendCore, ExerciseTrendStatus, summarizeExerciseHistory } from '../../../utils/analysis/exerciseTrend';
 import type { ExerciseTrendMode } from '../../../utils/storage/localStorage';

@@ -31,14 +31,17 @@ const BUDGETS = {
 
 const gzipSize = (file) => zlib.gzipSync(fs.readFileSync(file)).length;
 
-const walkJs = (dir, out = []) => {
+const walk = (dir, pattern, out = []) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, entry.name);
-    if (entry.isDirectory()) walkJs(p, out);
-    else if (/\.js$/.test(entry.name)) out.push(p);
+    if (entry.isDirectory()) walk(p, pattern, out);
+    else if (pattern.test(entry.name)) out.push(p);
   }
   return out;
 };
+
+const walkJs = (dir, out = []) => walk(dir, /\.js$/, out);
+const walkCss = (dir, out = []) => walk(dir, /\.css$/, out);
 
 const kb = (n) => `${(n / 1024).toFixed(1)}KB`;
 
@@ -49,7 +52,14 @@ const check = (label, actual, budget) => {
   if (!ok) failures.push(label);
 };
 
-const html = fs.readFileSync(path.join(CLIENT, 'index.html'), 'utf8');
+const htmlPath = path.join(CLIENT, 'index.html');
+const assetsDir = path.join(CLIENT, 'assets');
+if (!fs.existsSync(htmlPath) || !fs.existsSync(assetsDir)) {
+  console.error('Bundle budget: dist/client missing. Run npm run build first.');
+  process.exit(2);
+}
+
+const html = fs.readFileSync(htmlPath, 'utf8');
 const refs = new Set(
   [...html.matchAll(/(?:href|src)="(\/assets\/[^"]+)"/g)].map((m) => m[1]),
 );
@@ -67,19 +77,7 @@ console.log(`landing init: ${landingCount} JS files`);
 const allJs = walkJs(path.join(CLIENT, 'assets'));
 const allJsGzip = allJs.reduce((sum, f) => sum + gzipSize(f), 0);
 
-const cssFiles = walkJs(path.join(CLIENT, 'assets')).filter((f) => f.endsWith('.css'));
-const cssGzip = cssFiles.reduce((sum, f) => sum + gzipSize(f), 0);
-if (cssFiles.length === 0) {
-  // CSS may live directly under assets/ with hashed names; scan broadly.
-  const scan = (dir) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const p = path.join(dir, entry.name);
-      if (entry.isDirectory()) scan(p);
-      else if (/\.css$/.test(entry.name)) cssFiles.push(p);
-    }
-  };
-  scan(path.join(CLIENT, 'assets'));
-}
+const cssFiles = walkCss(path.join(CLIENT, 'assets'));
 const cssGzipTotal = cssFiles.reduce((sum, f) => sum + gzipSize(f), 0);
 
 check('landing JS (gzip)', landingGzip, BUDGETS.landingJsGzip);

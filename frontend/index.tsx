@@ -14,7 +14,7 @@ if (!rootElement) {
 }
 
 // Analytics must not compete with first paint — idle-deferred, never render-blocking.
-// initAnalytics is idempotent (module INIT_FLAG), so the visibility retry below
+// initGA (which delegates to idempotent initAnalytics + installGlobalClickCapture)
 // is a safe no-op when init already ran. It covers hidden-tab boot, where
 // requestIdleCallback may never fire and its timeout isn't guaranteed.
 const scheduleInitGA = () => {

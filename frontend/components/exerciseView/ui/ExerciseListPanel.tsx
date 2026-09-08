@@ -4,6 +4,7 @@ import { ExerciseStats } from '../../../types';
 import { ExerciseAssetLookup } from '../../../utils/exercise/exerciseAssetLookup';
 import type { ExerciseListSortMode, UseExerciseFiltersReturn } from '../hooks/useExerciseFilters';
 import { ExerciseListRow } from './ExerciseListRow';
+import { Reveal } from '../../ui/Reveal';
 
 interface ExerciseListPanelProps {
   searchTerm: string;
@@ -74,12 +75,28 @@ export const ExerciseListPanel: React.FC<ExerciseListPanelProps> = ({
     let cb = rowRefCallbacks.current.get(name);
     if (!cb) {
       cb = (el) => {
-        exerciseButtonRefs.current[name] = el;
+        if (el === null) {
+          delete exerciseButtonRefs.current[name];
+        } else {
+          exerciseButtonRefs.current[name] = el;
+        }
       };
       rowRefCallbacks.current.set(name, cb);
     }
     return cb;
   }, [exerciseButtonRefs]);
+
+  // Prune entries for exercises that are no longer rendered so filtered-out
+  // names don't accumulate stale callbacks / null refs over a long session.
+  useEffect(() => {
+    const visible = new Set(filteredExercises.map((e) => e.name));
+    for (const name of rowRefCallbacks.current.keys()) {
+      if (!visible.has(name)) rowRefCallbacks.current.delete(name);
+    }
+    for (const name of Object.keys(exerciseButtonRefs.current)) {
+      if (!visible.has(name)) delete exerciseButtonRefs.current[name];
+    }
+  }, [filteredExercises, exerciseButtonRefs]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -108,7 +125,7 @@ export const ExerciseListPanel: React.FC<ExerciseListPanelProps> = ({
   };
 
   return (
-    <div className="lg:col-span-1 flex flex-col gap-1 h-[34vh] lg:h-0 lg:min-h-full">
+    <Reveal className="lg:col-span-1 flex flex-col gap-1 h-[34vh] lg:h-0 lg:min-h-full">
       <div className="relative shrink-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
         <input
@@ -191,6 +208,6 @@ export const ExerciseListPanel: React.FC<ExerciseListPanelProps> = ({
           })}
         </div>
       </div>
-    </div>
+    </Reveal>
   );
 };

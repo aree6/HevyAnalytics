@@ -353,7 +353,18 @@ function PhoneSlideshow() {
                 }}
                 transition={spring}
               >
-                {!reduceMotion && (
+                {reduceMotion ? (
+                  <img
+                    src={assetPath(`${MOCKUPS_DIR}/${mockupScreenshots[imgIdx]}`)}
+                    alt="LiftShift dashboard"
+                    className="w-full h-auto object-contain drop-shadow-xl"
+                    // Center slot is the LCP element: discover + fetch it at high
+                    // priority instead of lazy-loading it with the side slots.
+                    loading={slotIdx === 1 ? 'eager' : 'lazy'}
+                    fetchPriority={slotIdx === 1 ? 'high' : undefined}
+                    decoding="async"
+                  />
+                ) : (
                   <motion.div
                     animate={{ y: [0, -4, 0] }}
                     transition={{
